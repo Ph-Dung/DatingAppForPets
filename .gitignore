@@ -1,0 +1,18 @@
+# Backend
+backendtarget
+backend.mvn
+backend.log
+
+# Mobile
+mobile.gradle
+mobilebuild
+mobilelocal.properties
+
+# IDE
+.idea
+.iml
+.vscode
+
+# OS
+.DS_Store
+Thumbs.db
