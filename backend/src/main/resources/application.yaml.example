@@ -22,11 +22,10 @@ server:
   port: 8080
 
 jwt:
-  secret: AGKL7CRP,84[B@6FsU-hgwr8OFyjsBvV9!+kblXFsJ1Vs7T*&O?mh;7x@eVu_)NuXrasOUEEGJ)^WLI3+yVdlU
+  secret: abcdefghijklmnopqrstuvwxyz
   expiration: 86400000
 
-# Thêm vào file cũ
 cloudinary:
-  cloud-name=dbvfhextb
-  api-key=165937976915528
-  api-secret=ngC4AiaS2oF0zGyhZCMZ-uLRlu4
+  cloud-name=your_cloud_name
+  api-key=123456789012345
+  api-secret=abcdefghijklmnopqrstuvwxyz
