@@ -1,6 +1,9 @@
 package com.petmatch.backend.security;
 
-import lombok.Value;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
@@ -23,10 +26,10 @@ public class JwtUtil {
 
     public String generateToken(String email, UUID userId) {
         return Jwts.builder()
-                .subject(email)
+                .setSubject(email)
                 .claim("userId", userId.toString())
-                .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + expiration))
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + expiration))
                 .signWith(getSigningKey())
                 .compact();
     }
