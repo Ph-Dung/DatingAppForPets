@@ -1,8 +1,8 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/petmatch_db
-    username: postgres
-    password: 123456
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
 
   jpa:
     hibernate:
@@ -19,14 +19,13 @@ spring:
       max-request-size: 20MB
 
 server:
-  port: 8080
+  port: ${SERVER_PORT:8080}
 
 jwt:
-  secret: AGKL7CRP,84[B@6FsU-hgwr8OFyjsBvV9!+kblXFsJ1Vs7T*&O?mh;7x@eVu_)NuXrasOUEEGJ)^WLI3+yVdlU
-  expiration: 86400000
+  secret: ${JWT_SECRET}
+  expiration: ${JWT_EXPIRATION}
 
-# Thêm vào file cũ
 cloudinary:
-  cloud-name=dbvfhextb
-  api-key=165937976915528
-  api-secret=ngC4AiaS2oF0zGyhZCMZ-uLRlu4
+  cloud-name: ${CLOUDINARY_NAME}
+  api-key: ${CLOUDINARY_API_KEY}
+  api-secret: ${CLOUDINARY_API_SECRET}

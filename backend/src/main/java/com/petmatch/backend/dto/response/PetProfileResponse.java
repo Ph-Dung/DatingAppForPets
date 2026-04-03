@@ -7,13 +7,13 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.UUID;
+
 
 @Data
 @Builder
 public class PetProfileResponse {
-    private UUID id;
-    private UUID ownerId;
+    private Long id;
+    private Long ownerId;
     private String ownerName;
     private String name;
     private String species;

@@ -10,7 +10,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/matches") @RequiredArgsConstructor
@@ -27,7 +26,7 @@ public class MatchRequestController {
     // ACCEPTED hoặc REJECTED
     @PatchMapping("/{matchId}/respond")
     public ResponseEntity<MatchRequestResponse> respond(
-            @PathVariable UUID matchId,
+            @PathVariable Long matchId,
             @RequestParam MatchStatus status) {
         return ResponseEntity.ok(matchService.respond(matchId, status));
     }

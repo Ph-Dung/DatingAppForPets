@@ -4,16 +4,15 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.time.LocalDateTime;
-import java.util.UUID;
 
 @Data
 @Builder
 public class MatchRequestResponse {
-    private UUID id;
-    private UUID senderPetId;
+    private Long id;
+    private Long senderPetId;
     private String senderPetName;
     private String senderPetAvatarUrl;
-    private UUID receiverPetId;
+    private Long receiverPetId;
     private String receiverPetName;
     private String status;
     private LocalDateTime createdAt;

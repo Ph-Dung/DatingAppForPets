@@ -17,7 +17,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/pets")
@@ -45,7 +44,7 @@ public class PetProfileController {
     }
 
     @GetMapping("/{petId}")
-    public ResponseEntity<PetProfileResponse> getById(@PathVariable UUID petId) {
+    public ResponseEntity<PetProfileResponse> getById(@PathVariable Long petId) {
         return ResponseEntity.ok(petService.getById(petId));
     }
 
@@ -101,7 +100,7 @@ public class PetProfileController {
     }
 
     @DeleteMapping("/photos/{photoId}")
-    public ResponseEntity<Void> deletePhoto(@PathVariable UUID photoId) {
+    public ResponseEntity<Void> deletePhoto(@PathVariable Long photoId) {
         petService.deletePhoto(photoId);
         return ResponseEntity.noContent().build();
     }

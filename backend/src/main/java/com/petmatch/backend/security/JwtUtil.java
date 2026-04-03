@@ -9,7 +9,6 @@ import org.springframework.stereotype.Component;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
-import java.util.UUID;
 
 @Component
 public class JwtUtil {
@@ -24,7 +23,7 @@ public class JwtUtil {
         return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 
-    public String generateToken(String email, UUID userId) {
+    public String generateToken(String email, Long userId) {
         return Jwts.builder()
                 .setSubject(email)
                 .claim("userId", userId.toString())
@@ -44,8 +43,8 @@ public class JwtUtil {
     }
 
     private Claims getClaims(String token) {
-        return Jwts.parser()
-                .verifyWith(getSigningKey()).build()
-                .parseSignedClaims(token).getPayload();
+        return Jwts.parser().setSigningKey(getSigningKey()).parseClaimsJws(token).getBody();
+//                .verifyWith(getSigningKey()).build()
+//                .parseSignedClaims(token).getPayload();
     }
 }
