@@ -8,5 +8,5 @@ import java.util.UUID;
 @Data
 public class MatchRequestDto {
     @NotNull
-    private UUID receiverPetId;
+    private Long receiverPetId;
 }

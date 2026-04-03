@@ -18,8 +18,8 @@ import java.util.UUID;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class User {
 
-    @Id @GeneratedValue(strategy = GenerationType.UUID)
-    UUID id;
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    Long id;
 
     @Column(name = "full_name", nullable = false, length = 100)
     String fullName;

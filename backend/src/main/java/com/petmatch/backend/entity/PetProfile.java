@@ -27,8 +27,8 @@ import java.util.UUID;
 public class PetProfile {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    UUID id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    Long id;
 
     // UNIQUE → đảm bảo 1 chủ 1 pet ở tầng DB
     @OneToOne(fetch = FetchType.LAZY)

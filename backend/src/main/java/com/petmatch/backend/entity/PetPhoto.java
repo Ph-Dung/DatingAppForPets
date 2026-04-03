@@ -17,20 +17,20 @@ import java.util.UUID;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class PetPhoto {
 
-    @Id @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "pet_id", nullable = false)
-    private PetProfile pet;
+    PetProfile pet;
 
     @Column(name = "photo_url", nullable = false, columnDefinition = "TEXT")
-    private String photoUrl;
+    String photoUrl;
 
     @Column(name = "is_avatar", nullable = false)
-    private Boolean isAvatar = false;
+    Boolean isAvatar = false;
 
     @CreationTimestamp
     @Column(name = "uploaded_at", updatable = false)
-    private LocalDateTime uploadedAt;
+    LocalDateTime uploadedAt;
 }

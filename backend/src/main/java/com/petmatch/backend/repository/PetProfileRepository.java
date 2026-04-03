@@ -9,13 +9,13 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.lang.Long;
 import java.util.Optional;
-import java.util.UUID;
 
-public interface PetProfileRepository extends JpaRepository<PetProfile, UUID> {
+public interface PetProfileRepository extends JpaRepository<PetProfile, Long> {
 
-    Optional<PetProfile> findByOwnerId(UUID ownerId);
-    boolean existsByOwnerId(UUID ownerId);
+    Optional<PetProfile> findByOwnerId(Long ownerId);
+    boolean existsByOwnerId(Long ownerId);
 
     // Lấy danh sách đề xuất: cùng loài, chưa bị ẩn,
     // loại trừ pet của chính mình + các pet bị block
@@ -33,7 +33,7 @@ public interface PetProfileRepository extends JpaRepository<PetProfile, UUID> {
           )
         """)
     Page<PetProfile> findSuggestions(
-            @Param("currentUserId") UUID currentUserId,
+            @Param("currentUserId") Long currentUserId,
             @Param("species") String species,
             Pageable pageable);
 
@@ -49,7 +49,7 @@ public interface PetProfileRepository extends JpaRepository<PetProfile, UUID> {
           AND p.owner.id != :currentUserId
         """)
     Page<PetProfile> search(
-            @Param("currentUserId") UUID currentUserId,
+            @Param("currentUserId") Long currentUserId,
             @Param("species")    String species,
             @Param("breed")      String breed,
             @Param("gender") Gender gender,

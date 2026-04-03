@@ -6,6 +6,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 import java.util.UUID;
 
-public interface PetVaccinationRepository extends JpaRepository<PetVaccination, UUID> {
-    List<PetVaccination> findByPetIdOrderByVaccinatedDateDesc(UUID petId);
+public interface PetVaccinationRepository extends JpaRepository<PetVaccination, Long> {
+    List<PetVaccination> findByPetIdOrderByVaccinatedDateDesc(Long petId);
 }

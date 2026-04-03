@@ -8,19 +8,19 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
-public interface MatchRequestRepository extends JpaRepository<MatchRequest, UUID> {
+
+public interface MatchRequestRepository extends JpaRepository<MatchRequest, Long> {
 
     // Kiểm tra đã gửi request chưa
-    boolean existsBySenderPetIdAndReceiverPetId(UUID senderPetId, UUID receiverPetId);
+    boolean existsBySenderPetIdAndReceiverPetId(Long senderPetId, Long receiverPetId);
 
     // Danh sách request đã gửi
-    List<MatchRequest> findBySenderPetIdOrderByCreatedAtDesc(UUID senderPetId);
+    List<MatchRequest> findBySenderPetIdOrderByCreatedAtDesc(Long senderPetId);
 
     // Danh sách request nhận được (đang pending)
     List<MatchRequest> findByReceiverPetIdAndStatusOrderByCreatedAtDesc(
-            UUID receiverPetId, MatchStatus status);
+            Long receiverPetId, MatchStatus status);
 
     // Kiểm tra 2 pet có mutual match không (cả 2 đều accepted)
     @Query("""
@@ -29,7 +29,7 @@ public interface MatchRequestRepository extends JpaRepository<MatchRequest, UUID
         WHERE m.senderPet.id = :petA AND m.receiverPet.id = :petB
           AND m.status = 'ACCEPTED'
         """)
-    boolean isMatched(@Param("petA") UUID petA, @Param("petB") UUID petB);
+    boolean isMatched(@Param("petA") Long petA, @Param("petB") Long petB);
 
     // Lấy match thành công (cả 2 chiều)
     @Query("""
@@ -37,8 +37,8 @@ public interface MatchRequestRepository extends JpaRepository<MatchRequest, UUID
         WHERE m.status = 'ACCEPTED'
           AND (m.senderPet.id = :petId OR m.receiverPet.id = :petId)
         """)
-    List<MatchRequest> findAcceptedByPetId(@Param("petId") UUID petId);
+    List<MatchRequest> findAcceptedByPetId(@Param("petId") Long petId);
 
     Optional<MatchRequest> findBySenderPetIdAndReceiverPetId(
-            UUID senderPetId, UUID receiverPetId);
+            Long senderPetId, Long receiverPetId);
 }
