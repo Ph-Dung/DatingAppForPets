@@ -1,5 +1,6 @@
 package com.petmatch.backend.entity;
 
+import com.petmatch.backend.enums.ReportStatus;
 import com.petmatch.backend.enums.ReportTargetType;
 import jakarta.persistence.*;
 import lombok.*;
@@ -7,9 +8,9 @@ import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
-import java.util.UUID;
 
 @Entity
+@Table(name = "reports")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -27,16 +28,18 @@ public class Report {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "target_type", nullable = false, length = 20)
-    ReportTargetType targetType;   // POST, COMMENT, USER
+    ReportTargetType targetType;   // USER, POST, COMMENT, PET_PROFILE
 
     @Column(name = "target_id", nullable = false)
-    UUID targetId;
+    Long targetId;                 // ID của đối tượng bị report (petId hoặc userId)
 
     @Column(nullable = false, columnDefinition = "TEXT")
     String reason;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    String status = "PENDING";     // PENDING, RESOLVED, DISMISSED
+    @Builder.Default
+    ReportStatus status = ReportStatus.PENDING;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

@@ -1,3 +1,4 @@
 package com.petmatch.backend.enums;
 
-public enum LookingFor { MATE, FRIEND, BOTH }
+/** Mục đích ghép đôi */
+public enum LookingFor { BREEDING, FRIENDSHIP, PLAY }

@@ -1,3 +1,3 @@
 package com.petmatch.backend.enums;
 
-public enum ReportTargetType { POST, COMMENT, USER }
+public enum ReportTargetType { USER, POST, COMMENT, PET_PROFILE }

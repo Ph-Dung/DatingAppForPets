@@ -27,6 +27,7 @@ public class PetPhoto {
     @Column(name = "photo_url", nullable = false, columnDefinition = "TEXT")
     String photoUrl;
 
+    @Builder.Default
     @Column(name = "is_avatar", nullable = false)
     Boolean isAvatar = false;
 

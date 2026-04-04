@@ -34,7 +34,12 @@ public class MatchRequest {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
+    @Builder.Default
     MatchStatus status = MatchStatus.PENDING;
+
+    @Builder.Default
+    @Column(name = "is_super_like", nullable = false)
+    Boolean isSuperLike = false;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

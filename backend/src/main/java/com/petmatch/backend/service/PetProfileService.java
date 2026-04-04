@@ -3,11 +3,13 @@ package com.petmatch.backend.service;
 import com.petmatch.backend.dto.request.PetProfileRequest;
 import com.petmatch.backend.dto.request.PetVaccinationRequest;
 import com.petmatch.backend.dto.response.PetProfileResponse;
+import com.petmatch.backend.dto.response.VaccinationResponse;
 import com.petmatch.backend.entity.PetPhoto;
 import com.petmatch.backend.entity.PetProfile;
 import com.petmatch.backend.entity.PetVaccination;
 import com.petmatch.backend.entity.User;
 import com.petmatch.backend.enums.Gender;
+import com.petmatch.backend.enums.HealthStatus;
 import com.petmatch.backend.enums.LookingFor;
 import com.petmatch.backend.exception.AppException;
 import com.petmatch.backend.repository.PetPhotoRepository;
@@ -21,7 +23,9 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.lang.Long;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.Period;
 import java.util.List;
 
 import static org.springframework.http.HttpStatus.*;
@@ -45,6 +49,12 @@ public class PetProfileService {
                 .orElseThrow(() -> new AppException("User không tồn tại", NOT_FOUND));
     }
 
+    private PetProfile myPet() {
+        return petProfileRepo.findByOwnerId(currentUser().getId())
+                .orElseThrow(() -> new AppException("Chưa có hồ sơ thú cưng", NOT_FOUND));
+    }
+
+    // ── Profile CRUD ─────────────────────────────────────
     public PetProfileResponse createProfile(PetProfileRequest req) {
         User user = currentUser();
         if (petProfileRepo.existsByOwnerId(user.getId()))
@@ -75,9 +85,7 @@ public class PetProfileService {
     }
 
     public PetProfileResponse updateProfile(PetProfileRequest req) {
-        User user = currentUser();
-        PetProfile pet = petProfileRepo.findByOwnerId(user.getId())
-                .orElseThrow(() -> new AppException("Chưa có hồ sơ thú cưng", NOT_FOUND));
+        PetProfile pet = myPet();
 
         pet.setName(req.getName());
         pet.setSpecies(req.getSpecies());
@@ -100,48 +108,56 @@ public class PetProfileService {
     }
 
     public void toggleHidden() {
-        User user = currentUser();
-        PetProfile pet = petProfileRepo.findByOwnerId(user.getId())
-                .orElseThrow(() -> new AppException("Chưa có hồ sơ thú cưng", NOT_FOUND));
+        PetProfile pet = myPet();
         pet.setIsHidden(!pet.getIsHidden());
         petProfileRepo.save(pet);
     }
 
+    @Transactional(readOnly = true)
     public PetProfileResponse getMyProfile() {
-        return toResponse(petProfileRepo.findByOwnerId(currentUser().getId())
-                .orElseThrow(() -> new AppException("Chưa có hồ sơ thú cưng", NOT_FOUND)));
+        return toResponse(myPet());
     }
 
+    @Transactional(readOnly = true)
     public PetProfileResponse getById(Long petId) {
         return toResponse(petProfileRepo.findById(petId)
                 .orElseThrow(() -> new AppException("Không tìm thấy hồ sơ", NOT_FOUND)));
     }
 
+    // ── Suggestions & Search ─────────────────────────────
+    @Transactional(readOnly = true)
     public Page<PetProfileResponse> getSuggestions(int page, int size) {
         User user = currentUser();
         PetProfile myPet = petProfileRepo.findByOwnerId(user.getId())
                 .orElseThrow(() -> new AppException("Bạn chưa tạo hồ sơ thú cưng", NOT_FOUND));
 
         return petProfileRepo.findSuggestions(
-                        user.getId(), myPet.getSpecies(),
+                        user.getId(), myPet.getId(), myPet.getSpecies(),
                         PageRequest.of(page, size))
                 .map(this::toResponse);
     }
 
+    @Transactional(readOnly = true)
     public Page<PetProfileResponse> search(String species, String breed,
                                            Gender gender, LookingFor lookingFor,
+                                           HealthStatus healthStatus,
+                                           BigDecimal minWeight, BigDecimal maxWeight,
+                                           Integer minAge, Integer maxAge,
                                            int page, int size) {
+        LocalDate minDob = maxAge != null ? LocalDate.now().minusYears(maxAge) : null;
+        LocalDate maxDob = minAge != null ? LocalDate.now().minusYears(minAge) : null;
+
         return petProfileRepo.search(
                         currentUser().getId(),
                         species, breed, gender, lookingFor,
+                        healthStatus, minWeight, maxWeight, minDob, maxDob,
                         PageRequest.of(page, size))
                 .map(this::toResponse);
     }
 
-    // ── Vaccination ──────────────────────────────────────
-    public PetVaccination addVaccination(PetVaccinationRequest req) {
-        PetProfile pet = petProfileRepo.findByOwnerId(currentUser().getId())
-                .orElseThrow(() -> new AppException("Chưa có hồ sơ", NOT_FOUND));
+    // ── Vaccination CRUD ──────────────────────────────────
+    public VaccinationResponse addVaccination(PetVaccinationRequest req) {
+        PetProfile pet = myPet();
         PetVaccination v = PetVaccination.builder()
                 .pet(pet)
                 .vaccineName(req.getVaccineName())
@@ -150,6 +166,7 @@ public class PetProfileService {
                 .clinicName(req.getClinicName())
                 .notes(req.getNotes())
                 .build();
+
         // Cập nhật is_vaccinated + ngày tiêm gần nhất
         pet.setIsVaccinated(true);
         if (pet.getLastVaccineDate() == null ||
@@ -157,24 +174,60 @@ public class PetProfileService {
             pet.setLastVaccineDate(req.getVaccinatedDate());
         }
         petProfileRepo.save(pet);
-        return vaccinationRepo.save(v);
+        return toVaccinationResponse(vaccinationRepo.save(v));
     }
 
-    public List<PetVaccination> getVaccinations() {
-        PetProfile pet = petProfileRepo.findByOwnerId(currentUser().getId())
-                .orElseThrow(() -> new AppException("Chưa có hồ sơ", NOT_FOUND));
-        return vaccinationRepo.findByPetIdOrderByVaccinatedDateDesc(pet.getId());
+    public VaccinationResponse updateVaccination(Long vacId, PetVaccinationRequest req) {
+        PetProfile pet = myPet();
+        PetVaccination v = vaccinationRepo.findByIdAndPetId(vacId, pet.getId())
+                .orElseThrow(() -> new AppException("Không tìm thấy bản ghi vaccine", NOT_FOUND));
+
+        v.setVaccineName(req.getVaccineName());
+        v.setVaccinatedDate(req.getVaccinatedDate());
+        v.setNextDueDate(req.getNextDueDate());
+        v.setClinicName(req.getClinicName());
+        v.setNotes(req.getNotes());
+
+        // Recalculate lastVaccineDate
+        vaccinationRepo.findByPetIdOrderByVaccinatedDateDesc(pet.getId()).stream()
+                .findFirst()
+                .ifPresent(latest -> pet.setLastVaccineDate(latest.getVaccinatedDate()));
+        petProfileRepo.save(pet);
+
+        return toVaccinationResponse(vaccinationRepo.save(v));
+    }
+
+    public void deleteVaccination(Long vacId) {
+        PetProfile pet = myPet();
+        PetVaccination v = vaccinationRepo.findByIdAndPetId(vacId, pet.getId())
+                .orElseThrow(() -> new AppException("Không tìm thấy bản ghi vaccine", NOT_FOUND));
+        vaccinationRepo.delete(v);
+
+        // Recalculate isVaccinated + lastVaccineDate
+        List<PetVaccination> remaining = vaccinationRepo.findByPetIdOrderByVaccinatedDateDesc(pet.getId());
+        if (remaining.isEmpty()) {
+            pet.setIsVaccinated(false);
+            pet.setLastVaccineDate(null);
+        } else {
+            pet.setLastVaccineDate(remaining.get(0).getVaccinatedDate());
+        }
+        petProfileRepo.save(pet);
+    }
+
+    @Transactional(readOnly = true)
+    public List<VaccinationResponse> getVaccinations() {
+        PetProfile pet = myPet();
+        return vaccinationRepo.findByPetIdOrderByVaccinatedDateDesc(pet.getId())
+                .stream().map(this::toVaccinationResponse).toList();
     }
 
     // ── Photos ───────────────────────────────────────────
     public PetPhoto addPhoto(String photoUrl, boolean setAsAvatar) {
-        PetProfile pet = petProfileRepo.findByOwnerId(currentUser().getId())
-                .orElseThrow(() -> new AppException("Chưa có hồ sơ", NOT_FOUND));
+        PetProfile pet = myPet();
 
         if (petPhotoRepo.countByPetId(pet.getId()) >= 10)
             throw new AppException("Tối đa 10 ảnh", BAD_REQUEST);
 
-        // Nếu set làm avatar → bỏ avatar cũ
         if (setAsAvatar) {
             petPhotoRepo.findByPetIdAndIsAvatarTrue(pet.getId())
                     .ifPresent(old -> { old.setIsAvatar(false); petPhotoRepo.save(old); });
@@ -192,19 +245,22 @@ public class PetProfileService {
         if (!photo.getPet().getOwner().getId().equals(currentUser().getId()))
             throw new AppException("Không có quyền xóa ảnh này", FORBIDDEN);
 
-        // Xóa trên Cloudinary trước
         cloudinaryService.deleteImage(photo.getPhotoUrl());
-
-        // Xóa trong DB
         petPhotoRepo.delete(photo);
     }
 
-    // ── Mapper ───────────────────────────────────────────
+    // ── Mappers ───────────────────────────────────────────
     private PetProfileResponse toResponse(PetProfile p) {
         String avatarUrl = petPhotoRepo.findByPetIdAndIsAvatarTrue(p.getId())
                 .map(PetPhoto::getPhotoUrl).orElse(null);
         List<String> photoUrls = petPhotoRepo.findByPetId(p.getId())
                 .stream().map(PetPhoto::getPhotoUrl).toList();
+        int vacCount = (int) vaccinationRepo.countByPetId(p.getId());
+
+        Integer age = null;
+        if (p.getDateOfBirth() != null) {
+            age = Period.between(p.getDateOfBirth(), LocalDate.now()).getYears();
+        }
 
         return PetProfileResponse.builder()
                 .id(p.getId())
@@ -215,12 +271,14 @@ public class PetProfileService {
                 .breed(p.getBreed())
                 .gender(p.getGender() != null ? p.getGender().name() : null)
                 .dateOfBirth(p.getDateOfBirth())
+                .age(age)
                 .weightKg(p.getWeightKg())
                 .color(p.getColor())
                 .size(p.getSize())
                 .reproductiveStatus(p.getReproductiveStatus() != null ? p.getReproductiveStatus().name() : null)
                 .isVaccinated(p.getIsVaccinated())
                 .lastVaccineDate(p.getLastVaccineDate())
+                .vaccinationCount(vacCount)
                 .healthStatus(p.getHealthStatus() != null ? p.getHealthStatus().name() : null)
                 .healthNotes(p.getHealthNotes())
                 .personalityTags(p.getPersonalityTags())
@@ -230,6 +288,18 @@ public class PetProfileService {
                 .avatarUrl(avatarUrl)
                 .photoUrls(photoUrls)
                 .createdAt(p.getCreatedAt())
+                .build();
+    }
+
+    private VaccinationResponse toVaccinationResponse(PetVaccination v) {
+        return VaccinationResponse.builder()
+                .id(v.getId())
+                .vaccineName(v.getVaccineName())
+                .vaccinatedDate(v.getVaccinatedDate())
+                .nextDueDate(v.getNextDueDate())
+                .clinicName(v.getClinicName())
+                .notes(v.getNotes())
+                .createdAt(v.getCreatedAt())
                 .build();
     }
 }

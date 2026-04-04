@@ -14,8 +14,10 @@ public class MatchRequestResponse {
     private String senderPetAvatarUrl;
     private Long receiverPetId;
     private String receiverPetName;
+    private String receiverPetAvatarUrl;
     private String status;
+    private Boolean isSuperLike;
     private LocalDateTime createdAt;
-    // true khi cả 2 phía đều accepted → cho phép mở conversation
+    /** true khi cả 2 phía đều accepted → cho phép mở conversation */
     private boolean canOpenConversation;
 }

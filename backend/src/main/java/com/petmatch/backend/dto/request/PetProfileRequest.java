@@ -1,5 +1,6 @@
 package com.petmatch.backend.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.petmatch.backend.enums.Gender;
 import com.petmatch.backend.enums.HealthStatus;
 import com.petmatch.backend.enums.LookingFor;
@@ -20,13 +21,18 @@ public class PetProfileRequest {
 
     @NotNull
     private Gender gender;
+
+    @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate dateOfBirth;
+
     private BigDecimal weightKg;
     private String color;
     private String size;
 
     @NotNull private ReproductiveStatus reproductiveStatus;
     private Boolean isVaccinated = false;
+
+    @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate lastVaccineDate;
 
     @NotNull private HealthStatus healthStatus;

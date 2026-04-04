@@ -20,19 +20,21 @@ public class PetProfileResponse {
     private String breed;
     private String gender;
     private LocalDate dateOfBirth;
+    private Integer age;             // tính từ dateOfBirth (năm)
     private BigDecimal weightKg;
     private String color;
     private String size;
     private String reproductiveStatus;
     private Boolean isVaccinated;
     private LocalDate lastVaccineDate;
+    private Integer vaccinationCount; // tổng số lần tiêm đã lưu
     private String healthStatus;
     private String healthNotes;
     private String personalityTags;
     private String lookingFor;
     private String notes;
     private Boolean isHidden;
-    private String avatarUrl;            // ảnh đại diện pet
+    private String avatarUrl;
     private List<String> photoUrls;
     private LocalDateTime createdAt;
 }
