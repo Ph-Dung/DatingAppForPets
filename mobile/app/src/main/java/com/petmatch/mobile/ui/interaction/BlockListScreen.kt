@@ -29,15 +29,21 @@ import kotlinx.coroutines.launch
 fun BlockListScreen(navController: NavController) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
-    var blocks by remember { mutableStateOf<List<Any>>(emptyList()) }
+    var blocks by remember { mutableStateOf<List<com.petmatch.mobile.data.model.BlockResponse>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
 
+    fun loadBlocks() {
+        scope.launch {
+            try {
+                val res = RetrofitClient.interactionApi(ctx).getMyBlocks()
+                if (res.isSuccessful) blocks = res.body() ?: emptyList()
+            } catch (_: Exception) {}
+            loading = false
+        }
+    }
+
     LaunchedEffect(Unit) {
-        try {
-            val res = RetrofitClient.interactionApi(ctx).getMyBlocks()
-            if (res.isSuccessful) blocks = res.body() ?: emptyList()
-        } catch (_: Exception) {}
-        loading = false
+        loadBlocks()
     }
 
     Scaffold(
@@ -92,9 +98,7 @@ fun BlockListScreen(navController: NavController) {
                     }
                 }
             }
-            // NOTE: The Block entity from API returns raw objects; display as placeholder
-            // In a real app, define a BlockResponse DTO matching the API structure
-            items(blocks.size) { i ->
+            items(blocks) { block ->
                 Card(
                     shape = RoundedCornerShape(16.dp),
                     modifier = Modifier.fillMaxWidth()
@@ -109,16 +113,25 @@ fun BlockListScreen(navController: NavController) {
                             color = MaterialTheme.colorScheme.errorContainer,
                             shape = CircleShape
                         ) {
-                            Icon(
-                                Icons.Default.Block,
-                                null,
-                                tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.padding(10.dp)
-                            )
+                            if (block.blockedUserAvatarUrl != null) {
+                                coil.compose.AsyncImage(
+                                    model = block.blockedUserAvatarUrl,
+                                    contentDescription = null,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                                )
+                            } else {
+                                Icon(
+                                    Icons.Default.Block,
+                                    null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.padding(10.dp)
+                                )
+                            }
                         }
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                "Người dùng ${i + 1}",
+                                block.blockedUserName,
                                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
                             )
                             Text(
@@ -129,7 +142,12 @@ fun BlockListScreen(navController: NavController) {
                         }
                         OutlinedButton(
                             onClick = {
-                                // TODO: unblock with actual userId from block object
+                                scope.launch {
+                                    try {
+                                        RetrofitClient.interactionApi(ctx).unblockUser(block.blockedUserId)
+                                        loadBlocks() // Refresh
+                                    } catch (_: Exception) {}
+                                }
                             },
                             shape = RoundedCornerShape(20.dp)
                         ) {

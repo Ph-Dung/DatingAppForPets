@@ -54,4 +54,18 @@ public interface MatchRequestRepository extends JpaRepository<MatchRequest, Long
     // Đếm số super like đã dùng từ thời điểm X
     long countBySenderPetIdAndIsSuperLikeTrueAndCreatedAtAfter(
             Long senderPetId, LocalDateTime since);
+
+    /** Lấy danh sách pets đã được like (để học preference) */
+    @Query("""
+        SELECT m.receiverPet FROM MatchRequest m
+        WHERE m.senderPet.id = :petId
+          AND m.status = 'ACCEPTED'
+        ORDER BY m.createdAt DESC
+        """)
+    List<com.petmatch.backend.entity.PetProfile> findLikedPetsBySenderPetId(
+            @Param("petId") Long petId);
+
+    /** Đếm tổng số lần like (ACCEPTED) của pet */
+    long countBySenderPetIdAndStatus(Long senderPetId, MatchStatus status);
 }
+

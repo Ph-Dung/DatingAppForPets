@@ -64,4 +64,7 @@ object RetrofitClient {
     fun matchApi(context: Context): MatchApi = getInstance(context).create(MatchApi::class.java)
     fun interactionApi(context: Context): InteractionApi = getInstance(context).create(InteractionApi::class.java)
     fun authApi(context: Context): AuthApi = getInstance(context).create(AuthApi::class.java)
+    fun userApi(context: Context): UserApi = getInstance(context).create(UserApi::class.java)
+    fun chatbotApi(context: Context): ChatbotApi = getInstance(context).create(ChatbotApi::class.java)
 }
+

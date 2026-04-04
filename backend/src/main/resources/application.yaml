@@ -36,3 +36,9 @@ cloudinary:
   cloud-name: ${CLOUDINARY_NAME}
   api-key: ${CLOUDINARY_API_KEY}
   api-secret: ${CLOUDINARY_API_SECRET}
+
+openai:
+  api-key: ${OPENAI_API_KEY}
+  base-url: "https://api.groq.com/openai/v1"
+  model: "llama-3.3-70b-versatile"
+

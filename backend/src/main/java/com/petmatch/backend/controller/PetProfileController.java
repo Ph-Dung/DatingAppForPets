@@ -58,9 +58,13 @@ public class PetProfileController {
 
     // ── Suggestions & Search ─────────────────────────────
     @GetMapping("/suggestions")
-    public ResponseEntity<Page<PetProfileResponse>> suggestions(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+    public ResponseEntity<?> suggestions(
+            @RequestParam(defaultValue = "0")  int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "false") boolean smart) {
+        if (smart) {
+            return ResponseEntity.ok(petService.getSmartSuggestions(page, size));
+        }
         return ResponseEntity.ok(petService.getSuggestions(page, size));
     }
 

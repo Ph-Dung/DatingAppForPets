@@ -53,6 +53,7 @@ fun MatchSwipeScreen(
     val isLoading by matchVm.isLoadingSuggestions.collectAsState()
     val superLikeStatus by matchVm.superLikeStatus.collectAsState()
     val matchPopup by matchVm.matchPopup.collectAsState()
+    val isSmartMode by matchVm.isSmartMode.collectAsState()
 
     LaunchedEffect(Unit) {
         matchVm.loadSuggestions(ctx, refresh = true)
@@ -66,6 +67,20 @@ fun MatchSwipeScreen(
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         Icon(Icons.Default.Pets, null, tint = Color.White, modifier = Modifier.size(22.dp))
                         Text("PetMatch", style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.ExtraBold), color = Color.White)
+                        // AI mode badge
+                        if (isSmartMode) {
+                            Surface(
+                                color = Color.White.copy(0.25f),
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
+                            ) {
+                                Text(
+                                    "🤖 AI",
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = Color.White
+                                )
+                            }
+                        }
                     }
                 },
                 actions = {
@@ -195,9 +210,15 @@ private fun SwipeCard(
                                     animOffsetX.snapTo(0f); animOffsetY.snapTo(0f)
                                 }
                                 animOffsetY.value < -screenWidth * 0.25f -> {
-                                    animOffsetY.animateTo(-screenWidth * 1.5f, tween(300))
-                                    onSuperLike()
-                                    animOffsetX.snapTo(0f); animOffsetY.snapTo(0f)
+                                    if (superLikeStatus?.canSuperLike == true) {
+                                        animOffsetY.animateTo(-screenWidth * 1.5f, tween(300))
+                                        onSuperLike()
+                                        animOffsetX.snapTo(0f); animOffsetY.snapTo(0f)
+                                    } else {
+                                        // Vuốt lên nhưng hếtượt -> bật ngược lại về giữa
+                                        animOffsetX.animateTo(0f, spring(Spring.DampingRatioMediumBouncy))
+                                        animOffsetY.animateTo(0f, spring(Spring.DampingRatioMediumBouncy))
+                                    }
                                 }
                                 else -> {
                                     animOffsetX.animateTo(0f, spring(Spring.DampingRatioMediumBouncy))

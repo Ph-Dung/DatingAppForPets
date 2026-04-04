@@ -30,6 +30,8 @@ public class InteractionService {
     private final BlockRepository blockRepository;
     private final ReportRepository reportRepository;
     private final UserRepository userRepository;
+    private final com.petmatch.backend.repository.PetProfileRepository petProfileRepo;
+    private final com.petmatch.backend.repository.PetPhotoRepository petPhotoRepo;
 
     private User currentUser() {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -88,8 +90,25 @@ public class InteractionService {
     }
 
     @Transactional(readOnly = true)
-    public List<Block> getMyBlocks() {
-        return blockRepository.findByBlocker(currentUser());
+    public List<com.petmatch.backend.dto.response.BlockResponse> getMyBlocks() {
+        return blockRepository.findByBlocker(currentUser()).stream()
+                .map(b -> com.petmatch.backend.dto.response.BlockResponse.builder()
+                        .id(b.getId())
+                        .blockedUserId(b.getBlocked().getId())
+                        .blockedUserName(b.getBlocked().getFullName())
+                        .blockedUserAvatarUrl(getAvatarForUser(b.getBlocked().getId()))
+                        .createdAt(b.getCreatedAt())
+                        .build())
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+    private String getAvatarForUser(Long userId) {
+        // Find avatar via PetPhoto
+        return userRepository.findById(userId)
+                .flatMap(u -> petProfileRepo.findByOwnerId(u.getId()))
+                .flatMap(p -> petPhotoRepo.findByPetIdAndIsAvatarTrue(p.getId()))
+                .map(com.petmatch.backend.entity.PetPhoto::getPhotoUrl)
+                .orElse(null);
     }
 
     // ── REPORTS ──────────────────────────────────────────

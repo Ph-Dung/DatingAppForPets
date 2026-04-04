@@ -31,13 +31,19 @@ import com.petmatch.mobile.ui.theme.*
 fun AccountScreen(
     navController: NavController,
     petVm: PetProfileViewModel,
-    authVm: AuthViewModel
+    authVm: AuthViewModel,
+    userVm: UserViewModel
 ) {
     val ctx = LocalContext.current
     val petState by petVm.myPet.collectAsState()
     val pet = (petState as? PetUiState.Success)?.pet
+    val userState by userVm.userInfo.collectAsState()
+    val user = (userState as? UserInfoState.Success)?.user
 
-    LaunchedEffect(Unit) { petVm.loadMyProfile(ctx) }
+    LaunchedEffect(Unit) {
+        petVm.loadMyProfile(ctx)
+        userVm.loadMyInfo(ctx)
+    }
 
     Scaffold(
         topBar = {
@@ -68,21 +74,21 @@ fun AccountScreen(
                 .background(MaterialTheme.colorScheme.background)
                 .verticalScroll(rememberScrollState())
         ) {
-            // ── Hero header ──────────────────────────────────────
+            // ── Hero header — hiển thị thông tin CHỦ SỞ HỮU ──────
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(
                         Brush.verticalGradient(listOf(PrimaryPink, SecondaryOrange.copy(0.6f)))
                     )
-                    .padding(top = 12.dp, bottom = 28.dp),
+                    .padding(top = 16.dp, bottom = 28.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // User avatar placeholder (pet avatar nếu có)
+                    // Avatar chủ
                     Box(
                         modifier = Modifier
                             .size(90.dp)
@@ -91,61 +97,82 @@ fun AccountScreen(
                             .border(3.dp, Color.White, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
-                        if (pet?.avatarUrl != null) {
+                        if (!user?.avatarUrl.isNullOrEmpty()) {
                             AsyncImage(
-                                model = pet.avatarUrl,
+                                model = user.avatarUrl,
                                 contentDescription = null,
                                 modifier = Modifier.fillMaxSize().clip(CircleShape)
                             )
                         } else {
-                            Icon(
-                                Icons.Default.Person,
-                                null,
-                                tint = Color.White,
-                                modifier = Modifier.size(48.dp)
-                            )
+                            // Ava default kiểu chuyên nghiệp
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color(0xFFE4E6EB)), // Màu xám nhạt FB
+                                contentAlignment = Alignment.BottomCenter
+                            ) {
+                                Icon(
+                                    Icons.Default.Person,
+                                    null,
+                                    tint = Color(0xFF8A8D91), // Màu xám đậm icon
+                                    modifier = Modifier.size(70.dp).offset(y = 10.dp)
+                                )
+                            }
                         }
                     }
 
-                    // User greeting
+                    // Tên chủ sở hữu
                     Text(
-                        "Xin chào! 👋",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White.copy(0.85f)
+                        user?.fullName ?: "Đang tải...",
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                        color = Color.White
                     )
 
-                    // Pet name nếu có
-                    if (pet != null) {
-                        Surface(
-                            color = Color.White.copy(0.2f),
-                            shape = RoundedCornerShape(20.dp)
+                    // Email
+                    if (user?.email != null) {
+                        Text(
+                            user.email,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(0.8f)
+                        )
+                    }
+
+                    // Phone nếu có
+                    if (!user?.phone.isNullOrBlank()) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(Icons.Default.Pets, null, tint = Color.White, modifier = Modifier.size(16.dp))
-                                Text(
-                                    pet.name,
-                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                    color = Color.White
-                                )
-                            }
+                            Icon(Icons.Default.Phone, null, tint = Color.White.copy(0.8f), modifier = Modifier.size(14.dp))
+                            Text(user!!.phone!!, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(0.8f))
                         }
                     }
                 }
             }
 
+            // ── Thông tin cá nhân ─────────────────────────────────
+            SectionHeader("Thông tin cá nhân")
+
+            AccountMenuItem(
+                icon = Icons.Default.Edit,
+                label = "Sửa thông tin",
+                subtitle = "Cập nhật họ tên, số điện thoại, địa chỉ",
+                onClick = { navController.navigate(Routes.EDIT_USER_PROFILE) }
+            )
+            AccountMenuItem(
+                icon = Icons.Default.Lock,
+                label = "Đổi mật khẩu",
+                subtitle = "Thay đổi mật khẩu tài khoản",
+                onClick = { navController.navigate(Routes.CHANGE_PASSWORD) }
+            )
+
             // ── Pet Profile Section ───────────────────────────────
+            Spacer(Modifier.height(8.dp))
             SectionHeader("Hồ sơ thú cưng")
 
             if (pet == null) {
-                // No pet profile yet
                 Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(containerColor = PrimaryPink.copy(0.08f))
                 ) {
@@ -155,15 +182,8 @@ fun AccountScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Text("🐾", fontSize = 36.sp)
-                        Text(
-                            "Chưa có hồ sơ thú cưng",
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
-                        )
-                        Text(
-                            "Tạo hồ sơ để bắt đầu ghép đôi cho thú cưng của bạn",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Text("Chưa có hồ sơ thú cưng", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold))
+                        Text("Tạo hồ sơ để bắt đầu ghép đôi", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Button(
                             onClick = { navController.navigate(Routes.PET_SETUP) },
                             shape = RoundedCornerShape(20.dp),
@@ -176,7 +196,6 @@ fun AccountScreen(
                     }
                 }
             } else {
-                // Pet profile quick info card
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -196,10 +215,7 @@ fun AccountScreen(
                             modifier = Modifier.size(60.dp).clip(RoundedCornerShape(12.dp))
                         )
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                pet.name,
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-                            )
+                            Text(pet.name, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
                             Text(
                                 buildString {
                                     append(pet.species)
@@ -214,53 +230,26 @@ fun AccountScreen(
                     }
                 }
 
-                // Pet management actions
                 Spacer(Modifier.height(8.dp))
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    QuickActionChip(
-                        icon = Icons.Default.Edit,
-                        label = "Sửa hồ sơ",
-                        onClick = { navController.navigate(Routes.PET_EDIT) },
-                        modifier = Modifier.weight(1f)
-                    )
-                    QuickActionChip(
-                        icon = Icons.Default.PhotoLibrary,
-                        label = "Quản lý ảnh",
-                        onClick = { navController.navigate(Routes.PHOTO_MANAGE) },
-                        modifier = Modifier.weight(1f)
-                    )
-                    QuickActionChip(
-                        icon = Icons.Default.Vaccines,
-                        label = "Vaccine",
-                        onClick = { navController.navigate(Routes.VAC_LIST) },
-                        modifier = Modifier.weight(1f)
-                    )
+                    QuickActionChip(icon = Icons.Default.Edit, label = "Sửa hồ sơ", onClick = { navController.navigate(Routes.PET_EDIT) }, modifier = Modifier.weight(1f))
+                    QuickActionChip(icon = Icons.Default.PhotoLibrary, label = "Quản lý ảnh", onClick = { navController.navigate(Routes.PHOTO_MANAGE) }, modifier = Modifier.weight(1f))
+                    QuickActionChip(icon = Icons.Default.Vaccines, label = "Vaccine", onClick = { navController.navigate(Routes.VAC_LIST) }, modifier = Modifier.weight(1f))
                 }
             }
 
-            // ── Activity Section ──────────────────────────────────
+            // ── Hoạt động ─────────────────────────────────────────
             Spacer(Modifier.height(16.dp))
             SectionHeader("Hoạt động")
 
-            AccountMenuItem(
-                icon = Icons.Default.FavoriteBorder,
-                label = "Ai đã thích tôi",
-                subtitle = "Xem danh sách nhận được",
-                onClick = { navController.navigate(Routes.WHO_LIKED_ME) }
-            )
-            AccountMenuItem(
-                icon = Icons.Default.Favorite,
-                label = "Danh sách đã ghép đôi",
-                subtitle = "Xem các cặp đôi của bạn",
-                onClick = { navController.navigate(Routes.MATCHED_LIST) }
-            )
+            AccountMenuItem(icon = Icons.Default.SmartToy, label = "AI Tìm kiếm thú cưng", subtitle = "Chat với AI để tìm bạn đôi phù hợp", onClick = { navController.navigate(Routes.AI_CHATBOT) }, iconTint = AccentPurple)
+            AccountMenuItem(icon = Icons.Default.FavoriteBorder, label = "Ai đã thích tôi", subtitle = "Xem danh sách nhận được", onClick = { navController.navigate(Routes.WHO_LIKED_ME) })
+            AccountMenuItem(icon = Icons.Default.Favorite, label = "Danh sách đã ghép đôi", subtitle = "Xem các cặp đôi của bạn", onClick = { navController.navigate(Routes.MATCHED_LIST) })
 
-            // ── Settings Section ──────────────────────────────────
+            // ── Cài đặt ───────────────────────────────────────────
             Spacer(Modifier.height(8.dp))
             SectionHeader("Cài đặt")
 
@@ -272,7 +261,7 @@ fun AccountScreen(
                 onClick = { navController.navigate(Routes.BLOCK_LIST) }
             )
 
-            // ── Logout ────────────────────────────────────────────
+            // ── Đăng xuất ─────────────────────────────────────────
             Spacer(Modifier.height(8.dp))
             Card(
                 modifier = Modifier
@@ -283,9 +272,7 @@ fun AccountScreen(
                         navController.navigate(Routes.LOGIN) { popUpTo(0) { inclusive = true } }
                     },
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(0.3f)
-                )
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(0.3f))
             ) {
                 Row(
                     modifier = Modifier.padding(16.dp),
@@ -293,11 +280,7 @@ fun AccountScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(Icons.Default.Logout, null, tint = MaterialTheme.colorScheme.error)
-                    Text(
-                        "Đăng xuất",
-                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
-                        color = MaterialTheme.colorScheme.error
-                    )
+                    Text("Đăng xuất", style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold), color = MaterialTheme.colorScheme.error)
                 }
             }
 
@@ -325,10 +308,7 @@ private fun AccountMenuItem(
     iconTint: Color = PrimaryPink
 ) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp)
-            .clickable { onClick() },
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).clickable { onClick() },
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(1.dp)

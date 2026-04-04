@@ -25,8 +25,9 @@ interface PetApi {
 
     @GET("api/pets/suggestions")
     suspend fun getSuggestions(
-        @Query("page") page: Int = 0,
-        @Query("size") size: Int = 10
+        @Query("page")  page: Int = 0,
+        @Query("size")  size: Int = 10,
+        @Query("smart") smart: Boolean = false
     ): Response<PageResponse<PetProfileResponse>>
 
     @GET("api/pets/search")
@@ -99,7 +100,7 @@ interface InteractionApi {
     suspend fun unblockUser(@Path("targetUserId") targetUserId: Long): Response<Unit>
 
     @GET("api/interactions/blocks")
-    suspend fun getMyBlocks(): Response<List<Any>>
+    suspend fun getMyBlocks(): Response<List<com.petmatch.mobile.data.model.BlockResponse>>
 
     @POST("api/interactions/reports")
     suspend fun submitReport(@Body req: ReportRequest): Response<Any>
@@ -112,3 +113,28 @@ interface AuthApi {
     @POST("api/auth/register")
     suspend fun register(@Body req: RegisterRequest): Response<AuthResponse>
 }
+
+interface UserApi {
+
+    @GET("api/users/me")
+    suspend fun getMyInfo(): Response<UserResponse>
+
+    @PUT("api/users/me")
+    suspend fun updateMyInfo(@Body req: UpdateUserRequest): Response<UserResponse>
+
+    @PUT("api/users/me/password")
+    suspend fun changePassword(@Body req: ChangePasswordRequest): Response<Unit>
+
+    @Multipart
+    @POST("api/users/me/avatar")
+    suspend fun updateAvatar(
+        @Part file: MultipartBody.Part
+    ): Response<UserResponse>
+}
+
+interface ChatbotApi {
+
+    @POST("api/chatbot/message")
+    suspend fun sendMessage(@Body req: ChatbotRequest): Response<ChatbotResponse>
+}
+

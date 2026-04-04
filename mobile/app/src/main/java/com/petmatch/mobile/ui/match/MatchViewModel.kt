@@ -21,6 +21,13 @@ class MatchViewModel : ViewModel() {
     private val _isLoadingSuggestions = MutableStateFlow(false)
     val isLoadingSuggestions: StateFlow<Boolean> = _isLoadingSuggestions
 
+    // ── AI Smart mode tracking ────────────────────────────
+    /** Tổng số like đã gửi từ đầu session */
+    private var totalSessionLikes = 0
+    /** Đủ 5 likes → bật smart mode, server sẽ sort theo AI score */
+    private val _isSmartMode = MutableStateFlow(false)
+    val isSmartMode: StateFlow<Boolean> = _isSmartMode
+
     // Super like status
     private val _superLikeStatus = MutableStateFlow<SuperLikeStatusResponse?>(null)
     val superLikeStatus: StateFlow<SuperLikeStatusResponse?> = _superLikeStatus
@@ -61,7 +68,24 @@ class MatchViewModel : ViewModel() {
         if (!_hasMoreSuggestions.value) return@launch
         _isLoadingSuggestions.value = true
         try {
-            val res = RetrofitClient.petApi(ctx).getSuggestions(_suggestionPage.value, 5)
+            val hasFilters = _filterSpecies.value != null || _filterGender.value != null ||
+                    _filterLookingFor.value != null || _filterMinAge.value != null ||
+                    _filterMaxAge.value != null || _filterHealthStatus.value != null
+
+            val res = if (hasFilters) {
+                RetrofitClient.petApi(ctx).search(
+                    species = _filterSpecies.value,
+                    gender = _filterGender.value,
+                    lookingFor = _filterLookingFor.value,
+                    minAge = _filterMinAge.value,
+                    maxAge = _filterMaxAge.value,
+                    healthStatus = _filterHealthStatus.value,
+                    page = _suggestionPage.value,
+                    size = 5
+                )
+            } else {
+                RetrofitClient.petApi(ctx).getSuggestions(_suggestionPage.value, 5, _isSmartMode.value)
+            }
             if (res.isSuccessful) {
                 val page = res.body()!!
                 _suggestions.value = _suggestions.value + page.content
@@ -78,14 +102,21 @@ class MatchViewModel : ViewModel() {
                 .sendMatchRequest(SendMatchRequest(petId, isSuperLike))
             if (res.isSuccessful) {
                 val resp = res.body()!!
-                // Show popup if auto-matched (both liked each other)
+                // Hiện popup nếu auto-match (cả 2 like nhau)
                 if (resp.status == "ACCEPTED" && resp.canOpenConversation) {
                     _matchPopup.value = resp
                 }
                 if (isSuperLike) loadSuperLikeStatus(ctx)
+
+                // ── AI preference tracking ────────────────────
+                totalSessionLikes++
+                // Sau 5 likes → bật smart mode
+                if (totalSessionLikes >= 5 && !_isSmartMode.value) {
+                    _isSmartMode.value = true
+                }
             }
         } catch (_: Exception) {}
-        // Remove top card from suggestions list
+
         _suggestions.value = _suggestions.value.drop(1)
         if (_suggestions.value.size <= 2) loadSuggestions(ctx)
     }

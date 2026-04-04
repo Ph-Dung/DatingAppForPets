@@ -8,10 +8,15 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.petmatch.mobile.ui.account.AccountScreen
+import com.petmatch.mobile.ui.account.ChangePasswordScreen
+import com.petmatch.mobile.ui.account.EditUserProfileScreen
+import com.petmatch.mobile.ui.account.UserViewModel
 import com.petmatch.mobile.ui.auth.AuthViewModel
 import com.petmatch.mobile.ui.auth.LoginScreen
 import com.petmatch.mobile.ui.auth.RegisterScreen
 import com.petmatch.mobile.ui.chat.ChatListScreen
+import com.petmatch.mobile.ui.chatbot.AiChatbotScreen
+import com.petmatch.mobile.ui.chatbot.ChatbotViewModel
 import com.petmatch.mobile.ui.community.CommunityScreen
 import com.petmatch.mobile.ui.interaction.BlockListScreen
 import com.petmatch.mobile.ui.interaction.InteractionViewModel
@@ -20,28 +25,35 @@ import com.petmatch.mobile.ui.match.*
 import com.petmatch.mobile.ui.petprofile.*
 
 object Routes {
-    const val LOGIN        = "login"
-    const val PET_SETUP    = "pet/setup"
-    const val PET_EDIT     = "pet/edit"
-    const val PET_ME       = "pet/me"
-    const val PET_DETAIL   = "pet/detail/{petId}"
-    const val PHOTO_MANAGE = "pet/photos"
-    const val VAC_LIST     = "pet/vaccinations"
-    const val VAC_FORM     = "pet/vaccinations/form?vacId={vacId}"
+    const val LOGIN             = "login"
+    const val PET_SETUP         = "pet/setup"
+    const val PET_EDIT          = "pet/edit"
+    const val PET_ME            = "pet/me"
+    const val PET_DETAIL        = "pet/detail/{petId}"
+    const val PHOTO_MANAGE      = "pet/photos"
+    const val VAC_LIST          = "pet/vaccinations"
+    const val VAC_FORM          = "pet/vaccinations/form?vacId={vacId}"
 
-    const val MATCH_SWIPE  = "match/swipe"
-    const val MATCH_FILTER = "match/filter"
-    const val WHO_LIKED_ME = "match/liked-me"
-    const val MATCHED_LIST = "match/matched"
+    const val MATCH_SWIPE       = "match/swipe"
+    const val MATCH_FILTER      = "match/filter"
+    const val WHO_LIKED_ME      = "match/liked-me"
+    const val MATCHED_LIST      = "match/matched"
 
-    const val CHAT_LIST    = "chat"
-    const val COMMUNITY    = "community"
-    const val REGISTER     = "register"
-    const val ACCOUNT      = "account"   // Tab bottom nav → AccountScreen
-    const val MY_PET       = "pet/mypet" // Sub-page: chi tiết pet của tôi
+    const val CHAT_LIST         = "chat"
+    const val COMMUNITY         = "community"
+    const val REGISTER          = "register"
+    const val ACCOUNT           = "account"
+    const val MY_PET            = "pet/mypet"
 
-    const val REPORT       = "report/{petId}/{ownerId}"
-    const val BLOCK_LIST   = "blocks"
+    const val REPORT            = "report/{petId}/{ownerId}"
+    const val BLOCK_LIST        = "blocks"
+
+    // User account management
+    const val EDIT_USER_PROFILE = "account/edit"
+    const val CHANGE_PASSWORD   = "account/change-password"
+
+    // AI Chatbot
+    const val AI_CHATBOT        = "chatbot"
 
     fun petDetail(petId: Long) = "pet/detail/$petId"
     fun report(petId: Long, ownerId: Long) = "report/$petId/$ownerId"
@@ -58,6 +70,8 @@ fun PetMatchNavGraph(
     val matchVm: MatchViewModel       = viewModel()
     val interVm: InteractionViewModel = viewModel()
     val authVm: AuthViewModel         = viewModel()
+    val userVm: UserViewModel         = viewModel()
+    val chatbotVm: ChatbotViewModel   = viewModel()
 
     NavHost(navController = navController, startDestination = startDestination) {
 
@@ -96,8 +110,10 @@ fun PetMatchNavGraph(
         // ── Pet Profile ──────────────────────────────────
         composable(Routes.PET_SETUP)    { PetProfileSetupScreen(navController, petVm) }
         composable(Routes.PET_EDIT)     { PetProfileEditScreen(navController, petVm) }
-        composable(Routes.PET_ME)       { AccountScreen(navController, petVm, authVm) }   // Bottom tab
-        composable(Routes.MY_PET)       { MyProfileScreen(navController, petVm, authVm) } // Sub-page: chi tiết pet
+        composable(Routes.PET_ME)       { AccountScreen(navController, petVm, authVm, userVm) }  // Bottom tab
+        composable(Routes.MY_PET)       { MyProfileScreen(navController, petVm, authVm) }          // Sub-page: chi tiết pet
+        composable(Routes.EDIT_USER_PROFILE) { EditUserProfileScreen(navController, userVm) }
+        composable(Routes.CHANGE_PASSWORD)   { ChangePasswordScreen(navController, userVm) }
         composable(Routes.PHOTO_MANAGE) { PhotoManageScreen(navController, petVm) }
 
         composable(
@@ -141,5 +157,8 @@ fun PetMatchNavGraph(
             ReportScreen(navController, petId, ownerId, interVm)
         }
         composable(Routes.BLOCK_LIST) { BlockListScreen(navController) }
+
+        // ── AI Chatbot ────────────────────────────────────────
+        composable(Routes.AI_CHATBOT) { AiChatbotScreen(navController, chatbotVm, petVm) }
     }
 }

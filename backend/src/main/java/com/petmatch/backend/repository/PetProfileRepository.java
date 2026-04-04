@@ -63,26 +63,32 @@ public interface PetProfileRepository extends JpaRepository<PetProfile, Long> {
         WHERE p.isHidden = false
           AND p.owner.isLocked = false
           AND p.owner.id != :currentUserId
-          AND (:species IS NULL OR p.species = :species)
-          AND (:breed IS NULL OR LOWER(p.breed) LIKE LOWER(CONCAT('%',:breed,'%')))
-          AND (:gender IS NULL OR p.gender = :gender)
-          AND (:lookingFor IS NULL OR p.lookingFor = :lookingFor)
-          AND (:healthStatus IS NULL OR p.healthStatus = :healthStatus)
-          AND (:minWeight IS NULL OR p.weightKg >= :minWeight)
-          AND (:maxWeight IS NULL OR p.weightKg <= :maxWeight)
-          AND (:minDob IS NULL OR p.dateOfBirth <= :minDob)
-          AND (:maxDob IS NULL OR p.dateOfBirth >= :maxDob)
+          AND p.owner.id NOT IN (
+              SELECT b.blocked.id FROM Block b WHERE b.blocker.id = :currentUserId
+          )
+          AND p.owner.id NOT IN (
+              SELECT b.blocker.id FROM Block b WHERE b.blocked.id = :currentUserId
+          )
+          AND (:hasSpecies = false OR LOWER(p.species) = LOWER(:species))
+          AND (:hasBreed = false OR LOWER(p.breed) LIKE CONCAT('%', LOWER(:breed), '%'))
+          AND (:hasGender = false OR p.gender = :gender)
+          AND (:hasLookingFor = false OR p.lookingFor = :lookingFor)
+          AND (:hasHealthStatus = false OR p.healthStatus = :healthStatus)
+          AND (:hasMinWeight = false OR p.weightKg >= :minWeight)
+          AND (:hasMaxWeight = false OR p.weightKg <= :maxWeight)
+          AND (:hasMinDob = false OR p.dateOfBirth >= :minDob)
+          AND (:hasMaxDob = false OR p.dateOfBirth <= :maxDob)
         """)
     Page<PetProfile> search(
             @Param("currentUserId") Long currentUserId,
-            @Param("species")       String species,
-            @Param("breed")         String breed,
-            @Param("gender")        Gender gender,
-            @Param("lookingFor")    LookingFor lookingFor,
-            @Param("healthStatus")  HealthStatus healthStatus,
-            @Param("minWeight")     java.math.BigDecimal minWeight,
-            @Param("maxWeight")     java.math.BigDecimal maxWeight,
-            @Param("minDob")        LocalDate minDob,   // = LocalDate.now().minusYears(maxAge)
-            @Param("maxDob")        LocalDate maxDob,   // = LocalDate.now().minusYears(minAge)
+            @Param("hasSpecies") boolean hasSpecies, @Param("species") String species,
+            @Param("hasBreed") boolean hasBreed, @Param("breed") String breed,
+            @Param("hasGender") boolean hasGender, @Param("gender") Gender gender,
+            @Param("hasLookingFor") boolean hasLookingFor, @Param("lookingFor") LookingFor lookingFor,
+            @Param("hasHealthStatus") boolean hasHealthStatus, @Param("healthStatus") HealthStatus healthStatus,
+            @Param("hasMinWeight") boolean hasMinWeight, @Param("minWeight") java.math.BigDecimal minWeight,
+            @Param("hasMaxWeight") boolean hasMaxWeight, @Param("maxWeight") java.math.BigDecimal maxWeight,
+            @Param("hasMinDob") boolean hasMinDob, @Param("minDob") LocalDate minDob,
+            @Param("hasMaxDob") boolean hasMaxDob, @Param("maxDob") LocalDate maxDob,
             Pageable pageable);
 }

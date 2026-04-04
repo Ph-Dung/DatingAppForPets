@@ -40,6 +40,7 @@ public class PetProfileService {
     private final PetVaccinationRepository vaccinationRepo;
     private final UserRepository userRepo;
     private final CloudinaryService cloudinaryService;
+    private final AiMatchingService aiMatchingService;
 
     // Helper lấy user hiện tại từ SecurityContext
     private User currentUser() {
@@ -137,6 +138,32 @@ public class PetProfileService {
                 .map(this::toResponse);
     }
 
+    /**
+     * Smart suggestions: khi user đã có đủ 5 likes, sort theo AI score.
+     * Nếu chưa đủ (smart = false), fallback về suggestions bình thường.
+     */
+    @Transactional(readOnly = true)
+    public List<PetProfileResponse> getSmartSuggestions(int page, int size) {
+        User user = currentUser();
+        PetProfile myPet = petProfileRepo.findByOwnerId(user.getId())
+                .orElseThrow(() -> new AppException("Bạn chưa tạo hồ sơ thú cưng", NOT_FOUND));
+
+        // Lấy pool candidates từ query thường (chưa swipe, cùng loài)
+        List<com.petmatch.backend.entity.PetProfile> candidates =
+                petProfileRepo.findSuggestions(
+                        user.getId(), myPet.getId(), myPet.getSpecies(),
+                        PageRequest.of(page, Math.max(size * 3, 30)))  // lấy pool 3x để score
+                        .getContent();
+
+        // Tính score cho từng candidate rồi sort DESC
+        return candidates.stream()
+                .map(c -> new Object[]{c, aiMatchingService.scorePet(myPet.getId(), c)})
+                .sorted((a, b) -> Integer.compare((int) b[1], (int) a[1]))
+                .limit(size)
+                .map(pair -> toResponse((com.petmatch.backend.entity.PetProfile) pair[0]))
+                .collect(java.util.stream.Collectors.toList());
+    }
+
     @Transactional(readOnly = true)
     public Page<PetProfileResponse> search(String species, String breed,
                                            Gender gender, LookingFor lookingFor,
@@ -146,11 +173,19 @@ public class PetProfileService {
                                            int page, int size) {
         LocalDate minDob = maxAge != null ? LocalDate.now().minusYears(maxAge) : null;
         LocalDate maxDob = minAge != null ? LocalDate.now().minusYears(minAge) : null;
+        String safeBreed = breed == null ? "" : breed;
 
         return petProfileRepo.search(
                         currentUser().getId(),
-                        species, breed, gender, lookingFor,
-                        healthStatus, minWeight, maxWeight, minDob, maxDob,
+                        species != null, species,
+                        safeBreed != null && !safeBreed.trim().isEmpty(), safeBreed,
+                        gender != null, gender,
+                        lookingFor != null, lookingFor,
+                        healthStatus != null, healthStatus,
+                        minWeight != null, minWeight,
+                        maxWeight != null, maxWeight,
+                        minDob != null, minDob,
+                        maxDob != null, maxDob,
                         PageRequest.of(page, size))
                 .map(this::toResponse);
     }

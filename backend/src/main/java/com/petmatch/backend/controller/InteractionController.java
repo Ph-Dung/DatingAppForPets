@@ -52,7 +52,7 @@ public class InteractionController {
 
     /** Danh sách người mình đã chặn */
     @GetMapping("/blocks")
-    public ResponseEntity<List<Block>> getMyBlocks() {
+    public ResponseEntity<List<com.petmatch.backend.dto.response.BlockResponse>> getMyBlocks() {
         return ResponseEntity.ok(interactionService.getMyBlocks());
     }
 

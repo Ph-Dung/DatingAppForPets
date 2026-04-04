@@ -35,6 +35,7 @@ public class MatchRequestService {
     private final PetPhotoRepository petPhotoRepo;
     private final BlockRepository blockRepo;
     private final UserRepository userRepo;
+    private final AiMatchingService aiMatchingService;
 
     private User currentUser() {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -110,6 +111,10 @@ public class MatchRequestService {
             matchRepo.save(reverse.get());
             matchRepo.save(saved);
         }
+
+        // ── Cập nhật preference cho AI scoring ───────────────
+        try { aiMatchingService.updatePreferences(sender.getId()); }
+        catch (Exception ignored) { /* không block luồng chính */ }
 
         return toResponse(saved);
     }

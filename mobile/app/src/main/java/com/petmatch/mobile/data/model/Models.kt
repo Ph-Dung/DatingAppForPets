@@ -127,3 +127,41 @@ data class RegisterRequest(
     val password: String,
     val phone: String? = null
 )
+
+// ── User Account ──────────────────────────────────────────
+data class UserResponse(
+    val id: Long,
+    val fullName: String,
+    val email: String,
+    val phone: String?,
+    val address: String?,
+    val avatarUrl: String?,
+    val createdAt: String?
+)
+
+data class UpdateUserRequest(
+    val fullName: String,
+    val phone: String?,
+    val address: String?
+)
+
+data class ChangePasswordRequest(
+    val oldPassword: String,
+    val newPassword: String
+)
+
+// ── AI Chatbot ────────────────────────────────────────────
+data class ChatMessage(
+    val role: String,   // "user" or "assistant"
+    val content: String
+)
+
+data class ChatbotRequest(
+    val messages: List<ChatMessage>
+)
+
+data class ChatbotResponse(
+    val reply: String,
+    val isReadyToSuggest: Boolean,
+    val suggestions: List<PetProfileResponse> = emptyList()
+)

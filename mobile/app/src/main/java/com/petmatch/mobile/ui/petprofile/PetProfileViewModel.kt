@@ -148,5 +148,15 @@ class PetProfileViewModel : ViewModel() {
         } catch (_: Exception) {}
     }
 
+    /** Gửi like từ màn hình chatbot (không cần MatchViewModel) */
+    fun sendLikeFromChatbot(ctx: Context, receiverPetId: Long) = viewModelScope.launch {
+        try {
+            RetrofitClient.matchApi(ctx).sendMatchRequest(
+                com.petmatch.mobile.data.model.SendMatchRequest(receiverPetId, false)
+            )
+        } catch (_: Exception) {}
+    }
+
     fun resetAction() { _actionState.value = ActionState.Idle }
 }
+
