@@ -1,5 +1,6 @@
 package com.petmatch.backend.service;
 
+import com.petmatch.backend.config.ResourceNotFoundException;
 import com.petmatch.backend.dto.ReviewRequest;
 import com.petmatch.backend.entity.Block;
 import com.petmatch.backend.entity.Review;
@@ -24,9 +25,9 @@ public class InteractionService {
     @Transactional
     public Review createReview(Long reviewerId, ReviewRequest request) {
         User reviewer = userRepository.findById(reviewerId)
-                .orElseThrow(() -> new RuntimeException("Reviewer not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User", reviewerId));
         User reviewee = userRepository.findById(request.getRevieweeId())
-                .orElseThrow(() -> new RuntimeException("Reviewee not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User", request.getRevieweeId()));
 
         if (request.getRating() < 1 || request.getRating() > 5) {
             throw new IllegalArgumentException("Rating must be between 1 and 5");
@@ -45,19 +46,19 @@ public class InteractionService {
     @Transactional(readOnly = true)
     public List<Review> getUserReviews(Long userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User", userId));
         return reviewRepository.findByRevieweeOrderByCreatedAtDesc(user);
     }
 
     @Transactional
     public Block blockUser(Long blockerId, Long blockedId) {
         User blocker = userRepository.findById(blockerId)
-                .orElseThrow(() -> new RuntimeException("Blocker not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User", blockerId));
         User blocked = userRepository.findById(blockedId)
-                .orElseThrow(() -> new RuntimeException("Blocked user not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User", blockedId));
 
         if (blockRepository.existsByBlockerAndBlocked(blocker, blocked)) {
-            throw new RuntimeException("User is already blocked");
+            throw new IllegalStateException("User is already blocked");
         }
 
         Block block = Block.builder()

@@ -1,5 +1,6 @@
 package com.petmatch.backend.service;
 
+import com.petmatch.backend.config.ResourceNotFoundException;
 import com.petmatch.backend.dto.AppointmentRequest;
 import com.petmatch.backend.entity.Appointment;
 import com.petmatch.backend.entity.AppointmentStatus;
@@ -22,9 +23,9 @@ public class AppointmentService {
     @Transactional
     public Appointment createAppointment(Long requesterId, AppointmentRequest request) {
         User requester = userRepository.findById(requesterId)
-                .orElseThrow(() -> new RuntimeException("Requester not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User", requesterId));
         User recipient = userRepository.findById(request.getRecipientId())
-                .orElseThrow(() -> new RuntimeException("Recipient not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User", request.getRecipientId()));
 
         Appointment appointment = Appointment.builder()
                 .requester(requester)
@@ -41,7 +42,7 @@ public class AppointmentService {
     @Transactional
     public Appointment updateAppointmentStatus(Long appointmentId, AppointmentStatus status) {
         Appointment appointment = appointmentRepository.findById(appointmentId)
-                .orElseThrow(() -> new RuntimeException("Appointment not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Appointment", appointmentId));
         appointment.setStatus(status);
         return appointmentRepository.save(appointment);
     }
@@ -49,7 +50,7 @@ public class AppointmentService {
     @Transactional
     public Appointment updateAppointmentDetails(Long appointmentId, AppointmentRequest request) {
         Appointment appointment = appointmentRepository.findById(appointmentId)
-                .orElseThrow(() -> new RuntimeException("Appointment not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Appointment", appointmentId));
         appointment.setMeetingTime(request.getMeetingTime());
         appointment.setLocation(request.getLocation());
         appointment.setNotes(request.getNotes());
@@ -59,14 +60,14 @@ public class AppointmentService {
     @Transactional(readOnly = true)
     public List<Appointment> getAppointmentsForUser(Long userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User", userId));
         return appointmentRepository.findByRequesterOrRecipientOrderByMeetingTimeDesc(user, user);
     }
     
     @Transactional
     public void cancelAppointment(Long appointmentId) {
         Appointment appointment = appointmentRepository.findById(appointmentId)
-                .orElseThrow(() -> new RuntimeException("Appointment not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Appointment", appointmentId));
         appointment.setStatus(AppointmentStatus.CANCELLED);
         appointmentRepository.save(appointment);
     }

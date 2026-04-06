@@ -1,5 +1,6 @@
 package com.petmatch.backend.service;
 
+import com.petmatch.backend.config.ResourceNotFoundException;
 import com.petmatch.backend.dto.MessageDto;
 import com.petmatch.backend.entity.Message;
 import com.petmatch.backend.entity.User;
@@ -22,9 +23,9 @@ public class ChatService {
     @Transactional
     public MessageDto saveMessage(MessageDto messageDto) {
         User sender = userRepository.findById(messageDto.getSenderId())
-                .orElseThrow(() -> new RuntimeException("Sender not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User", messageDto.getSenderId()));
         User receiver = userRepository.findById(messageDto.getReceiverId())
-                .orElseThrow(() -> new RuntimeException("Receiver not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User", messageDto.getReceiverId()));
 
         Message message = Message.builder()
                 .sender(sender)
@@ -46,9 +47,9 @@ public class ChatService {
     @Transactional(readOnly = true)
     public List<MessageDto> getChatHistory(Long userId1, Long userId2) {
         User user1 = userRepository.findById(userId1)
-                .orElseThrow(() -> new RuntimeException("User 1 not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User", userId1));
         User user2 = userRepository.findById(userId2)
-                .orElseThrow(() -> new RuntimeException("User 2 not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User", userId2));
 
         return messageRepository.findChatHistory(user1, user2).stream()
                 .map(msg -> MessageDto.builder()

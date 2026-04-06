@@ -1,5 +1,6 @@
 package com.petmatch.backend.service;
 
+import com.petmatch.backend.config.ResourceNotFoundException;
 import com.petmatch.backend.dto.CallRequest;
 import com.petmatch.backend.entity.CallHistory;
 import com.petmatch.backend.entity.CallStatus;
@@ -23,9 +24,9 @@ public class CallService {
     @Transactional
     public CallHistory initiateCall(Long callerId, CallRequest request) {
         User caller = userRepository.findById(callerId)
-                .orElseThrow(() -> new RuntimeException("Caller not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User", callerId));
         User callee = userRepository.findById(request.getCalleeId())
-                .orElseThrow(() -> new RuntimeException("Callee not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User", request.getCalleeId()));
 
         CallHistory callHistory = CallHistory.builder()
                 .caller(caller)
@@ -40,10 +41,11 @@ public class CallService {
     @Transactional
     public CallHistory endCall(Long callId, CallStatus finalStatus) {
         CallHistory call = callHistoryRepository.findById(callId)
-                .orElseThrow(() -> new RuntimeException("Call not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("CallHistory", callId));
         
         call.setStatus(finalStatus);
-        if (finalStatus == CallStatus.COMPLETED) {
+        // Set endedAt for all terminal states (COMPLETED, MISSED, REJECTED)
+        if (finalStatus != CallStatus.ONGOING) {
             call.setEndedAt(LocalDateTime.now());
         }
         
@@ -53,7 +55,7 @@ public class CallService {
     @Transactional(readOnly = true)
     public List<CallHistory> getUserCallHistory(Long userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User", userId));
         return callHistoryRepository.findByCallerOrCallee(user);
     }
 }
