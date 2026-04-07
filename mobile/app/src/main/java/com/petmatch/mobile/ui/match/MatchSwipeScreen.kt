@@ -51,6 +51,7 @@ fun MatchSwipeScreen(
     val ctx = LocalContext.current
     val suggestions by matchVm.suggestions.collectAsState()
     val isLoading by matchVm.isLoadingSuggestions.collectAsState()
+    val error by matchVm.error.collectAsState()
     val superLikeStatus by matchVm.superLikeStatus.collectAsState()
     val matchPopup by matchVm.matchPopup.collectAsState()
     val isSmartMode by matchVm.isSmartMode.collectAsState()
@@ -140,6 +141,39 @@ fun MatchSwipeScreen(
                             onLikedMe = { navController.navigate(Routes.WHO_LIKED_ME) },
                             onMatched  = { navController.navigate(Routes.MATCHED_LIST) }
                         )
+                    }
+                }
+            }
+
+            if (!error.isNullOrBlank()) {
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            error ?: "",
+                            modifier = Modifier.weight(1f),
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        TextButton(onClick = {
+                            matchVm.clearError()
+                            if (suggestions.isEmpty()) {
+                                matchVm.loadSuggestions(ctx, refresh = true)
+                            }
+                        }) {
+                            Text("Dong")
+                        }
                     }
                 }
             }
