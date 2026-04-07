@@ -1,0 +1,21 @@
+# Backend
+backend/target/
+backend/.mvn/
+backend/*.log
+
+# Mobile
+mobile/.gradle/
+mobile/build/
+mobile/local.properties
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local secrets
+backend/src/main/resources/application-secret.yaml

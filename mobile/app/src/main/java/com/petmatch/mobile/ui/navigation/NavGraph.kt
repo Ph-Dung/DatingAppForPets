@@ -1,0 +1,231 @@
+package com.petmatch.mobile.ui.navigation
+
+import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavHostController
+import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.navArgument
+import com.petmatch.mobile.ui.admin.AdminDashboardScreen
+import com.petmatch.mobile.ui.admin.AdminAccountScreen
+import com.petmatch.mobile.ui.admin.AdminLoginScreen
+import com.petmatch.mobile.ui.admin.AdminPetsScreen
+import com.petmatch.mobile.ui.admin.AdminReportsScreen
+import com.petmatch.mobile.ui.admin.AdminUsersScreen
+import com.petmatch.mobile.ui.admin.AdminViewModel
+import com.petmatch.mobile.ui.account.AccountScreen
+import com.petmatch.mobile.ui.account.ChangePasswordScreen
+import com.petmatch.mobile.ui.account.EditUserProfileScreen
+import com.petmatch.mobile.ui.account.UserViewModel
+import com.petmatch.mobile.ui.auth.AuthViewModel
+import com.petmatch.mobile.ui.auth.LoginScreen
+import com.petmatch.mobile.ui.auth.RegisterScreen
+import com.petmatch.mobile.ui.chat.ChatListScreen
+import com.petmatch.mobile.ui.chatbot.AiChatbotScreen
+import com.petmatch.mobile.ui.chatbot.ChatbotViewModel
+import com.petmatch.mobile.ui.community.CommunityScreen
+import com.petmatch.mobile.ui.interaction.BlockListScreen
+import com.petmatch.mobile.ui.interaction.InteractionViewModel
+import com.petmatch.mobile.ui.interaction.ReportScreen
+import com.petmatch.mobile.ui.match.*
+import com.petmatch.mobile.ui.petprofile.*
+
+object Routes {
+    const val LOGIN             = "login"
+    const val PET_SETUP         = "pet/setup"
+    const val PET_EDIT          = "pet/edit"
+    const val PET_ME            = "pet/me"
+    const val PET_DETAIL        = "pet/detail/{petId}"
+    const val PHOTO_MANAGE      = "pet/photos"
+    const val VAC_LIST          = "pet/vaccinations"
+    const val VAC_FORM          = "pet/vaccinations/form?vacId={vacId}"
+
+    const val MATCH_SWIPE       = "match/swipe"
+    const val MATCH_FILTER      = "match/filter"
+    const val WHO_LIKED_ME      = "match/liked-me"
+    const val MATCHED_LIST      = "match/matched"
+
+    const val CHAT_LIST         = "chat"
+    const val COMMUNITY         = "community"
+    const val REGISTER          = "register"
+    const val ACCOUNT           = "account"
+    const val MY_PET            = "pet/mypet"
+
+    const val REPORT            = "report/{petId}/{ownerId}"
+    const val BLOCK_LIST        = "blocks"
+
+    // User account management
+    const val EDIT_USER_PROFILE = "account/edit"
+    const val CHANGE_PASSWORD   = "account/change-password"
+
+    // AI Chatbot
+    const val AI_CHATBOT        = "chatbot"
+
+    const val ADMIN_LOGIN       = "admin/login"
+    const val ADMIN_DASHBOARD   = "admin/dashboard"
+    const val ADMIN_USERS       = "admin/users"
+    const val ADMIN_PETS        = "admin/pets"
+    const val ADMIN_REPORTS     = "admin/reports"
+    const val ADMIN_ACCOUNT     = "admin/account"
+
+    fun petDetail(petId: Long) = "pet/detail/$petId"
+    fun report(petId: Long, ownerId: Long) = "report/$petId/$ownerId"
+    fun vacForm(vacId: Long? = null) = if (vacId != null) "pet/vaccinations/form?vacId=$vacId"
+                                       else "pet/vaccinations/form?vacId=-1"
+}
+
+@Composable
+fun PetMatchNavGraph(
+    navController: NavHostController,
+    startDestination: String = Routes.LOGIN
+) {
+    val petVm: PetProfileViewModel    = viewModel()
+    val matchVm: MatchViewModel       = viewModel()
+    val interVm: InteractionViewModel = viewModel()
+    val authVm: AuthViewModel         = viewModel()
+    val userVm: UserViewModel         = viewModel()
+    val chatbotVm: ChatbotViewModel   = viewModel()
+    val adminVm: AdminViewModel       = viewModel()
+
+    NavHost(
+        navController = navController,
+        startDestination = startDestination,
+        modifier = androidx.compose.ui.Modifier.fillMaxSize()
+    ) {
+
+        // ── Auth ─────────────────────────────────────────────
+        composable(Routes.LOGIN) {
+            LoginScreen(
+                vm = authVm,
+                onLoginSuccess = { hasPetProfile ->
+                    val destination = if (hasPetProfile) Routes.MATCH_SWIPE else Routes.PET_SETUP
+                    navController.navigate(destination) {
+                        popUpTo(Routes.LOGIN) { inclusive = true }
+                    }
+                },
+                onNavigateToRegister = {
+                    navController.navigate(Routes.REGISTER)
+                },
+                onNavigateToAdmin = {
+                    navController.navigate(Routes.ADMIN_LOGIN)
+                }
+            )
+        }
+
+        composable(Routes.ADMIN_LOGIN) {
+            AdminLoginScreen(
+                vm = adminVm,
+                onSuccess = {
+                    navController.navigate(Routes.ADMIN_DASHBOARD) {
+                        popUpTo(Routes.ADMIN_LOGIN) { inclusive = true }
+                    }
+                },
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Routes.ADMIN_DASHBOARD) {
+            AdminDashboardScreen(
+                vm = adminVm,
+                onOpenUsers = { navController.navigate(Routes.ADMIN_USERS) },
+                onOpenPets = { navController.navigate(Routes.ADMIN_PETS) },
+                onOpenReports = { navController.navigate(Routes.ADMIN_REPORTS) }
+            )
+        }
+
+        composable(Routes.ADMIN_USERS) {
+            AdminUsersScreen(vm = adminVm)
+        }
+
+        composable(Routes.ADMIN_PETS) {
+            AdminPetsScreen(vm = adminVm)
+        }
+
+        composable(Routes.ADMIN_REPORTS) {
+            AdminReportsScreen(vm = adminVm)
+        }
+
+        composable(Routes.ADMIN_ACCOUNT) {
+            AdminAccountScreen(
+                vm = adminVm,
+                onLogout = {
+                    navController.navigate(Routes.ADMIN_LOGIN) {
+                        popUpTo(Routes.ADMIN_DASHBOARD) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable(Routes.REGISTER) {
+            RegisterScreen(
+                vm = authVm,
+                onRegisterSuccess = { hasPetProfile ->
+                    // luôn false với tài khoản mới, nhưng để tương thích
+                    val dest = if (hasPetProfile) Routes.MATCH_SWIPE else Routes.PET_SETUP
+                    navController.navigate(dest) {
+                        popUpTo(Routes.LOGIN) { inclusive = true }
+                    }
+                },
+                onBackToLogin = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        // ── Pet Profile ──────────────────────────────────
+        composable(Routes.PET_SETUP)    { PetProfileSetupScreen(navController, petVm) }
+        composable(Routes.PET_EDIT)     { PetProfileEditScreen(navController, petVm) }
+        composable(Routes.PET_ME)       { AccountScreen(navController, petVm, authVm, userVm) }  // Bottom tab
+        composable(Routes.MY_PET)       { MyProfileScreen(navController, petVm, authVm) }          // Sub-page: chi tiết pet
+        composable(Routes.EDIT_USER_PROFILE) { EditUserProfileScreen(navController, userVm) }
+        composable(Routes.CHANGE_PASSWORD)   { ChangePasswordScreen(navController, userVm) }
+        composable(Routes.PHOTO_MANAGE) { PhotoManageScreen(navController, petVm) }
+
+        composable(
+            route = Routes.PET_DETAIL,
+            arguments = listOf(navArgument("petId") { type = NavType.LongType })
+        ) { back ->
+            val petId = back.arguments!!.getLong("petId")
+            PetProfileDetailScreen(navController, petId, petVm, matchVm, interVm)
+        }
+
+        // ── Vaccination ──────────────────────────────────────
+        composable(Routes.VAC_LIST) { VaccinationListScreen(navController, petVm) }
+        composable(
+            route = Routes.VAC_FORM,
+            arguments = listOf(navArgument("vacId") { type = NavType.LongType; defaultValue = -1L })
+        ) { back ->
+            val vacId = back.arguments!!.getLong("vacId").let { if (it == -1L) null else it }
+            VaccinationFormScreen(navController, petVm, vacId)
+        }
+
+        // ── Match ─────────────────────────────────────────────
+        composable(Routes.MATCH_SWIPE)  { MatchSwipeScreen(navController, matchVm, petVm) }
+        composable(Routes.MATCH_FILTER) { MatchFilterScreen(navController, matchVm) }
+        composable(Routes.WHO_LIKED_ME) { WhoLikedMeScreen(navController, matchVm, petVm) }
+        composable(Routes.MATCHED_LIST) { MatchedListScreen(navController, matchVm) }
+
+        // ── Chat & Community ──────────────────────────────────
+        composable(Routes.CHAT_LIST) { ChatListScreen(navController) }
+        composable(Routes.COMMUNITY)  { CommunityScreen(navController) }
+
+        // ── Interaction ───────────────────────────────────────
+        composable(
+            route = Routes.REPORT,
+            arguments = listOf(
+                navArgument("petId")   { type = NavType.LongType },
+                navArgument("ownerId") { type = NavType.LongType }
+            )
+        ) { back ->
+            val petId   = back.arguments!!.getLong("petId")
+            val ownerId = back.arguments!!.getLong("ownerId")
+            ReportScreen(navController, petId, ownerId, interVm)
+        }
+        composable(Routes.BLOCK_LIST) { BlockListScreen(navController) }
+
+        // ── AI Chatbot ────────────────────────────────────────
+        composable(Routes.AI_CHATBOT) { AiChatbotScreen(navController, chatbotVm, petVm) }
+    }
+}
