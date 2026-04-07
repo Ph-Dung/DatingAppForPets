@@ -79,4 +79,12 @@ class UserViewModel : ViewModel() {
         }
 
     fun resetUpdateState() { _updateState.value = null }
+
+    fun updateLocation(ctx: Context, lat: Double, lon: Double) = viewModelScope.launch {
+        try {
+            RetrofitClient.userApi(ctx).updateLocation(
+                com.petmatch.mobile.data.model.UpdateLocationRequest(lat, lon)
+            )
+        } catch (_: Exception) {}
+    }
 }

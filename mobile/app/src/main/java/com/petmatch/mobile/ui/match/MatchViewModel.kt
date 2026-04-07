@@ -57,6 +57,8 @@ class MatchViewModel : ViewModel() {
     val filterMaxAge: StateFlow<Int?> = _filterMaxAge
     private val _filterHealthStatus = MutableStateFlow<String?>(null)
     val filterHealthStatus: StateFlow<String?> = _filterHealthStatus
+    private val _filterMaxDistance = MutableStateFlow<Double?>(null)
+    val filterMaxDistance: StateFlow<Double?> = _filterMaxDistance
 
     fun loadSuggestions(ctx: Context, refresh: Boolean = false) = viewModelScope.launch {
         if (_isLoadingSuggestions.value) return@launch
@@ -70,7 +72,8 @@ class MatchViewModel : ViewModel() {
         try {
             val hasFilters = _filterSpecies.value != null || _filterGender.value != null ||
                     _filterLookingFor.value != null || _filterMinAge.value != null ||
-                    _filterMaxAge.value != null || _filterHealthStatus.value != null
+                    _filterMaxAge.value != null || _filterHealthStatus.value != null ||
+                    _filterMaxDistance.value != null
 
             val res = if (hasFilters) {
                 RetrofitClient.petApi(ctx).search(
@@ -80,11 +83,12 @@ class MatchViewModel : ViewModel() {
                     minAge = _filterMinAge.value,
                     maxAge = _filterMaxAge.value,
                     healthStatus = _filterHealthStatus.value,
+                    maxDistanceKm = _filterMaxDistance.value,
                     page = _suggestionPage.value,
                     size = 5
                 )
             } else {
-                RetrofitClient.petApi(ctx).getSuggestions(_suggestionPage.value, 5, _isSmartMode.value)
+                RetrofitClient.petApi(ctx).getSuggestions(_suggestionPage.value, 5, _isSmartMode.value, _filterMaxDistance.value)
             }
             if (res.isSuccessful) {
                 val page = res.body()!!
@@ -168,7 +172,7 @@ class MatchViewModel : ViewModel() {
     fun applyFilters(
         species: String?, gender: String?, lookingFor: String?,
         minAge: Int?, maxAge: Int?, healthStatus: String?,
-        ctx: Context
+        maxDistanceKm: Double?, ctx: Context
     ) {
         _filterSpecies.value = species
         _filterGender.value = gender
@@ -176,8 +180,15 @@ class MatchViewModel : ViewModel() {
         _filterMinAge.value = minAge
         _filterMaxAge.value = maxAge
         _filterHealthStatus.value = healthStatus
+        _filterMaxDistance.value = maxDistanceKm
         loadSuggestions(ctx, refresh = true)
     }
 
-    fun clearFilters(ctx: Context) = applyFilters(null, null, null, null, null, null, ctx)
+    fun clearFilters(ctx: Context) = applyFilters(null, null, null, null, null, null, null, ctx)
+    
+    fun updateLocation(ctx: Context, lat: Double, lon: Double) = viewModelScope.launch {
+        try {
+            RetrofitClient.userApi(ctx).updateLocation(UpdateLocationRequest(lat, lon))
+        } catch (_: Exception) {}
+    }
 }

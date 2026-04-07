@@ -25,7 +25,11 @@ data class PetProfileResponse(
     val isHidden: Boolean,
     val avatarUrl: String?,
     val photoUrls: List<String>,
-    val createdAt: String?
+    val createdAt: String?,
+    
+    // Geolocation
+    val distanceKm: Double? = null,
+    val ownerAddress: String? = null
 )
 
 data class PetProfileRequest(
@@ -217,4 +221,9 @@ data class AdminReportItemResponse(
 data class AdminHandleReportRequest(
     val action: String,
     val note: String?
+)
+
+data class UpdateLocationRequest(
+    val latitude: Double,
+    val longitude: Double
 )

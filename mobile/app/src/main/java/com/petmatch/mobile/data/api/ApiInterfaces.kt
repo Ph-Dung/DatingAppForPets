@@ -27,7 +27,8 @@ interface PetApi {
     suspend fun getSuggestions(
         @Query("page")  page: Int = 0,
         @Query("size")  size: Int = 10,
-        @Query("smart") smart: Boolean = false
+        @Query("smart") smart: Boolean = false,
+        @Query("maxDistanceKm") maxDistanceKm: Double? = null
     ): Response<PageResponse<PetProfileResponse>>
 
     @GET("api/pets/search")
@@ -41,6 +42,7 @@ interface PetApi {
         @Query("maxWeight") maxWeight: Double? = null,
         @Query("minAge") minAge: Int? = null,
         @Query("maxAge") maxAge: Int? = null,
+        @Query("maxDistanceKm") maxDistanceKm: Double? = null,
         @Query("page") page: Int = 0,
         @Query("size") size: Int = 10
     ): Response<PageResponse<PetProfileResponse>>
@@ -197,6 +199,9 @@ interface UserApi {
     suspend fun updateAvatar(
         @Part file: MultipartBody.Part
     ): Response<UserResponse>
+
+    @PATCH("api/users/me/location")
+    suspend fun updateLocation(@Body req: UpdateLocationRequest): Response<Unit>
 }
 
 interface ChatbotApi {

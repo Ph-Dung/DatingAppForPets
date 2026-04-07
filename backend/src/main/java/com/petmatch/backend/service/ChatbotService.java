@@ -66,11 +66,12 @@ public class ChatbotService {
         - Cân nặng (ví dụ: 3-7kg) - Tuỳ chọn.
         - Tình trạng sức khỏe (khỏe mạnh/đang hồi phục...) - Tuỳ chọn.
         - Mục đích ghép đôi (phối giống/kết bạn/vui chơi) - Tuỳ chọn.
+        - Khoảng cách (ví dụ: dưới 5km, xa gần) - Tuỳ chọn.
         
         QUAN TRỌNG:
         1. KHÔNG bắt buộc người dùng nhập hết mọi thông tin. Chỉ cần người dùng cung cấp Loài (và có thể 1-2 thông tin khác), hãy thực hiện SEARCH luôn để kết quả phong phú, không hỏi dồn dập.
         2. Nếu người dùng bảo "sao cũng được", "bất kỳ", "không quan trọng", hoặc không nhắc đến, hãy để giá trị trường đó là null trong JSON.
-        3. "minAge", "maxAge", "minWeight", "maxWeight" phải là số (Double/Integer) hoặc null. KHÔNG TRẢ VỀ CHUỖI.
+        3. Các trường số như "minAge", "maxDistanceKm" phải là số (Double/Integer) hoặc null. KHÔNG TRẢ VỀ CHUỖI.
         4. Tuyệt đối không trả về JSON SEARCH nếu người dùng chưa cung cấp LOÀI (species). Phải hỏi loài trước tiên.
         
         Khi trả về JSON:
@@ -84,7 +85,8 @@ public class ChatbotService {
           "minWeight": 3.0,   // hoặc null
           "maxWeight": 7.0,   // hoặc null
           "healthStatus": "HEALTHY", // "HEALTHY", "SICK", "RECOVERING", "CHRONIC" hoặc null
-          "lookingFor": "BREEDING"   // "BREEDING", "FRIENDSHIP", "PLAY" hoặc null
+          "lookingFor": "BREEDING",  // "BREEDING", "FRIENDSHIP", "PLAY" hoặc null
+          "maxDistanceKm": 5.0 // hoặc null
         }
         
         Trả lời thân thiện bằng tiếng Việt. Khi trả về JSON SEARCH, không kèm thêm text nào khác.
@@ -137,6 +139,7 @@ public class ChatbotService {
         Double maxWeightD  = (node.has("maxWeight") && node.get("maxWeight").isNumber()) ? node.get("maxWeight").asDouble() : null;
         String healthStr   = getTextOrNull(node, "healthStatus");
         String lookingStr  = getTextOrNull(node, "lookingFor");
+        Double maxDistanceKm = (node.has("maxDistanceKm") && node.get("maxDistanceKm").isNumber()) ? node.get("maxDistanceKm").asDouble() : null;
 
         // Map species tiếng Việt → giá trị DB
         if (species != null) species = mapSpecies(species);
@@ -173,6 +176,7 @@ public class ChatbotService {
 
         String safeBreed = breed == null ? "" : breed;
         // Tìm kiếm
+        int expandedSize = maxDistanceKm != null ? 30 : 3;
         var results = petProfileRepo.search(
                 userId,
                 species != null, species,
@@ -184,14 +188,26 @@ public class ChatbotService {
                 maxWeight != null, maxWeight,
                 minDob != null, minDob,
                 maxDob != null, maxDob,
-                PageRequest.of(0, 3)
+                PageRequest.of(0, expandedSize)
         );
 
-        List<PetProfileResponse> suggestions = results.getContent()
-                .stream()
-                .limit(3) // Tuyệt đối không quá 3
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+        User currentUser = userRepo.findByEmail(email).orElse(null);
+        List<PetProfileResponse> suggestions;
+
+        if (maxDistanceKm != null && currentUser != null && currentUser.getLatitude() != null) {
+            suggestions = results.getContent().stream()
+                    .filter(p -> p.getOwner().getLatitude() != null &&
+                            haversineKm(currentUser.getLatitude(), currentUser.getLongitude(),
+                                    p.getOwner().getLatitude(), p.getOwner().getLongitude()) <= maxDistanceKm)
+                    .limit(3)
+                    .map(this::toResponse)
+                    .collect(Collectors.toList());
+        } else {
+            suggestions = results.getContent().stream()
+                    .limit(3)
+                    .map(this::toResponse)
+                    .collect(Collectors.toList());
+        }
 
         String replyText;
         if (suggestions.isEmpty()) {
@@ -248,11 +264,26 @@ public class ChatbotService {
     }
 
     private PetProfileResponse toResponse(PetProfile p) {
+        User currentUser = null;
+        try {
+            String email = SecurityContextHolder.getContext().getAuthentication().getName();
+            currentUser = userRepo.findByEmail(email).orElse(null);
+        } catch (Exception ignored) {}
+
         String avatarUrl = petPhotoRepo.findByPetIdAndIsAvatarTrue(p.getId())
                 .map(PetPhoto::getPhotoUrl).orElse(null);
         List<String> photoUrls = petPhotoRepo.findByPetId(p.getId())
                 .stream().map(PetPhoto::getPhotoUrl).toList();
         int age = p.getDateOfBirth() != null ? Period.between(p.getDateOfBirth(), LocalDate.now()).getYears() : 0;
+
+        Double distanceKm = null;
+        if (currentUser != null && currentUser.getLatitude() != null
+                && p.getOwner().getLatitude() != null) {
+            distanceKm = Math.round(haversineKm(
+                    currentUser.getLatitude(), currentUser.getLongitude(),
+                    p.getOwner().getLatitude(), p.getOwner().getLongitude()) * 10.0) / 10.0;
+        }
+
         return PetProfileResponse.builder()
                 .id(p.getId())
                 .ownerId(p.getOwner().getId())
@@ -278,6 +309,19 @@ public class ChatbotService {
                 .avatarUrl(avatarUrl)
                 .photoUrls(photoUrls)
                 .createdAt(p.getCreatedAt())
+                .distanceKm(distanceKm)
+                .ownerAddress(p.getOwner().getAddress())
                 .build();
+    }
+
+    /** Haversine formula: trả về khoảng cách km giữa 2 điểm lat/lon */
+    private static double haversineKm(double lat1, double lon1, double lat2, double lon2) {
+        final double R = 6371.0;
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 }

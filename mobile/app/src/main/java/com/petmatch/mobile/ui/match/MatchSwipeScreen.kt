@@ -322,6 +322,8 @@ private fun SwipeCard(
                     if (!pet.breed.isNullOrBlank())
                         Text(pet.breed, color = Color.White.copy(0.85f), style = MaterialTheme.typography.bodyMedium)
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        if (pet.distanceKm != null)
+                            PetInfoBadge("📍 ${pet.distanceKm} km", Color.White.copy(0.9f))
                         if (pet.isVaccinated == true)
                             PetInfoBadge("✓ Đã tiêm", Color(0xFF22C55E))
                         val lookingFor = Constants.LOOKING_FOR_LABELS[pet.lookingFor]

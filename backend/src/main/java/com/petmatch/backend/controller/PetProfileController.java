@@ -61,11 +61,12 @@ public class PetProfileController {
     public ResponseEntity<?> suggestions(
             @RequestParam(defaultValue = "0")  int page,
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "false") boolean smart) {
+            @RequestParam(defaultValue = "false") boolean smart,
+            @RequestParam(required = false) Double maxDistanceKm) {
         if (smart) {
-            return ResponseEntity.ok(petService.getSmartSuggestions(page, size));
+            return ResponseEntity.ok(petService.getSmartSuggestions(page, size, maxDistanceKm));
         }
-        return ResponseEntity.ok(petService.getSuggestions(page, size));
+        return ResponseEntity.ok(petService.getSuggestions(page, size, maxDistanceKm));
     }
 
     @GetMapping("/search")
@@ -79,11 +80,13 @@ public class PetProfileController {
             @RequestParam(required = false) BigDecimal maxWeight,
             @RequestParam(required = false) Integer minAge,
             @RequestParam(required = false) Integer maxAge,
+            @RequestParam(required = false) Double maxDistanceKm,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         return ResponseEntity.ok(
                 petService.search(species, breed, gender, lookingFor,
-                        healthStatus, minWeight, maxWeight, minAge, maxAge, page, size));
+                        healthStatus, minWeight, maxWeight, minAge, maxAge,
+                        maxDistanceKm, page, size));
     }
 
     // ── Vaccinations ─────────────────────────────────────
