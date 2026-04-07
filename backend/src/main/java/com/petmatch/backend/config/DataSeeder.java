@@ -152,7 +152,7 @@ public class DataSeeder implements CommandLineRunner {
         log.info("DataSeeder: Đang tạo {} tài khoản test...", totalUsersToSeed);
         String encodedPass = passwordEncoder.encode("12345678");
 
-        for (int i = 1; i <= totalUsersToSeed; i++) {
+        for (int i = 1; i <= 100; i++) {
             try {
                 ProvinceInfo prov;
                 double maxRadius = 15.0; // 15km quanh tâm
@@ -196,7 +196,7 @@ public class DataSeeder implements CommandLineRunner {
                 }
 
                 Gender gender = RNG.nextBoolean() ? Gender.MALE : Gender.FEMALE;
-                String petName = randomPetName(gender, i);
+                String petName = "Profile " + i;
                 int ageYears = 1 + RNG.nextInt(9); // 1-9 tuổi
                 LocalDate dob = LocalDate.now().minusYears(ageYears).minusDays(RNG.nextInt(365));
                 BigDecimal weight = randomWeight(species);
@@ -252,7 +252,7 @@ public class DataSeeder implements CommandLineRunner {
                         .isHidden(false)
                         .build());
 
-                // 4. Tạo 1-2 ảnh mẫu
+                // 4. Upload 1-2 ảnh lên Cloudinary
                 int photoCount = 1 + RNG.nextInt(2);
                 boolean firstPhoto = true;
                 for (int p = 0; p < photoCount; p++) {
@@ -268,13 +268,13 @@ public class DataSeeder implements CommandLineRunner {
                 }
 
                 if (i % 10 == 0)
-                    log.info("DataSeeder: Đã tạo {}/{} tài khoản...", i, totalUsersToSeed);
+                    log.info("DataSeeder: Đã tạo {}/100 tài khoản...", i);
 
             } catch (Exception e) {
                 log.warn("DataSeeder: Lỗi khi tạo user{}: {}", i, e.getMessage());
             }
         }
-        log.info("DataSeeder: Hoàn thành! Đã tạo {} tài khoản test.", totalUsersToSeed);
+        log.info("DataSeeder: Hoàn thành! Đã tạo 100 tài khoản test.");
         if (communityPostsEnabled) {
             seedCommunityPostsIfNeeded();
         }
@@ -324,11 +324,10 @@ public class DataSeeder implements CommandLineRunner {
         log.info("DataSeeder: Đã seed 3 community posts mẫu.");
     }
 
-        private String uploadRandomPhoto(String species, int seed) {
+       private String uploadRandomPhoto(String species, int seed) {
         try {
             String imageUrl;
             if ("Chó".equals(species)) {
-                imageUrl = "https://loremflickr.com/400/500/dog?lock=" + (seed % 50);
                 imageUrl = "https://loremflickr.com/400/500/dog?lock=" + seed;
             } else if ("Mèo".equals(species)) {
                 imageUrl = "https://loremflickr.com/400/500/cat?lock=" + seed;
@@ -364,21 +363,6 @@ public class DataSeeder implements CommandLineRunner {
         }
     }
 
-    private String randomImageUrl(String species, int seed) {
-        String safeSpecies = species == null ? "" : species;
-        return switch (safeSpecies) {
-            case "Chó" -> "https://loremflickr.com/400/500/dog?lock=" + (seed % 50);
-            case "Mèo" -> "https://loremflickr.com/400/500/cat?lock=" + seed;
-            case "Thỏ" -> "https://picsum.photos/seed/rabbit" + seed + "/400/500";
-            case "Hamster" -> "https://picsum.photos/seed/hamster" + seed + "/400/500";
-            default -> "https://picsum.photos/seed/pet" + seed + "/400/500";
-        };
-    }
-
-    private String randomPetName(Gender gender, int seed) {
-        String[] pool = gender == Gender.MALE ? MALE_NAMES : FEMALE_NAMES;
-        return pool[seed % pool.length] + " " + (seed + 1);
-    }
 
     private BigDecimal randomWeight(String species) {
         double w = switch (species) {
@@ -436,7 +420,7 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     private void ensureDefaultAdmin() {
-        final String adminEmail = "admin@petmatch.com";
+        final String adminEmail = "admin@gmail.com";
         if (userRepo.existsByEmail(adminEmail)) {
             return;
         }
@@ -444,7 +428,7 @@ public class DataSeeder implements CommandLineRunner {
         userRepo.save(User.builder()
                 .fullName("System Admin")
                 .email(adminEmail)
-                .passwordHash(passwordEncoder.encode("Admin@123"))
+                .passwordHash(passwordEncoder.encode("12345678"))
                 .role(Role.ADMIN)
                 .isLocked(false)
                 .build());
