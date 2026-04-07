@@ -41,6 +41,19 @@ android {
     buildFeatures {
         compose = true
     }
+    // Avoid duplicate native lib conflicts from WebRTC
+    packaging {
+        jniLibs {
+            pickFirsts += setOf("**/libjingle_peerconnection_so.so")
+        }
+        resources {
+            excludes += setOf(
+                "META-INF/INDEX.LIST",
+                "META-INF/io.netty.versions.properties",
+                "META-INF/DEPENDENCIES"
+            )
+        }
+    }
 }
 
 dependencies {
@@ -83,4 +96,7 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+
+    // ─── WebRTC (stream-webrtc-android wraps google-webrtc, cung cấp org.webrtc.*) ─
+    implementation("io.getstream:stream-webrtc-android:1.1.1")
 }

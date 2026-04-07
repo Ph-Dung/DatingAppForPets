@@ -2,6 +2,7 @@ package com.petmatch.backend.service;
 
 import com.petmatch.backend.dto.response.MatchRequestResponse;
 import com.petmatch.backend.dto.response.SuperLikeStatusResponse;
+import com.petmatch.backend.entity.Match;
 import com.petmatch.backend.entity.MatchRequest;
 import com.petmatch.backend.entity.PetPhoto;
 import com.petmatch.backend.entity.PetProfile;
@@ -9,6 +10,7 @@ import com.petmatch.backend.entity.User;
 import com.petmatch.backend.enums.MatchStatus;
 import com.petmatch.backend.exception.AppException;
 import com.petmatch.backend.repository.BlockRepository;
+import com.petmatch.backend.repository.MatchRepository;
 import com.petmatch.backend.repository.MatchRequestRepository;
 import com.petmatch.backend.repository.PetPhotoRepository;
 import com.petmatch.backend.repository.PetProfileRepository;
@@ -31,6 +33,7 @@ import static org.springframework.http.HttpStatus.*;
 public class MatchRequestService {
 
     private final MatchRequestRepository matchRepo;
+    private final MatchRepository matchRepository;
     private final PetProfileRepository petProfileRepo;
     private final PetPhotoRepository petPhotoRepo;
     private final BlockRepository blockRepo;
@@ -110,6 +113,9 @@ public class MatchRequestService {
             reverse.get().setStatus(MatchStatus.ACCEPTED);
             matchRepo.save(reverse.get());
             matchRepo.save(saved);
+            
+            // ── Create User-level Match for chat ───────────────────────
+            createOrUpdateUserMatch(sender.getOwner(), receiver.getOwner());
         }
 
         // ── Cập nhật preference cho AI scoring ───────────────
@@ -117,6 +123,23 @@ public class MatchRequestService {
         catch (Exception ignored) { /* không block luồng chính */ }
 
         return toResponse(saved);
+    }
+
+    /**
+     * Tạo Match record giữa 2 user nếu chưa tồn tại,
+     * để cho chat list có thể hiển thị cuộc trò chuyện.
+     */
+    private void createOrUpdateUserMatch(User user1, User user2) {
+        // Kiểm tra Match đã tồn tại chưa (2 chiều)
+        boolean matchExists = matchRepository.findMatchByUsers(user1, user2).isPresent();
+        
+        if (!matchExists) {
+            Match match = Match.builder()
+                    .user1(user1)
+                    .user2(user2)
+                    .build();
+            matchRepository.save(match);
+        }
     }
 
     // ── Respond (vẫn giữ cho trường hợp manual nếu cần) ───
@@ -131,7 +154,14 @@ public class MatchRequestService {
             throw new AppException("Yêu cầu đã được xử lý", BAD_REQUEST);
 
         match.setStatus(newStatus);
-        return toResponse(matchRepo.save(match));
+        MatchRequest saved = matchRepo.save(match);
+        
+        // ── Nếu ACCEPTED, tạo user-level Match cho chat ─────────────────
+        if (newStatus == MatchStatus.ACCEPTED) {
+            createOrUpdateUserMatch(match.getSenderPet().getOwner(), match.getReceiverPet().getOwner());
+        }
+        
+        return toResponse(saved);
     }
 
     // ── Lists ─────────────────────────────────────────────

@@ -89,12 +89,21 @@ interface MatchApi {
 
     @GET("api/matches/matched")
     suspend fun getMatchedList(): Response<List<MatchRequestResponse>>
+
+    @PATCH("api/matches/{matchId}/respond")
+    suspend fun respondToMatch(
+        @Path("matchId") matchId: Long,
+        @Query("status") status: String
+    ): Response<MatchRequestResponse>
 }
 
 interface InteractionApi {
 
     @POST("api/interactions/blocks/{targetUserId}")
-    suspend fun blockUser(@Path("targetUserId") targetUserId: Long): Response<Any>
+    suspend fun blockUser(
+        @Path("targetUserId") targetUserId: Long,
+        @Query("level") level: String = "ALL"
+    ): Response<Any>
 
     @DELETE("api/interactions/blocks/{targetUserId}")
     suspend fun unblockUser(@Path("targetUserId") targetUserId: Long): Response<Unit>

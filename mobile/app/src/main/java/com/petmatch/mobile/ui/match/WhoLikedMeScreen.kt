@@ -25,6 +25,7 @@ import com.petmatch.mobile.data.model.MatchRequestResponse
 import com.petmatch.mobile.ui.common.*
 import com.petmatch.mobile.ui.navigation.Routes
 import com.petmatch.mobile.ui.petprofile.PetProfileViewModel
+import com.petmatch.mobile.ui.chat.ChatViewModel
 import com.petmatch.mobile.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -32,7 +33,8 @@ import com.petmatch.mobile.ui.theme.*
 fun WhoLikedMeScreen(
     navController: NavController,
     matchVm: MatchViewModel,
-    petVm: PetProfileViewModel
+    petVm: PetProfileViewModel,
+    chatVm: ChatViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
 ) {
     val ctx = LocalContext.current
     val whoLikedMe by matchVm.whoLikedMe.collectAsState()
@@ -91,7 +93,13 @@ fun WhoLikedMeScreen(
                     }
                 }
                 items(superLikes) { req ->
-                    WhoLikedMeCard(req = req, navController = navController, isSuperLike = true)
+                    WhoLikedMeCard(
+                        req = req,
+                        navController = navController,
+                        matchVm = matchVm,
+                        chatVm = chatVm,
+                        isSuperLike = true
+                    )
                 }
             }
 
@@ -112,7 +120,13 @@ fun WhoLikedMeScreen(
                     }
                 }
                 items(regular) { req ->
-                    WhoLikedMeCard(req = req, navController = navController, isSuperLike = false)
+                    WhoLikedMeCard(
+                        req = req,
+                        navController = navController,
+                        matchVm = matchVm,
+                        chatVm = chatVm,
+                        isSuperLike = false
+                    )
                 }
             }
         }
@@ -120,12 +134,18 @@ fun WhoLikedMeScreen(
 }
 
 @Composable
-private fun WhoLikedMeCard(req: MatchRequestResponse, navController: NavController, isSuperLike: Boolean) {
+private fun WhoLikedMeCard(
+    req: MatchRequestResponse,
+    navController: NavController,
+    matchVm: MatchViewModel,
+    chatVm: ChatViewModel,
+    isSuperLike: Boolean
+) {
+    val ctx = LocalContext.current
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(0.72f)
-            .clickable { navController.navigate(Routes.petDetail(req.senderPetId)) },
+            .aspectRatio(0.72f),
         shape = RoundedCornerShape(20.dp),
         elevation = CardDefaults.cardElevation(4.dp)
     ) {
@@ -133,7 +153,7 @@ private fun WhoLikedMeCard(req: MatchRequestResponse, navController: NavControll
             AsyncImage(
                 model = req.senderPetAvatarUrl ?: "https://placedog.net/200/280",
                 contentDescription = req.senderPetName,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().clickable { navController.navigate(Routes.petDetail(req.senderPetId)) },
                 contentScale = ContentScale.Crop
             )
             Box(
@@ -184,10 +204,44 @@ private fun WhoLikedMeCard(req: MatchRequestResponse, navController: NavControll
                 }
             }
 
+            // Action Buttons (Accept/Reject)
+            Row(
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                // Reject button
+                Surface(
+                    modifier = Modifier.weight(1f).height(40.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    color = DislikeRed.copy(0.8f),
+                    onClick = { matchVm.respondToMatch(ctx, req.id, false) }
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.Close, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                    }
+                }
+
+                // Accept button
+                Surface(
+                    modifier = Modifier.weight(1f).height(40.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    color = LikeGreen.copy(0.9f),
+                    onClick = {
+                        matchVm.respondToMatch(ctx, req.id, true) {
+                            chatVm.loadConversations(ctx)  // Refresh chat list
+                        }
+                    }
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                    }
+                }
+            }
+
             // Matched badge
             if (req.status == "ACCEPTED") {
                 Surface(
-                    modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp),
+                    modifier = Modifier.align(Alignment.TopStart).padding(8.dp),
                     color = LikeGreen, shape = RoundedCornerShape(6.dp)
                 ) {
                     Text("Match!", modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),

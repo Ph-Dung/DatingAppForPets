@@ -26,15 +26,27 @@ import coil.compose.AsyncImage
 import com.petmatch.mobile.data.model.MatchRequestResponse
 import com.petmatch.mobile.ui.common.*
 import com.petmatch.mobile.ui.navigation.Routes
+import com.petmatch.mobile.ui.petprofile.PetProfileViewModel
+import com.petmatch.mobile.ui.petprofile.PetUiState
 import com.petmatch.mobile.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MatchedListScreen(navController: NavController, matchVm: MatchViewModel) {
+fun MatchedListScreen(
+    navController: NavController,
+    matchVm: MatchViewModel,
+    petVm: PetProfileViewModel
+) {
     val ctx = LocalContext.current
     val matched by matchVm.matched.collectAsState()
+    val myPetState by petVm.myPet.collectAsState()
 
-    LaunchedEffect(Unit) { matchVm.loadMatched(ctx) }
+    LaunchedEffect(Unit) {
+        matchVm.loadMatched(ctx)
+        petVm.loadMyProfile(ctx)
+    }
+
+    val myPetId = (myPetState as? PetUiState.Success)?.pet?.id ?: 0L
 
     Scaffold(
         topBar = {
@@ -86,18 +98,28 @@ fun MatchedListScreen(navController: NavController, matchVm: MatchViewModel) {
                 )
             }
             items(matched, key = { it.id }) { req ->
-                MatchedCard(req = req, navController = navController)
+                MatchedCard(
+                    req = req,
+                    navController = navController,
+                    myPetId = myPetId
+                )
             }
         }
     }
 }
 
 @Composable
-private fun MatchedCard(req: MatchRequestResponse, navController: NavController) {
-    // Determine "the other pet" based on context
-    val otherName   = req.receiverPetName ?: req.senderPetName ?: "?"
-    val otherAvatar = req.receiverPetAvatarUrl ?: req.senderPetAvatarUrl
-    val otherPetId  = req.receiverPetId
+private fun MatchedCard(
+    req: MatchRequestResponse,
+    navController: NavController,
+    myPetId: Long
+) {
+    // Determine "the other pet" - if I'm the sender, other is receiver & vice versa
+    val (otherName, otherAvatar, otherPetId) = if (req.senderPetId == myPetId) {
+        Triple(req.receiverPetName ?: "?", req.receiverPetAvatarUrl, req.receiverPetId)
+    } else {
+        Triple(req.senderPetName ?: "?", req.senderPetAvatarUrl, req.senderPetId)
+    }
 
     Card(
         modifier = Modifier

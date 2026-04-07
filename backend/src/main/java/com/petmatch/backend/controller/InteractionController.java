@@ -3,6 +3,7 @@ package com.petmatch.backend.controller;
 import com.petmatch.backend.dto.ReviewRequest;
 import com.petmatch.backend.dto.request.ReportRequest;
 import com.petmatch.backend.entity.Block;
+import com.petmatch.backend.entity.BlockLevel;
 import com.petmatch.backend.entity.Report;
 import com.petmatch.backend.entity.Review;
 import com.petmatch.backend.service.InteractionService;
@@ -22,7 +23,6 @@ public class InteractionController {
 
     // ── REVIEWS ──────────────────────────────────────────
 
-    /** Đánh giá người dùng sau khi match */
     @PostMapping("/reviews/{revieweeId}")
     public ResponseEntity<Review> createReview(
             @PathVariable Long revieweeId,
@@ -37,20 +37,23 @@ public class InteractionController {
 
     // ── BLOCKS ───────────────────────────────────────────
 
-    /** Chặn người dùng – dùng JWT để xác định blocker */
+    /**
+     * Chặn người dùng với cấp độ chặn.
+     * level: MESSAGE | CALL | ALL (mặc định ALL)
+     */
     @PostMapping("/blocks/{targetUserId}")
-    public ResponseEntity<Block> blockUser(@PathVariable Long targetUserId) {
-        return ResponseEntity.ok(interactionService.blockUser(targetUserId));
+    public ResponseEntity<Block> blockUser(
+            @PathVariable Long targetUserId,
+            @RequestParam(defaultValue = "ALL") BlockLevel level) {
+        return ResponseEntity.ok(interactionService.blockUser(targetUserId, level));
     }
 
-    /** Bỏ chặn người dùng theo targetUserId */
     @DeleteMapping("/blocks/{targetUserId}")
     public ResponseEntity<Void> unblockUser(@PathVariable Long targetUserId) {
         interactionService.unblockUser(targetUserId);
         return ResponseEntity.noContent().build();
     }
 
-    /** Danh sách người mình đã chặn */
     @GetMapping("/blocks")
     public ResponseEntity<List<com.petmatch.backend.dto.response.BlockResponse>> getMyBlocks() {
         return ResponseEntity.ok(interactionService.getMyBlocks());
@@ -58,7 +61,6 @@ public class InteractionController {
 
     // ── REPORTS ──────────────────────────────────────────
 
-    /** Báo cáo vi phạm (pet profile, user, ...) */
     @PostMapping("/reports")
     public ResponseEntity<Report> submitReport(@Valid @RequestBody ReportRequest req) {
         return ResponseEntity.status(201).body(interactionService.submitReport(req));

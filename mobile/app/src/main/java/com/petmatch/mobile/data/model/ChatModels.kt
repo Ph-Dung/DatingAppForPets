@@ -8,15 +8,42 @@ data class MessageResponse(
     val id: Long,
     val senderId: Long,
     val receiverId: Long,
-    val content: String,
+    val content: String?,
     val sentAt: String?,
-    val isRead: Boolean
+    val isRead: Boolean,
+    val type: String = "TEXT",     // TEXT | IMAGE | VOICE
+    val mediaUrl: String? = null
 )
 
 data class MessageRequest(
     val senderId: Long,
     val receiverId: Long,
-    val content: String
+    val content: String?,
+    val type: String = "TEXT",
+    val mediaUrl: String? = null
+)
+
+// ── Conversation (match-gated list) ──────────────────────────────────────────
+
+data class ConversationItem(
+    @SerializedName("matchedUserId")
+    val userId: Long,
+    val userName: String,
+    @SerializedName("avatarUrl")
+    val userAvatar: String?,
+    val lastMessage: String?,
+    val lastMessageTime: String?,
+    val unreadCount: Long,
+    val isOnline: Boolean = false,
+    val isMuted: Boolean = false
+)
+
+// ── Block Status ──────────────────────────────────────────────────────────────
+
+data class BlockStatus(
+    val iBlockedThem: Boolean,
+    val theyBlockedMe: Boolean,
+    val myBlockLevel: String  // MESSAGE | CALL | ALL | ""
 )
 
 // ── WebRTC Signaling ─────────────────────────────────────────────────────────
@@ -40,7 +67,7 @@ data class CallHistoryResponse(
     val callerId: Long,
     val calleeId: Long,
     val type: String,
-    val status: String,  // MISSED, ACCEPTED, REJECTED, ONGOING
+    val status: String,
     val startedAt: String?,
     val endedAt: String?,
     val durationSeconds: Int?
@@ -50,7 +77,7 @@ data class CallHistoryResponse(
 
 data class AppointmentRequest(
     val recipientId: Long,
-    val meetingTime: String,  // ISO-8601
+    val meetingTime: String,
     val location: String,
     val notes: String?
 )
@@ -64,14 +91,14 @@ data class AppointmentResponse(
     val meetingTime: String,
     val location: String,
     val notes: String?,
-    val status: String,  // PENDING, CONFIRMED, COMPLETED, CANCELLED
+    val status: String,
     val createdAt: String?
 )
 
 // ── Review ────────────────────────────────────────────────────────────────────
 
 data class ReviewRequest(
-    val rating: Int,  // 1..5
+    val rating: Int,
     val comment: String?
 )
 
@@ -96,10 +123,20 @@ data class GroupChatResponse(
     val id: Long,
     val name: String,
     val avatarUrl: String?,
-    val creatorId: Long,
-    val memberIds: List<Long>,
-    val lastMessage: String?,
+    @SerializedName("createdById") val creatorId: Long,
+    val members: List<GroupMemberResponse> = emptyList(),
+    val lastMessage: String? = null,
     val createdAt: String?
+) {
+    val memberIds: List<Long> get() = members.map { it.userId }
+}
+
+data class GroupMemberResponse(
+    val userId: Long,
+    val fullName: String,
+    val avatarUrl: String?,
+    val role: String,
+    val joinedAt: String?
 )
 
 data class GroupMessageRequest(
@@ -116,14 +153,9 @@ data class GroupMessageResponse(
     val sentAt: String?
 )
 
-// ── Chat Conversation (for list display) ─────────────────────────────────────
+// ── Upload Media Response ─────────────────────────────────────────────────────
 
-data class ConversationItem(
-    val userId: Long,
-    val userName: String,
-    val userAvatar: String?,
-    val lastMessage: String,
-    val lastMessageTime: String?,
-    val unreadCount: Long,
-    val isOnline: Boolean = false
+data class MediaUploadResponse(
+    val mediaUrl: String,
+    val type: String  // IMAGE | VOICE
 )

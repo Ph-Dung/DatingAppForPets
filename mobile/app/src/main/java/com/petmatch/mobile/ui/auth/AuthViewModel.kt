@@ -35,6 +35,10 @@ class AuthViewModel : ViewModel() {
                 val body = res.body()!!
                 ctx.dataStore.edit { prefs ->
                     prefs[stringPreferencesKey(Constants.TOKEN_KEY)] = body.token
+                    // Persist user ID so other ViewModels can use it
+                    body.userId?.let { uid ->
+                        prefs[stringPreferencesKey("current_user_id")] = uid.toString()
+                    }
                 }
                 _authState.value = AuthState.Success(hasPetProfile = body.hasPetProfile)
             } else {
@@ -55,6 +59,9 @@ class AuthViewModel : ViewModel() {
                 val body = res.body()!!
                 ctx.dataStore.edit { prefs ->
                     prefs[stringPreferencesKey(Constants.TOKEN_KEY)] = body.token
+                    body.userId?.let { uid ->
+                        prefs[stringPreferencesKey("current_user_id")] = uid.toString()
+                    }
                 }
                 // Tài khoản mới → hasPetProfile luôn false
                 _authState.value = AuthState.Success(hasPetProfile = body.hasPetProfile)
@@ -71,7 +78,10 @@ class AuthViewModel : ViewModel() {
     }
 
     fun logout(ctx: Context) = viewModelScope.launch {
-        ctx.dataStore.edit { it.remove(stringPreferencesKey(Constants.TOKEN_KEY)) }
+        ctx.dataStore.edit {
+            it.remove(stringPreferencesKey(Constants.TOKEN_KEY))
+            it.remove(stringPreferencesKey("current_user_id"))
+        }
         _authState.value = AuthState.Idle
     }
 

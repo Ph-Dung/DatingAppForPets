@@ -19,6 +19,7 @@ public class GroupChatResponse {
     private Long createdById;
     private LocalDateTime createdAt;
     private List<GroupMemberResponse> members;
+    private String lastMessage;   // Nội dung tin nhắn cuối cùng (null nếu chưa có)
 
     @Data
     @Builder
@@ -32,3 +33,4 @@ public class GroupChatResponse {
         private LocalDateTime joinedAt;
     }
 }
+

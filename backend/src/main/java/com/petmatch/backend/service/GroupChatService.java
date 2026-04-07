@@ -157,6 +157,10 @@ public class GroupChatService {
 
     private GroupChatResponse toGroupResponse(ChatGroup group) {
         List<ChatGroupMember> members = chatGroupMemberRepository.findByGroup(group);
+        String lastMessage = groupMessageRepository.findTopByGroupOrderBySentAtDesc(group)
+                .map(GroupMessage::getContent)
+                .orElse(null);
+
         return GroupChatResponse.builder()
                 .id(group.getId())
                 .name(group.getName())
@@ -170,6 +174,7 @@ public class GroupChatService {
                         .role(m.getRole().name())
                         .joinedAt(m.getJoinedAt())
                         .build()).collect(Collectors.toList()))
+                .lastMessage(lastMessage)
                 .build();
     }
 

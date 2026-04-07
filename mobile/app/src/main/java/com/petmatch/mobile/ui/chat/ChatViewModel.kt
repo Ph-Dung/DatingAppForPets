@@ -1,15 +1,214 @@
 package com.petmatch.mobile.ui.chat
 
 import android.content.Context
+import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.gson.Gson
+import com.petmatch.mobile.Constants
 import com.petmatch.mobile.data.api.RetrofitClient
+import com.petmatch.mobile.data.api.SignalingClient
+import com.petmatch.mobile.data.api.dataStore
 import com.petmatch.mobile.data.model.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.asRequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
+import androidx.datastore.preferences.core.stringPreferencesKey
+import java.io.File
+
+/** Trạng thái cuộc gọi đến – null = không có cuộc gọi nào. */
+data class IncomingCallState(
+    val callId: Long,
+    val callType: String,   // "AUDIO" | "VIDEO"
+    val callerId: Long,
+    val callerName: String
+)
 
 class ChatViewModel : ViewModel() {
+
+    // ── Current user ID (from DataStore) ──────────────────────────────────────
+    private val _currentUserId = MutableStateFlow(0L)
+    val currentUserId: StateFlow<Long> = _currentUserId
+
+    fun loadCurrentUserId(ctx: Context) {
+        viewModelScope.launch {
+            val id = ctx.dataStore.data
+                .map { it[stringPreferencesKey("current_user_id")] }
+                .firstOrNull()?.toLongOrNull() ?: 0L
+            _currentUserId.value = id
+        }
+    }
+
+    // ── Signaling (WebRTC) ────────────────────────────────────────────────────
+    private val gson = Gson()
+    private var signalingClient: SignalingClient? = null
+
+    /** Cuộc gọi đến – collect bởi màn hình đang hiển thị để show IncomingCallOverlay. */
+    private val _incomingCall = MutableStateFlow<IncomingCallState?>(null)
+    val incomingCall: StateFlow<IncomingCallState?> = _incomingCall
+
+    /** Signal thô nhận từ người kia (OFFER / ANSWER / ICE_CANDIDATE / HANG_UP). */
+    private val _rtcSignal = MutableStateFlow<SignalingMessage?>(null)
+    val rtcSignal: StateFlow<SignalingMessage?> = _rtcSignal
+
+    private val _signalingConnected = MutableStateFlow(false)
+    val signalingConnected: StateFlow<Boolean> = _signalingConnected
+
+    /**
+     * Khởi tạo SignalingClient và kết nối STOMP.
+     * Gọi một lần khi vào màn hình Call.
+     */
+    fun connectSignaling(ctx: Context, onConnected: () -> Unit = {}) {
+        // Guard: if already connected, just fire the callback
+        if (_signalingConnected.value && signalingClient != null) {
+            onConnected()
+            return
+        }
+        viewModelScope.launch {
+            val token = ctx.dataStore.data
+                .map { it[stringPreferencesKey(Constants.TOKEN_KEY)] }
+                .firstOrNull() ?: return@launch
+
+            val baseWsUrl = Constants.BASE_URL
+                .replace("http://", "ws://")
+                .replace("https://", "wss://")
+                .trimEnd('/')
+
+            signalingClient?.disconnect()  // clean up any stale connection
+            signalingClient = SignalingClient(
+                baseWsUrl = baseWsUrl,
+                token = token,
+                onSignal = { msg -> handleIncomingSignal(msg) },
+                onConnectionEstablished = {
+                    _signalingConnected.value = true
+                    onConnected()
+                },
+                onConnectionLost = { _signalingConnected.value = false }
+            ).also { it.connect() }
+        }
+    }
+
+    fun disconnectSignaling() {
+        signalingClient?.disconnect()
+        signalingClient = null
+        _signalingConnected.value = false
+        _rtcSignal.value = null
+        _incomingCall.value = null
+    }
+
+    fun sendRtcSignal(msg: SignalingMessage) {
+        signalingClient?.sendSignal(msg)
+            ?: Log.w("ChatViewModel", "sendRtcSignal: signalingClient is null")
+    }
+
+    /** Clear đã xử lý signal. */
+    fun consumeRtcSignal() { _rtcSignal.value = null }
+
+    /** Dismiss incoming call (người dùng bác bỏ). */
+    fun dismissIncomingCall() { _incomingCall.value = null }
+
+    private fun handleIncomingSignal(msg: SignalingMessage) {
+        when (msg.type) {
+            "INCOMING_CALL" -> {
+                // msg.data = { "callId": 42, "callType": "AUDIO" }
+                try {
+                    val map = gson.fromJson(msg.data, Map::class.java)
+                    val callId = (map["callId"] as? Double)?.toLong() ?: return
+                    val callType = map["callType"] as? String ?: "AUDIO"
+                    _incomingCall.value = IncomingCallState(
+                        callId = callId,
+                        callType = callType,
+                        callerId = msg.senderId,
+                        callerName = "Cuộc gọi đến"   // Name resolved from conversation list
+                    )
+                } catch (e: Exception) {
+                    Log.e("ChatViewModel", "Parse INCOMING_CALL error: ${e.message}")
+                }
+            }
+            // OFFER, ANSWER, ICE_CANDIDATE, HANG_UP → relay tới CallScreen
+            else -> { _rtcSignal.value = msg }
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        disconnectSignaling()
+    }
+
+    // ── Conversations (match-gated list) ──────────────────────────────────────
+    private val _conversations = MutableStateFlow<List<ConversationItem>>(emptyList())
+    val conversations: StateFlow<List<ConversationItem>> = _conversations
+
+    private val _conversationsLoading = MutableStateFlow(false)
+    val conversationsLoading: StateFlow<Boolean> = _conversationsLoading
+
+    fun loadConversations(ctx: Context) {
+        viewModelScope.launch {
+            _conversationsLoading.value = true
+            try {
+                val resp = RetrofitClient.chatApi(ctx).getConversations()
+                if (resp.isSuccessful) {
+                    _conversations.value = resp.body() ?: emptyList()
+                }
+            } catch (_: Exception) {}
+            finally { _conversationsLoading.value = false }
+        }
+    }
+
+    fun deleteConversation(ctx: Context, otherId: Long) {
+        viewModelScope.launch {
+            try {
+                RetrofitClient.chatApi(ctx).deleteConversation(otherId)
+                _conversations.value = _conversations.value.filter { it.userId != otherId }
+            } catch (_: Exception) {}
+        }
+    }
+
+    fun muteConversation(otherId: Long) {
+        // Toggle mute locally (backend mute endpoint can be added later)
+        _conversations.value = _conversations.value.map {
+            if (it.userId == otherId) it.copy(isMuted = !it.isMuted) else it
+        }
+    }
+
+    // ── Block Status ──────────────────────────────────────────────────────────
+    private val _blockStatus = MutableStateFlow<BlockStatus?>(null)
+    val blockStatus: StateFlow<BlockStatus?> = _blockStatus
+
+    fun loadBlockStatus(ctx: Context, otherUserId: Long) {
+        viewModelScope.launch {
+            try {
+                val resp = RetrofitClient.chatApi(ctx).getBlockStatus(otherUserId)
+                if (resp.isSuccessful) _blockStatus.value = resp.body()
+            } catch (_: Exception) {}
+        }
+    }
+
+    fun blockUser(ctx: Context, targetUserId: Long, level: String = "ALL") {
+        viewModelScope.launch {
+            try {
+                RetrofitClient.interactionApi(ctx).blockUser(targetUserId, level)
+                _blockStatus.value = _blockStatus.value?.copy(iBlockedThem = true, myBlockLevel = level)
+                    ?: BlockStatus(iBlockedThem = true, theyBlockedMe = false, myBlockLevel = level)
+            } catch (_: Exception) {}
+        }
+    }
+
+    fun unblockUser(ctx: Context, targetUserId: Long) {
+        viewModelScope.launch {
+            try {
+                RetrofitClient.interactionApi(ctx).unblockUser(targetUserId)
+                _blockStatus.value = _blockStatus.value?.copy(iBlockedThem = false, myBlockLevel = "")
+            } catch (_: Exception) {}
+        }
+    }
 
     // ── Chat History ──────────────────────────────────────────────────────────
     private val _messages = MutableStateFlow<List<MessageResponse>>(emptyList())
@@ -45,9 +244,59 @@ class ChatViewModel : ViewModel() {
 
     fun markAsRead(ctx: Context, senderId: Long, receiverId: Long) {
         viewModelScope.launch {
+            try { RetrofitClient.chatApi(ctx).markAsRead(senderId, receiverId) }
+            catch (_: Exception) {}
+        }
+    }
+
+    // ── Media Upload (Image / Voice) ──────────────────────────────────────────
+    private val _mediaUploadLoading = MutableStateFlow(false)
+    val mediaUploadLoading: StateFlow<Boolean> = _mediaUploadLoading
+
+    /**
+     * Upload file từ Uri, gửi media message vào conversation.
+     * type: "IMAGE" hoặc "VOICE"
+     */
+    fun uploadAndSendMedia(
+        ctx: Context,
+        fileUri: Uri,
+        type: String,
+        currentUserId: Long,
+        receiverId: Long
+    ) {
+        viewModelScope.launch {
+            _mediaUploadLoading.value = true
             try {
-                RetrofitClient.chatApi(ctx).markAsRead(senderId, receiverId)
+                val contentResolver = ctx.contentResolver
+                val mimeType = contentResolver.getType(fileUri) ?: "application/octet-stream"
+                val inputStream = contentResolver.openInputStream(fileUri) ?: return@launch
+                val tempFile = File.createTempFile("upload_", null, ctx.cacheDir)
+                tempFile.outputStream().use { inputStream.copyTo(it) }
+
+                val requestFile = tempFile.asRequestBody(mimeType.toMediaTypeOrNull())
+                val filePart = MultipartBody.Part.createFormData("file", tempFile.name, requestFile)
+                val typePart = type.toRequestBody("text/plain".toMediaTypeOrNull())
+
+                val resp = RetrofitClient.chatApi(ctx).uploadMedia(filePart, typePart)
+                if (resp.isSuccessful) {
+                    val upload = resp.body() ?: return@launch
+                    // Thêm vào UI ngay (optimistic)
+                    val localMsg = MessageResponse(
+                        id = System.currentTimeMillis(),
+                        senderId = currentUserId,
+                        receiverId = receiverId,
+                        content = null,
+                        sentAt = java.time.LocalDateTime.now().toString(),
+                        isRead = false,
+                        type = upload.type,
+                        mediaUrl = upload.mediaUrl
+                    )
+                    addLocalMessage(localMsg)
+                }
             } catch (_: Exception) {}
+            finally {
+                _mediaUploadLoading.value = false
+            }
         }
     }
 
@@ -64,29 +313,20 @@ class ChatViewModel : ViewModel() {
     fun startCall(ctx: Context, calleeId: Long, type: String, onSuccess: (CallHistoryResponse) -> Unit) {
         viewModelScope.launch {
             try {
-                val resp = RetrofitClient.callApi(ctx).startCall(
-                    CallRequest(calleeId = calleeId, type = type)
-                )
+                val resp = RetrofitClient.callApi(ctx).startCall(CallRequest(calleeId, type))
                 if (resp.isSuccessful) {
-                    resp.body()?.let {
-                        _currentCall.value = it
-                        onSuccess(it)
-                    }
+                    resp.body()?.let { _currentCall.value = it; onSuccess(it) }
                 } else {
                     _callError.value = "Không thể bắt đầu cuộc gọi"
                 }
-            } catch (e: Exception) {
-                _callError.value = e.message
-            }
+            } catch (e: Exception) { _callError.value = e.message }
         }
     }
 
-    fun endCall(ctx: Context, callId: Long, status: String = "ACCEPTED") {
+    fun endCall(ctx: Context, callId: Long, status: String = "ACCEPTED", durationSeconds: Int? = null) {
         viewModelScope.launch {
-            try {
-                RetrofitClient.callApi(ctx).endCall(callId, status)
-                _currentCall.value = null
-            } catch (_: Exception) {}
+            try { RetrofitClient.callApi(ctx).endCall(callId, status, durationSeconds); _currentCall.value = null }
+            catch (_: Exception) {}
         }
     }
 
@@ -94,9 +334,7 @@ class ChatViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 val resp = RetrofitClient.callApi(ctx).getCallHistory(userId)
-                if (resp.isSuccessful) {
-                    _callHistory.value = resp.body() ?: emptyList()
-                }
+                if (resp.isSuccessful) _callHistory.value = resp.body() ?: emptyList()
             } catch (_: Exception) {}
         }
     }
@@ -116,21 +354,13 @@ class ChatViewModel : ViewModel() {
 
     fun createAppointment(ctx: Context, req: AppointmentRequest, onSuccess: () -> Unit) {
         viewModelScope.launch {
-            _appointmentLoading.value = true
-            _appointmentError.value = null
+            _appointmentLoading.value = true; _appointmentError.value = null
             try {
                 val resp = RetrofitClient.appointmentApi(ctx).createAppointment(req)
-                if (resp.isSuccessful) {
-                    _appointmentSuccess.value = true
-                    onSuccess()
-                } else {
-                    _appointmentError.value = "Không thể tạo lịch hẹn"
-                }
-            } catch (e: Exception) {
-                _appointmentError.value = e.message
-            } finally {
-                _appointmentLoading.value = false
-            }
+                if (resp.isSuccessful) { _appointmentSuccess.value = true; onSuccess() }
+                else _appointmentError.value = "Không thể tạo lịch hẹn"
+            } catch (e: Exception) { _appointmentError.value = e.message }
+            finally { _appointmentLoading.value = false }
         }
     }
 
@@ -139,13 +369,9 @@ class ChatViewModel : ViewModel() {
             _appointmentLoading.value = true
             try {
                 val resp = RetrofitClient.appointmentApi(ctx).getUserAppointments(userId)
-                if (resp.isSuccessful) {
-                    _appointments.value = resp.body() ?: emptyList()
-                }
+                if (resp.isSuccessful) _appointments.value = resp.body() ?: emptyList()
             } catch (_: Exception) {}
-            finally {
-                _appointmentLoading.value = false
-            }
+            finally { _appointmentLoading.value = false }
         }
     }
 
@@ -153,50 +379,31 @@ class ChatViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 val resp = RetrofitClient.appointmentApi(ctx).updateStatus(id, status)
-                if (resp.isSuccessful) {
-                    // Refresh list
-                    _appointments.value = _appointments.value.map {
-                        if (it.id == id) it.copy(status = status) else it
-                    }
-                }
+                if (resp.isSuccessful)
+                    _appointments.value = _appointments.value.map { if (it.id == id) it.copy(status = status) else it }
             } catch (_: Exception) {}
         }
     }
 
-    fun resetAppointmentSuccess() {
-        _appointmentSuccess.value = false
-    }
+    fun resetAppointmentSuccess() { _appointmentSuccess.value = false }
 
     // ── Review ────────────────────────────────────────────────────────────────
     private val _reviewLoading = MutableStateFlow(false)
     val reviewLoading: StateFlow<Boolean> = _reviewLoading
-
     private val _reviewError = MutableStateFlow<String?>(null)
     val reviewError: StateFlow<String?> = _reviewError
-
     private val _reviewSuccess = MutableStateFlow(false)
     val reviewSuccess: StateFlow<Boolean> = _reviewSuccess
 
     fun submitReview(ctx: Context, revieweeId: Long, rating: Int, comment: String?, onSuccess: () -> Unit) {
         viewModelScope.launch {
-            _reviewLoading.value = true
-            _reviewError.value = null
+            _reviewLoading.value = true; _reviewError.value = null
             try {
-                val resp = RetrofitClient.reviewApi(ctx).submitReview(
-                    revieweeId,
-                    ReviewRequest(rating = rating, comment = comment)
-                )
-                if (resp.isSuccessful) {
-                    _reviewSuccess.value = true
-                    onSuccess()
-                } else {
-                    _reviewError.value = "Không thể gửi đánh giá"
-                }
-            } catch (e: Exception) {
-                _reviewError.value = e.message
-            } finally {
-                _reviewLoading.value = false
-            }
+                val resp = RetrofitClient.reviewApi(ctx).submitReview(revieweeId, ReviewRequest(rating, comment))
+                if (resp.isSuccessful) { _reviewSuccess.value = true; onSuccess() }
+                else _reviewError.value = "Không thể gửi đánh giá"
+            } catch (e: Exception) { _reviewError.value = e.message }
+            finally { _reviewLoading.value = false }
         }
     }
 
@@ -205,16 +412,12 @@ class ChatViewModel : ViewModel() {
     // ── Group Chat ─────────────────────────────────────────────────────────────
     private val _groups = MutableStateFlow<List<GroupChatResponse>>(emptyList())
     val groups: StateFlow<List<GroupChatResponse>> = _groups
-
     private val _groupMessages = MutableStateFlow<List<GroupMessageResponse>>(emptyList())
     val groupMessages: StateFlow<List<GroupMessageResponse>> = _groupMessages
-
     private val _groupLoading = MutableStateFlow(false)
     val groupLoading: StateFlow<Boolean> = _groupLoading
-
     private val _groupError = MutableStateFlow<String?>(null)
     val groupError: StateFlow<String?> = _groupError
-
     private val _groupCreateSuccess = MutableStateFlow(false)
     val groupCreateSuccess: StateFlow<Boolean> = _groupCreateSuccess
 
@@ -223,36 +426,21 @@ class ChatViewModel : ViewModel() {
             _groupLoading.value = true
             try {
                 val resp = RetrofitClient.groupChatApi(ctx).getUserGroups()
-                if (resp.isSuccessful) {
-                    _groups.value = resp.body() ?: emptyList()
-                }
-            } catch (_: Exception) {} finally {
-                _groupLoading.value = false
-            }
+                if (resp.isSuccessful) _groups.value = resp.body() ?: emptyList()
+            } catch (_: Exception) {}
+            finally { _groupLoading.value = false }
         }
     }
 
     fun createGroup(ctx: Context, name: String, avatarUrl: String?, memberIds: List<Long>, onSuccess: (GroupChatResponse) -> Unit) {
         viewModelScope.launch {
-            _groupLoading.value = true
-            _groupError.value = null
+            _groupLoading.value = true; _groupError.value = null
             try {
-                val resp = RetrofitClient.groupChatApi(ctx).createGroup(
-                    GroupChatCreateRequest(name = name, avatarUrl = avatarUrl, memberIds = memberIds)
-                )
-                if (resp.isSuccessful) {
-                    resp.body()?.let {
-                        _groupCreateSuccess.value = true
-                        onSuccess(it)
-                    }
-                } else {
-                    _groupError.value = "Không thể tạo nhóm"
-                }
-            } catch (e: Exception) {
-                _groupError.value = e.message
-            } finally {
-                _groupLoading.value = false
-            }
+                val resp = RetrofitClient.groupChatApi(ctx).createGroup(GroupChatCreateRequest(name, avatarUrl, memberIds))
+                if (resp.isSuccessful) resp.body()?.let { _groupCreateSuccess.value = true; onSuccess(it) }
+                else _groupError.value = "Không thể tạo nhóm"
+            } catch (e: Exception) { _groupError.value = e.message }
+            finally { _groupLoading.value = false }
         }
     }
 
@@ -260,9 +448,7 @@ class ChatViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 val resp = RetrofitClient.groupChatApi(ctx).getGroupHistory(groupId)
-                if (resp.isSuccessful) {
-                    _groupMessages.value = resp.body() ?: emptyList()
-                }
+                if (resp.isSuccessful) _groupMessages.value = resp.body() ?: emptyList()
             } catch (_: Exception) {}
         }
     }

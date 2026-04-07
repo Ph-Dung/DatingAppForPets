@@ -22,6 +22,7 @@ public class AppointmentService {
     private final AppointmentRepository appointmentRepository;
     private final UserRepository userRepository;
     private final SimpMessagingTemplate messagingTemplate;
+    private final com.petmatch.backend.repository.MatchRepository matchRepository;
 
     @Transactional
     public Appointment createAppointment(Long requesterId, AppointmentRequest request) {
@@ -29,6 +30,11 @@ public class AppointmentService {
                 .orElseThrow(() -> new AppException("Requester not found", HttpStatus.NOT_FOUND));
         User recipient = userRepository.findById(request.getRecipientId())
                 .orElseThrow(() -> new AppException("Recipient not found", HttpStatus.NOT_FOUND));
+
+        // Match check: chỉ người đã match mới tạo lịch hẹn được
+        if (matchRepository.findMatchByUsers(requester, recipient).isEmpty()) {
+            throw new AppException("Chỉ có thể đặt lịch hẹn với người đã match", HttpStatus.FORBIDDEN);
+        }
 
         Appointment appointment = Appointment.builder()
                 .requester(requester)
@@ -41,7 +47,7 @@ public class AppointmentService {
 
         Appointment saved = appointmentRepository.save(appointment);
 
-        // Fix #14: Thông báo real-time cho người nhận có lịch hẹn mới
+        // Thông báo real-time cho người nhận có lịch hẹn mới (cần xác nhận)
         messagingTemplate.convertAndSendToUser(
                 String.valueOf(request.getRecipientId()),
                 "/queue/appointments",

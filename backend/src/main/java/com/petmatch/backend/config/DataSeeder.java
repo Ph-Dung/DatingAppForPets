@@ -37,37 +37,37 @@ public class DataSeeder implements CommandLineRunner {
 
     // ── Data pools ────────────────────────────────────────────
     private static final String[] DOG_BREEDS = {
-        "Poodle", "Golden Retriever", "Husky", "Corgi", "Shiba Inu",
-        "Phú Quốc", "Chow Chow", "Labrador", "Chihuahua", "Bulldog Pháp",
-        "Bichon", "Pomeranian", "Dachshund", "Beagle", "Lai"
+            "Poodle", "Golden Retriever", "Husky", "Corgi", "Shiba Inu",
+            "Phú Quốc", "Chow Chow", "Labrador", "Chihuahua", "Bulldog Pháp",
+            "Bichon", "Pomeranian", "Dachshund", "Beagle", "Lai"
     };
     private static final String[] CAT_BREEDS = {
-        "Anh lông ngắn", "Ba Tư", "Munchkin", "Ragdoll", "Maine Coon",
-        "Scottish Fold", "Siamese", "Bengal", "Mèo ta", "Lai"
+            "Anh lông ngắn", "Ba Tư", "Munchkin", "Ragdoll", "Maine Coon",
+            "Scottish Fold", "Siamese", "Bengal", "Mèo ta", "Lai"
     };
     private static final String[] RABBIT_BREEDS = {
-        "Holland Lop", "Mini Rex", "Angora", "Flemish Giant", "Lai"
+            "Holland Lop", "Mini Rex", "Angora", "Flemish Giant", "Lai"
     };
     private static final String[] HAMSTER_BREEDS = {
-        "Syrian", "Dwarf Roborovski", "Djungarian", "Chinese"
+            "Syrian", "Dwarf Roborovski", "Djungarian", "Chinese"
     };
     private static final String[] COLORS = {
-        "Trắng", "Đen", "Nâu", "Vàng", "Xám", "Nâu đen", "Trắng đen", "Kem"
+            "Trắng", "Đen", "Nâu", "Vàng", "Xám", "Nâu đen", "Trắng đen", "Kem"
     };
     private static final String[] PERSONALITY_OPTIONS = {
-        "Năng động", "Thân thiện", "Lười biếng", "Tinh nghịch", "Ngoan ngoãn",
-        "Nhút nhát", "Thích ôm", "Độc lập", "Ham ăn", "Thích chơi",
-        "Yên lặng", "Thông minh", "Tò mò", "Bảo vệ chủ"
+            "Năng động", "Thân thiện", "Lười biếng", "Tinh nghịch", "Ngoan ngoãn",
+            "Nhút nhát", "Thích ôm", "Độc lập", "Ham ăn", "Thích chơi",
+            "Yên lặng", "Thông minh", "Tò mò", "Bảo vệ chủ"
     };
     private static final String[] MALE_NAMES = {
-        "Max", "Buddy", "Charlie", "Rocky", "Bear", "Duke", "Milo",
-        "Simba", "Leo", "Coco", "Tuấn", "Kobe", "Shadow", "Titan", "Thor",
-        "Bông", "Bi", "Tom", "Jerry", "Chip"
+            "Max", "Buddy", "Charlie", "Rocky", "Bear", "Duke", "Milo",
+            "Simba", "Leo", "Coco", "Tuấn", "Kobe", "Shadow", "Titan", "Thor",
+            "Bông", "Bi", "Tom", "Jerry", "Chip"
     };
     private static final String[] FEMALE_NAMES = {
-        "Bella", "Luna", "Daisy", "Molly", "Lola", "Chloe", "Sophie",
-        "Lily", "Nala", "Sakura", "Mi", "Bé", "Trúc", "Hoa", "Tuyết",
-        "Nemo", "Mochi", "Peach", "Pearl", "Ruby"
+            "Bella", "Luna", "Daisy", "Molly", "Lola", "Chloe", "Sophie",
+            "Lily", "Nala", "Sakura", "Mi", "Bé", "Trúc", "Hoa", "Tuyết",
+            "Nemo", "Mochi", "Peach", "Pearl", "Ruby"
     };
 
     @Override
@@ -98,15 +98,22 @@ public class DataSeeder implements CommandLineRunner {
                 String species;
                 String[] breeds;
                 int roll = RNG.nextInt(100);
-                if (roll < 50)      { species = "Chó";     breeds = DOG_BREEDS; }
-                else if (roll < 80) { species = "Mèo";     breeds = CAT_BREEDS; }
-                else if (roll < 90) { species = "Thỏ";     breeds = RABBIT_BREEDS; }
-                else                { species = "Hamster";  breeds = HAMSTER_BREEDS; }
+                if (roll < 50) {
+                    species = "Chó";
+                    breeds = DOG_BREEDS;
+                } else if (roll < 80) {
+                    species = "Mèo";
+                    breeds = CAT_BREEDS;
+                } else if (roll < 90) {
+                    species = "Thỏ";
+                    breeds = RABBIT_BREEDS;
+                } else {
+                    species = "Hamster";
+                    breeds = HAMSTER_BREEDS;
+                }
 
                 Gender gender = RNG.nextBoolean() ? Gender.MALE : Gender.FEMALE;
-                String petName = gender == Gender.MALE
-                        ? MALE_NAMES[RNG.nextInt(MALE_NAMES.length)]
-                        : FEMALE_NAMES[RNG.nextInt(FEMALE_NAMES.length)];
+                String petName = "Profile " + i;
                 int ageYears = 1 + RNG.nextInt(9); // 1-9 tuổi
                 LocalDate dob = LocalDate.now().minusYears(ageYears).minusDays(RNG.nextInt(365));
                 BigDecimal weight = randomWeight(species);
@@ -114,17 +121,24 @@ public class DataSeeder implements CommandLineRunner {
                 // HealthStatus phân bổ: 80% HEALTHY
                 HealthStatus health;
                 int hr = RNG.nextInt(100);
-                if (hr < 80)      health = HealthStatus.HEALTHY;
-                else if (hr < 90) health = HealthStatus.RECOVERING;
-                else if (hr < 95) health = HealthStatus.SICK;
-                else              health = HealthStatus.CHRONIC;
+                if (hr < 80)
+                    health = HealthStatus.HEALTHY;
+                else if (hr < 90)
+                    health = HealthStatus.RECOVERING;
+                else if (hr < 95)
+                    health = HealthStatus.SICK;
+                else
+                    health = HealthStatus.CHRONIC;
 
                 // LookingFor: 40% BREEDING, 40% FRIENDSHIP, 20% PLAY
                 LookingFor lookingFor;
                 int lr = RNG.nextInt(100);
-                if (lr < 40)      lookingFor = LookingFor.BREEDING;
-                else if (lr < 80) lookingFor = LookingFor.FRIENDSHIP;
-                else              lookingFor = LookingFor.PLAY;
+                if (lr < 40)
+                    lookingFor = LookingFor.BREEDING;
+                else if (lr < 80)
+                    lookingFor = LookingFor.FRIENDSHIP;
+                else
+                    lookingFor = LookingFor.PLAY;
 
                 ReproductiveStatus repro = RNG.nextBoolean()
                         ? ReproductiveStatus.INTACT
@@ -170,7 +184,8 @@ public class DataSeeder implements CommandLineRunner {
                     }
                 }
 
-                if (i % 10 == 0) log.info("DataSeeder: Đã tạo {}/100 tài khoản...", i);
+                if (i % 10 == 0)
+                    log.info("DataSeeder: Đã tạo {}/100 tài khoản...", i);
 
             } catch (Exception e) {
                 log.warn("DataSeeder: Lỗi khi tạo user{}: {}", i, e.getMessage());
@@ -187,7 +202,8 @@ public class DataSeeder implements CommandLineRunner {
             } else if ("Mèo".equals(species)) {
                 imageUrl = "https://loremflickr.com/400/500/cat?lock=" + seed;
             } else {
-                // Thỏ / Hamster → dùng picsum với seed cố định (không dùng tiếng Việt có dấu trong URL)
+                // Thỏ / Hamster → dùng picsum với seed cố định (không dùng tiếng Việt có dấu
+                // trong URL)
                 String safeSeed = "Thỏ".equals(species) ? "rabbit" : "hamster";
                 imageUrl = "https://picsum.photos/seed/" + safeSeed + seed + "/400/500";
             }
@@ -202,15 +218,16 @@ public class DataSeeder implements CommandLineRunner {
             Map<?, ?> result = cloudinary.uploader().upload(imageBytes,
                     ObjectUtils.asMap(
                             "folder", "petmatch/pets",
-                            "resource_type", "image"
-                    ));
+                            "resource_type", "image"));
             return result.get("secure_url").toString();
 
         } catch (Exception e) {
             log.warn("DataSeeder: Không thể upload ảnh: {}", e.getMessage());
             // Fallback: trả về URL trực tiếp không qua Cloudinary
-            if ("Chó".equals(species)) return "https://loremflickr.com/400/500/dog?lock=" + (seed % 50);
-            if ("Mèo".equals(species)) return "https://loremflickr.com/400/500/cat?lock=" + seed;
+            if ("Chó".equals(species))
+                return "https://loremflickr.com/400/500/dog?lock=" + (seed % 50);
+            if ("Mèo".equals(species))
+                return "https://loremflickr.com/400/500/cat?lock=" + seed;
             String safeSeed = "Thỏ".equals(species) ? "rabbit" : "hamster";
             return "https://picsum.photos/seed/" + safeSeed + seed + "/400/500";
         }
@@ -218,31 +235,33 @@ public class DataSeeder implements CommandLineRunner {
 
     private BigDecimal randomWeight(String species) {
         double w = switch (species) {
-            case "Chó"     -> 2.0 + RNG.nextDouble() * 28.0;   // 2-30kg
-            case "Mèo"     -> 2.0 + RNG.nextDouble() * 6.0;    // 2-8kg
-            case "Thỏ"     -> 0.8 + RNG.nextDouble() * 3.2;    // 0.8-4kg
-            case "Hamster" -> 0.03 + RNG.nextDouble() * 0.12;  // 30-150g
-            default        -> 1.0 + RNG.nextDouble() * 5.0;
+            case "Chó" -> 2.0 + RNG.nextDouble() * 28.0; // 2-30kg
+            case "Mèo" -> 2.0 + RNG.nextDouble() * 6.0; // 2-8kg
+            case "Thỏ" -> 0.8 + RNG.nextDouble() * 3.2; // 0.8-4kg
+            case "Hamster" -> 0.03 + RNG.nextDouble() * 0.12; // 30-150g
+            default -> 1.0 + RNG.nextDouble() * 5.0;
         };
         return BigDecimal.valueOf(w).setScale(2, RoundingMode.HALF_UP);
     }
 
     private String randomSize(BigDecimal weight) {
         double w = weight.doubleValue();
-        if (w < 5.0)  return "small";
-        if (w < 15.0) return "medium";
+        if (w < 5.0)
+            return "small";
+        if (w < 15.0)
+            return "medium";
         return "large";
     }
 
     private String randomFullName() {
-        String[] lastNames = {"Nguyễn", "Trần", "Lê", "Phạm", "Hoàng", "Huỳnh", "Vũ", "Phan", "Đặng", "Bùi"};
-        String[] midNames  = {"Văn", "Thị", "Hoàng", "Minh", "Quốc", "Thành", "Ngọc", "Như"};
-        String[] firstNames= {"An", "Bình", "Chi", "Dung", "Em", "Giang", "Hà", "Hùng",
-                              "Khoa", "Lan", "Linh", "Mai", "Nam", "Nga", "Phi", "Quân",
-                              "Sơn", "Thảo", "Trung", "Uyên", "Việt", "Yến"};
+        String[] lastNames = { "Nguyễn", "Trần", "Lê", "Phạm", "Hoàng", "Huỳnh", "Vũ", "Phan", "Đặng", "Bùi" };
+        String[] midNames = { "Văn", "Thị", "Hoàng", "Minh", "Quốc", "Thành", "Ngọc", "Như" };
+        String[] firstNames = { "An", "Bình", "Chi", "Dung", "Em", "Giang", "Hà", "Hùng",
+                "Khoa", "Lan", "Linh", "Mai", "Nam", "Nga", "Phi", "Quân",
+                "Sơn", "Thảo", "Trung", "Uyên", "Việt", "Yến" };
         return lastNames[RNG.nextInt(lastNames.length)] + " "
-             + midNames[RNG.nextInt(midNames.length)] + " "
-             + firstNames[RNG.nextInt(firstNames.length)];
+                + midNames[RNG.nextInt(midNames.length)] + " "
+                + firstNames[RNG.nextInt(firstNames.length)];
     }
 
     private List<String> pickRandom(String[] arr, int count) {

@@ -2,18 +2,11 @@ package com.petmatch.backend.service;
 
 import com.petmatch.backend.dto.request.ReportRequest;
 import com.petmatch.backend.dto.ReviewRequest;
-import com.petmatch.backend.entity.Block;
-import com.petmatch.backend.entity.Report;
-import com.petmatch.backend.entity.Review;
-import com.petmatch.backend.entity.User;
+import com.petmatch.backend.entity.*;
 import com.petmatch.backend.enums.ReportStatus;
 import com.petmatch.backend.enums.ReportTargetType;
 import com.petmatch.backend.exception.AppException;
-import com.petmatch.backend.repository.BlockRepository;
-import com.petmatch.backend.repository.MatchRepository;
-import com.petmatch.backend.repository.ReportRepository;
-import com.petmatch.backend.repository.ReviewRepository;
-import com.petmatch.backend.repository.UserRepository;
+import com.petmatch.backend.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -32,6 +25,7 @@ public class InteractionService {
     private final ReportRepository reportRepository;
     private final UserRepository userRepository;
     private final MatchRepository matchRepository;
+    private final MessageRepository messageRepository;
     private final com.petmatch.backend.repository.PetProfileRepository petProfileRepo;
     private final com.petmatch.backend.repository.PetPhotoRepository petPhotoRepo;
 
@@ -52,13 +46,18 @@ public class InteractionService {
             throw new AppException("Không thể tự đánh giá bản thân", BAD_REQUEST);
         }
 
-        // Fix #7: Kiểm tra 2 người có match không — chỉ cho phép review sau khi match
+        // Kiểm tra 2 người có match không
         boolean hasMatch = matchRepository.findMatchByUsers(reviewer, reviewee).isPresent();
         if (!hasMatch) {
             throw new AppException("Chỉ có thể đánh giá người mà bạn đã match", FORBIDDEN);
         }
 
-        // Fix #7: Ngăn review trùng lặp
+        // Kiểm tra đã từng nhắn tin chưa (phải nói chuyện trước khi review)
+        if (!messageRepository.existsChat(reviewer, reviewee)) {
+            throw new AppException("Bạn cần nhắn tin với người này trước khi đánh giá", FORBIDDEN);
+        }
+
+        // Ngăn review trùng lặp
         if (reviewRepository.existsByReviewerAndReviewee(reviewer, reviewee)) {
             throw new AppException("Bạn đã đánh giá người này rồi", CONFLICT);
         }
@@ -85,7 +84,7 @@ public class InteractionService {
 
     // ── BLOCKS ───────────────────────────────────────────
     @Transactional
-    public Block blockUser(Long targetUserId) {
+    public Block blockUser(Long targetUserId, com.petmatch.backend.entity.BlockLevel level) {
         User blocker = currentUser();
         User blocked = userRepository.findById(targetUserId)
                 .orElseThrow(() -> new AppException("Người dùng không tồn tại", NOT_FOUND));
@@ -93,10 +92,24 @@ public class InteractionService {
         if (blocker.getId().equals(targetUserId))
             throw new AppException("Không thể tự chặn chính mình", BAD_REQUEST);
 
-        if (blockRepository.existsByBlockerAndBlocked(blocker, blocked))
-            throw new AppException("Đã chặn người này rồi", CONFLICT);
+        com.petmatch.backend.entity.BlockLevel effectiveLevel =
+                (level != null) ? level : com.petmatch.backend.entity.BlockLevel.ALL;
 
-        return blockRepository.save(Block.builder().blocker(blocker).blocked(blocked).build());
+        // Nếu đã chặn thì cập nhật level mới
+        blockRepository.findByBlockerAndBlocked(blocker, blocked).ifPresent(existing -> {
+            existing.setLevel(effectiveLevel);
+            blockRepository.save(existing);
+        });
+
+        if (blockRepository.existsByBlockerAndBlocked(blocker, blocked)) {
+            return blockRepository.findByBlockerAndBlocked(blocker, blocked).get();
+        }
+
+        return blockRepository.save(Block.builder()
+                .blocker(blocker)
+                .blocked(blocked)
+                .level(effectiveLevel)
+                .build());
     }
 
     @Transactional

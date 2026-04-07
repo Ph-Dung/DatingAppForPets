@@ -7,9 +7,14 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Optional;
+
 @Repository
 public interface GroupMessageRepository extends JpaRepository<GroupMessage, Long> {
 
     /** Lấy tin nhắn của nhóm với phân trang, mới nhất trước */
     Page<GroupMessage> findByGroupOrderBySentAtDesc(ChatGroup group, Pageable pageable);
+
+    /** Lấy tin nhắn mới nhất của nhóm (để hiển thị lastMessage preview) */
+    Optional<GroupMessage> findTopByGroupOrderBySentAtDesc(ChatGroup group);
 }

@@ -1,6 +1,13 @@
 package com.petmatch.mobile.ui.navigation
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -41,7 +48,8 @@ object Routes {
 
     const val CHAT_LIST         = "chat"
     const val CHAT_DETAIL       = "chat/direct/{otherUserId}/{otherUserName}"
-    const val CALL              = "chat/call/{calleeId}/{calleeName}/{callType}"
+    // isCallee: false = caller, true = callee | incomingCallId: 0 nếu là caller
+    const val CALL              = "chat/call/{peerId}/{peerName}/{callType}/{isCallee}/{incomingCallId}"
     const val GROUP_CHAT_DETAIL = "chat/group/{groupId}/{groupName}"
     const val GROUP_CHAT_CREATE = "chat/group/create"
     const val APPOINTMENT       = "chat/appointment/{recipientId}/{recipientName}"
@@ -68,7 +76,13 @@ object Routes {
     fun vacForm(vacId: Long? = null) = if (vacId != null) "pet/vaccinations/form?vacId=$vacId"
                                        else "pet/vaccinations/form?vacId=-1"
     fun chatDetail(otherUserId: Long, otherUserName: String) = "chat/direct/$otherUserId/$otherUserName"
-    fun call(calleeId: Long, calleeName: String, callType: String) = "chat/call/$calleeId/$calleeName/$callType"
+    fun call(
+        peerId: Long,
+        peerName: String,
+        callType: String,
+        isCallee: Boolean = false,
+        incomingCallId: Long = 0L
+    ) = "chat/call/$peerId/$peerName/$callType/$isCallee/$incomingCallId"
     fun groupChatDetail(groupId: Long, groupName: String) = "chat/group/$groupId/$groupName"
     fun appointment(recipientId: Long, recipientName: String) = "chat/appointment/$recipientId/$recipientName"
     fun appointmentList(userId: Long) = "chat/appointments/$userId"
@@ -80,6 +94,7 @@ fun PetMatchNavGraph(
     navController: NavHostController,
     startDestination: String = Routes.LOGIN
 ) {
+    val ctx = LocalContext.current
     val petVm: PetProfileViewModel    = viewModel()
     val matchVm: MatchViewModel       = viewModel()
     val interVm: InteractionViewModel = viewModel()
@@ -88,7 +103,16 @@ fun PetMatchNavGraph(
     val chatbotVm: ChatbotViewModel   = viewModel()
     val chatVm: ChatViewModel         = viewModel()
 
-    NavHost(navController = navController, startDestination = startDestination) {
+    // ── Keep signaling alive globally so INCOMING_CALL works on all screens ──
+    LaunchedEffect(Unit) {
+        chatVm.connectSignaling(ctx)
+    }
+
+    // ── Global IncomingCall Overlay (renders on top of NavHost) ─────────────
+    val incomingCall by chatVm.incomingCall.collectAsState()
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        NavHost(navController = navController, startDestination = startDestination) {
 
         // ── Auth ─────────────────────────────────────────────
         composable(Routes.LOGIN) {
@@ -152,8 +176,8 @@ fun PetMatchNavGraph(
         // ── Match ─────────────────────────────────────────────
         composable(Routes.MATCH_SWIPE)  { MatchSwipeScreen(navController, matchVm, petVm) }
         composable(Routes.MATCH_FILTER) { MatchFilterScreen(navController, matchVm) }
-        composable(Routes.WHO_LIKED_ME) { WhoLikedMeScreen(navController, matchVm, petVm) }
-        composable(Routes.MATCHED_LIST) { MatchedListScreen(navController, matchVm) }
+        composable(Routes.WHO_LIKED_ME) { WhoLikedMeScreen(navController, matchVm, petVm, chatVm) }
+        composable(Routes.MATCHED_LIST) { MatchedListScreen(navController, matchVm, petVm) }
 
         // ── Chat & Community ──────────────────────────────────
         composable(Routes.CHAT_LIST) { ChatListScreen(navController, chatVm) }
@@ -177,24 +201,30 @@ fun PetMatchNavGraph(
             )
         }
 
-        // ── Call (Audio / Video) ──────────────────────────────
+        // ── Call (Audio / Video – Caller AND Callee) ──────────────────────
         composable(
             route = Routes.CALL,
             arguments = listOf(
-                navArgument("calleeId")   { type = NavType.LongType },
-                navArgument("calleeName") { type = NavType.StringType },
-                navArgument("callType")   { type = NavType.StringType }
+                navArgument("peerId")         { type = NavType.LongType },
+                navArgument("peerName")        { type = NavType.StringType },
+                navArgument("callType")        { type = NavType.StringType },
+                navArgument("isCallee")        { type = NavType.BoolType; defaultValue = false },
+                navArgument("incomingCallId")  { type = NavType.LongType; defaultValue = 0L }
             )
         ) { back ->
-            val calleeId   = back.arguments!!.getLong("calleeId")
-            val calleeName = back.arguments!!.getString("calleeName") ?: ""
-            val callType   = back.arguments!!.getString("callType") ?: "AUDIO"
+            val peerId          = back.arguments!!.getLong("peerId")
+            val peerName        = back.arguments!!.getString("peerName") ?: ""
+            val callType        = back.arguments!!.getString("callType") ?: "AUDIO"
+            val isCallee        = back.arguments!!.getBoolean("isCallee")
+            val incomingCallId  = back.arguments!!.getLong("incomingCallId")
             CallScreen(
-                navController = navController,
-                calleeId      = calleeId,
-                calleeName    = calleeName,
-                callType      = callType,
-                chatVm        = chatVm
+                navController  = navController,
+                peerId         = peerId,
+                peerName       = peerName,
+                callType       = callType,
+                isCallee       = isCallee,
+                incomingCallId = incomingCallId,
+                chatVm         = chatVm
             )
         }
 
@@ -291,5 +321,36 @@ fun PetMatchNavGraph(
 
         // ── AI Chatbot ────────────────────────────────────────
         composable(Routes.AI_CHATBOT) { AiChatbotScreen(navController, chatbotVm, petVm) }
-    }
+    } // end NavHost
+
+        // ── IncomingCall Overlay – trên cùng, nhìn thấy từ mọi màn hình ────────
+        incomingCall?.let { state ->
+            IncomingCallOverlay(
+                state    = state,
+                onAccept = {
+                    chatVm.dismissIncomingCall()
+                    navController.navigate(
+                        Routes.call(
+                            peerId         = state.callerId,
+                            peerName       = state.callerName,
+                            callType       = state.callType,
+                            isCallee       = true,
+                            incomingCallId = state.callId
+                        )
+                    )
+                },
+                onReject = {
+                    chatVm.dismissIncomingCall()
+                    chatVm.sendRtcSignal(
+                        com.petmatch.mobile.data.model.SignalingMessage(
+                            senderId   = 0L,
+                            receiverId = state.callerId,
+                            type       = "REJECT",
+                            data       = null
+                        )
+                    )
+                }
+            )
+        }
+    } // end Box
 }

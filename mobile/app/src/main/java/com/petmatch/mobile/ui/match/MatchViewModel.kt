@@ -149,6 +149,22 @@ class MatchViewModel : ViewModel() {
         } catch (_: Exception) {}
     }
 
+    fun respondToMatch(ctx: Context, matchId: Long, accept: Boolean, onMatchSuccessful: (() -> Unit)? = null) = viewModelScope.launch {
+        try {
+            val status = if (accept) "ACCEPTED" else "REJECTED"
+            val res = RetrofitClient.matchApi(ctx).respondToMatch(matchId, status)
+            if (res.isSuccessful) {
+                // Remove từ whoLikedMe list
+                _whoLikedMe.value = _whoLikedMe.value.filter { it.id != matchId }
+                // If accepted, reload matched list & notify callback
+                if (accept) {
+                    loadMatched(ctx)
+                    onMatchSuccessful?.invoke()  // Trigger chat refresh
+                }
+            }
+        } catch (_: Exception) {}
+    }
+
     fun applyFilters(
         species: String?, gender: String?, lookingFor: String?,
         minAge: Int?, maxAge: Int?, healthStatus: String?,

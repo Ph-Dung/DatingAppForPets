@@ -60,6 +60,27 @@ public class CloudinaryService {
     }
 
     /**
+     * Upload bất kỳ file nào (audio, video, raw) – dùng cho voice messages.
+     * folder: "chat/images" hoặc "chat/voices"
+     */
+    public String uploadFile(MultipartFile file, String folder) {
+        if (file.isEmpty())
+            throw new AppException("File không được rỗng", HttpStatus.BAD_REQUEST);
+        if (file.getSize() > 20 * 1024 * 1024)
+            throw new AppException("File không được vượt quá 20MB", HttpStatus.BAD_REQUEST);
+        try {
+            byte[] fileBytes = file.getBytes();
+            String contentType = file.getContentType() != null ? file.getContentType() : "";
+            String resourceType = contentType.startsWith("image/") ? "image" : "raw";
+            Map<?, ?> result = cloudinary.uploader().upload(fileBytes,
+                    ObjectUtils.asMap("folder", folder, "resource_type", resourceType));
+            return result.get("secure_url").toString();
+        } catch (IOException e) {
+            throw new AppException("Upload file thất bại: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
      * Xóa ảnh trên Cloudinary theo publicId
      * publicId lấy từ URL: .../petmatch/pets/abc123  → publicId = "petmatch/pets/abc123"
      */

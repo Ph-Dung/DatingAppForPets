@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
 import androidx.compose.ui.draw.*
@@ -493,13 +494,17 @@ fun AppointmentListScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                appointments.groupBy { it.status }.forEach { (status, items) ->
+                appointments.groupBy { it.status }.forEach { (status, groupItems) ->
                     item {
                         AppointmentStatusHeader(status)
                     }
-                    androidx.compose.foundation.lazy.items(items, key = { it.id }) { appt ->
+                    items(
+                        items = groupItems,
+                        key = { it.id }
+                    ) { appt ->
                         AppointmentCard(
                             appt = appt,
+                            currentUserId = userId,
                             onConfirm = { chatVm.updateAppointmentStatus(ctx, appt.id, "CONFIRMED") },
                             onCancel = { chatVm.updateAppointmentStatus(ctx, appt.id, "CANCELLED") }
                         )
@@ -535,6 +540,7 @@ private fun AppointmentStatusHeader(status: String) {
 @Composable
 private fun AppointmentCard(
     appt: AppointmentResponse,
+    currentUserId: Long,
     onConfirm: () -> Unit,
     onCancel: () -> Unit
 ) {
@@ -558,8 +564,10 @@ private fun AppointmentCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Hiển thị tên người kia dựa vào vai trò
+                val otherName = if (currentUserId == appt.requesterId) appt.recipientName else appt.requesterName
                 Text(
-                    "Hẹn gặp ${appt.recipientName ?: "người dùng khác"}",
+                    "Hẹn gặp ${otherName ?: "người dùng khác"}",
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
                 )
                 Surface(color = statusColor.copy(0.12f), shape = RoundedCornerShape(8.dp)) {
@@ -613,12 +621,15 @@ private fun AppointmentCard(
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = DislikeRed),
                         border = BorderStroke(1.dp, DislikeRed.copy(0.5f))
                     ) { Text("Hủy") }
-                    Button(
-                        onClick = onConfirm,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = LikeGreen)
-                    ) { Text("Xác nhận", color = Color.White) }
+                    
+                    if (currentUserId == appt.recipientId) {
+                        Button(
+                            onClick = onConfirm,
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = LikeGreen)
+                        ) { Text("Xác nhận", color = Color.White) }
+                    }
                 }
             }
         }

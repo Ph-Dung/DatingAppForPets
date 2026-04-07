@@ -46,19 +46,19 @@ fun CreateGroupChatScreen(
     val selectedMembers = remember { mutableStateListOf<ConversationItem>() }
     var step by remember { mutableIntStateOf(1) }  // 1=Select members, 2=Name group
 
-    // Mock friends/matched users (thực tế load từ API matches)
-    val allContacts = remember {
-        listOf(
-            ConversationItem(1L, "Mèo Bông", null, "", "10:30", 0L, true),
-            ConversationItem(2L, "Chó Đốm", null, "", "Hôm qua", 0L, false),
-            ConversationItem(3L, "Thỏ Trắng", null, "", "T2", 0L, true),
-            ConversationItem(4L, "Hamster Gold", null, "", "T6", 0L, false),
-            ConversationItem(5L, "Chó Phốc", null, "", "T5", 0L, true),
-            ConversationItem(6L, "Mèo Anh", null, "", "T3", 0L, false),
-            ConversationItem(7L, "Golden Ret", null, "", "T1", 0L, true),
-            ConversationItem(8L, "Shiba Inu", null, "", "Hôm qua", 0L, false),
-        )
+    // Load danh sách người đã match (conversations thật từ API)
+    val conversations by chatVm.conversations.collectAsState()
+    val conversationsLoading by chatVm.conversationsLoading.collectAsState()
+
+    LaunchedEffect(Unit) {
+        // Nếu chưa load conversations thì load ngay
+        if (conversations.isEmpty()) {
+            chatVm.loadConversations(ctx)
+        }
     }
+
+    // Dùng danh sách matched users thật thay vì mock
+    val allContacts = conversations
 
     LaunchedEffect(success) {
         if (success) {
@@ -139,6 +139,7 @@ fun CreateGroupChatScreen(
                 when (currentStep) {
                     1 -> SelectMembersStep(
                         contacts = filteredContacts,
+                        isLoadingContacts = conversationsLoading,
                         selectedMembers = selectedMembers,
                         searchQuery = searchQuery,
                         onSearchQueryChange = { searchQuery = it },
@@ -175,6 +176,7 @@ fun CreateGroupChatScreen(
 @Composable
 private fun SelectMembersStep(
     contacts: List<ConversationItem>,
+    isLoadingContacts: Boolean = false,
     selectedMembers: List<ConversationItem>,
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
@@ -182,6 +184,10 @@ private fun SelectMembersStep(
     onNext: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
+        if (isLoadingContacts && contacts.isEmpty()) {
+            PetMatchLoading()
+            return@Column
+        }
         // Search bar
         OutlinedTextField(
             value = searchQuery,

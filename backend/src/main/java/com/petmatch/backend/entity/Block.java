@@ -32,4 +32,9 @@ public class Block {
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     LocalDateTime createdAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    BlockLevel level = BlockLevel.ALL;
 }

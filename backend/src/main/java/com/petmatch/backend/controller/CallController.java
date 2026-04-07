@@ -59,9 +59,16 @@ public class CallController {
 
     @PutMapping("/{callId}/end")
     public ResponseEntity<CallHistory> endCall(
+            Authentication auth,
             @PathVariable Long callId,
-            @RequestParam CallStatus status) {
-        return ResponseEntity.ok(callService.endCall(callId, status));
+            @RequestParam CallStatus status,
+            @RequestParam(required = false) Integer durationSeconds) {
+            
+        Long userId = userRepository.findByEmail(auth.getName())
+                .orElseThrow(() -> new RuntimeException("User not found"))
+                .getId();
+                
+        return ResponseEntity.ok(callService.endCall(callId, userId, status, durationSeconds));
     }
 
     @GetMapping("/history/{userId}")
