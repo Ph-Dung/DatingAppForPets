@@ -50,18 +50,18 @@
 | TB-2 | Backend scope: B2 Tuong tac cong dong | 1 | DONE | Cao | like/comment/reply | Like/comment/reply dong bo dung |  |
 | TB-3 | Backend scope: B3 Bao cao + kiem duyet | 1 | DONE | Cao | report/moderation config | Report luu dung + moderation tuy chon |  |
 | T2-1 | Frontend: chot real flow theo domain | 2 | DONE | Cao | UI flow hien tai | Danh sach man hinh + state map + route map + API map baseline |  |
-| T2-2 | Frontend: flow Auth chi tiet | 2 | DONE | Cao | login/register/token/session | Auth diem vao app that |  |
-| T2-3 | Frontend: flow Match/Explore chi tiet | 2 | DONE | Cao | swipe/filter/match list | Match experience that, khong con mock |  |
+| T2-2 | Frontend: flow Auth chi tiet | 2 | SKIPPED | Cao | login/register/token/session | Auth diem vao app that | Out of scope (teammate) |
+| T2-3 | Frontend: flow Match/Explore chi tiet | 2 | SKIPPED | Cao | swipe/filter/match list | Match experience that, khong con mock | Out of scope (teammate) |
 | T2-4 | Frontend: flow Community chi tiet | 2 | DONE | Cao | feed/create/edit/delete/engage | Community real flow on dinh |  |
-| T2-5 | Frontend: flow Chat chi tiet | 2 | TODO | Cao | direct/group/call/appointment/review | Chat handoff that, khong vo state |  |
-| T2-6 | Frontend: flow Profile/Account + shared UI | 2 | TODO | Cao | pet/account/photos/vaccination | Profile+shared runtime on dinh |  |
-| T2-7 | Frontend: test luong nguoi dung chinh tren API that | 2 | TODO | Trung binh | script thao tac | Danh sach luong pass/fail |  |
-| T3-1 | Integration: thay tung mock con lai bang API that | 3 | TODO | Cao | backend done + frontend API ready | Tich hop theo dot, rollback duoc |  |
-| T3-2 | Integration: E2E smoke (auth -> match -> community -> chat -> profile) | 3 | TODO | Cao | app + backend running | E2E pass |  |
-| T3-3 | Hardening: logs, retry, timeout, fallback | 3 | TODO | Trung binh | log + issue list | Giam loi runtime, de debug |  |
-| T3-4 | Hardening: cleanup code path va canh bao con lai | 3 | TODO | Trung binh | build, lint, warnings | Giam technical debt sau khi ghep that |  |
+| T2-5 | Frontend: flow Chat chi tiet | 2 | SKIPPED | Cao | direct/group/call/appointment/review | Chat handoff that, khong vo state | Out of scope (teammate) |
+| T2-6 | Frontend: flow Profile/Account + shared UI | 2 | SKIPPED | Cao | pet/account/photos/vaccination | Profile+shared runtime on dinh | Out of scope (teammate) |
+| T2-7 | Frontend: test luong nguoi dung chinh tren API that | 2 | SKIPPED | Trung binh | script thao tac | Danh sach luong pass/fail | Out of scope (teammate) |
+| T3-1 | Integration: thay tung mock con lai bang API that | 3 | SKIPPED | Cao | backend done + frontend API ready | Tich hop theo dot, rollback duoc | Out of scope (teammate) |
+| T3-2 | Integration: E2E smoke (auth -> match -> community -> chat -> profile) | 3 | SKIPPED | Cao | app + backend running | E2E pass | Out of scope (teammate) |
+| T3-3 | Hardening: logs, retry, timeout, fallback | 3 | SKIPPED | Trung binh | log + issue list | Giam loi runtime, de debug | Out of scope (teammate) |
+| T3-4 | Hardening: cleanup code path va canh bao con lai | 3 | SKIPPED | Trung binh | build, lint, warnings | Giam technical debt sau khi ghep that | Out of scope (teammate) |
 
-Trang thai hop le: TODO | IN_PROGRESS | BLOCKED | REVIEW | DONE
+Trang thai hop le: TODO | IN_PROGRESS | BLOCKED | REVIEW | DONE | SKIPPED
 
 ---
 
@@ -353,6 +353,8 @@ Checklist lock T2-1:
 | 2026-04-08 | T2-2 | Hoan tat Auth flow: login/register + session resume theo token/profile + logout route gate | DONE | Khong | Chuyen sang T2-3 (Match/Explore chi tiet) |
 | 2026-04-08 | T2-3 | Hoan tat Match/Explore: loading-error-retry cho swipe/who-liked-me/matched + xu ly like API fail an toan | DONE | Khong | Chuyen sang T2-4 (Community chi tiet) |
 | 2026-04-08 | T2-4 | Hoan tat Community real flow: feed/add/manage/like + comment dialog + report post + loading/error/retry state | DONE | Khong | Chuyen sang T2-5 (Chat chi tiet) |
+| 2026-04-08 | T2-2/T2-3/T2-5/T2-6/T2-7 | Reclassify task ownership theo pham vi: frontend non-community la teammate | SKIPPED | Out of scope cua toi | Chi tiep tuc task Community trong scope |
+| 2026-04-08 | T3-1/T3-2/T3-3/T3-4 | Danh dau skip integration/hardening tong the vi khong thuoc scope ca nhan | SKIPPED | Out of scope cua toi | Cho teammate/nhom integration tiep quan |
 | 2026-04-07 | TB-1 | Hoan tat B1 post CRUD (create/update/delete) + owner permission + edge-case test | DONE | Khong | Chuyen sang TB-2 (like/comment/reply) |
 | 2026-04-07 | TB-2 | Hoan tat B2 like/comment/reply + edge-case test (toggle, post/comment not-found) | DONE | Khong | Chuyen sang TB-3 (report/moderation) |
 | 2026-04-07 | TB-3 | Hoan tat B3 report + moderation test (target validation, unsupported target, moderation on/off) | DONE | Khong | Chuyen sang T3-1 (integration mock -> API that) |
