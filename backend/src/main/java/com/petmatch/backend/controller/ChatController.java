@@ -55,6 +55,27 @@ public class ChatController {
         );
     }
 
+    // ── REST: Gửi tin nhắn Text ──────────────────────────────────────────────
+
+    @PostMapping("/messages")
+    public ResponseEntity<MessageDto> sendRestMessage(@RequestBody MessageDto messageDto, Authentication auth) {
+        String email = auth.getName();
+        Long senderId = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalStateException("User not found: " + email))
+                .getId();
+        messageDto.setSenderId(senderId);
+
+        MessageDto savedMessage = chatService.saveMessage(messageDto);
+
+        // Gửi qua WebSocket cho người nhận real-time
+        messagingTemplate.convertAndSendToUser(
+                String.valueOf(savedMessage.getReceiverId()),
+                "/queue/messages",
+                savedMessage
+        );
+        return ResponseEntity.ok(savedMessage);
+    }
+
     // ── WebSocket: WebRTC Signaling ──────────────────────────────────────────
 
     @MessageMapping("/chat.signal")
@@ -144,5 +165,19 @@ public class ChatController {
             @RequestParam("file") MultipartFile file,
             @RequestParam("type") String type) {
         return ResponseEntity.ok(chatService.uploadMedia(file, type));
+    }
+
+    // ── REST: Nicknames ──────────────────────────────────────────────────────
+
+    @GetMapping("/nicknames/{receiverId}")
+    public ResponseEntity<Map<String, String>> getNickname(@PathVariable Long receiverId, Authentication auth) {
+        String nickname = chatService.getNickname(auth.getName(), receiverId);
+        return ResponseEntity.ok(Map.of("nickname", nickname != null ? nickname : ""));
+    }
+
+    @PutMapping("/nicknames/{receiverId}")
+    public ResponseEntity<Map<String, String>> setNickname(@PathVariable Long receiverId, @RequestBody Map<String, String> body, Authentication auth) {
+        String nickname = chatService.setNickname(auth.getName(), receiverId, body.get("nickname"));
+        return ResponseEntity.ok(Map.of("nickname", nickname));
     }
 }

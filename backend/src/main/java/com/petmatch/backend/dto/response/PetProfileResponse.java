@@ -37,4 +37,7 @@ public class PetProfileResponse {
     private String avatarUrl;
     private List<String> photoUrls;
     private LocalDateTime createdAt;
+    // Địa lý
+    private Double distanceKm;    // null nếu chưa có GPS
+    private String ownerAddress;  // địa chỉ văn bản của chủ
 }

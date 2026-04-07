@@ -14,6 +14,13 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.petmatch.mobile.ui.admin.AdminLoginScreen
+import com.petmatch.mobile.ui.admin.AdminAccountScreen
+import com.petmatch.mobile.ui.admin.AdminDashboardScreen
+import com.petmatch.mobile.ui.admin.AdminPetsScreen
+import com.petmatch.mobile.ui.admin.AdminReportsScreen
+import com.petmatch.mobile.ui.admin.AdminUsersScreen
+import com.petmatch.mobile.ui.admin.AdminViewModel
 import com.petmatch.mobile.ui.account.AccountScreen
 import com.petmatch.mobile.ui.account.ChangePasswordScreen
 import com.petmatch.mobile.ui.account.EditUserProfileScreen
@@ -36,6 +43,12 @@ import com.petmatch.mobile.ui.petprofile.*
 
 object Routes {
     const val LOGIN             = "login"
+    const val ADMIN_LOGIN       = "admin/login"
+    const val ADMIN_DASHBOARD   = "admin/dashboard"
+    const val ADMIN_USERS       = "admin/users"
+    const val ADMIN_PETS        = "admin/pets"
+    const val ADMIN_REPORTS     = "admin/reports"
+    const val ADMIN_ACCOUNT     = "admin/account"
     const val PET_SETUP         = "pet/setup"
     const val PET_EDIT          = "pet/edit"
     const val PET_ME            = "pet/me"
@@ -58,6 +71,7 @@ object Routes {
     const val APPOINTMENT       = "chat/appointment/{recipientId}/{recipientName}"
     const val APPOINTMENT_LIST  = "chat/appointments/{userId}"
     const val REVIEW            = "chat/review/{revieweeId}/{revieweeName}"
+    const val MESSENGER_PROFILE = "chat/profile/{userId}/{userName}"
 
     const val COMMUNITY         = "community"
     const val POST_MANAGEMENT   = "community/management"
@@ -92,6 +106,7 @@ object Routes {
     fun appointment(recipientId: Long, recipientName: String) = "chat/appointment/$recipientId/$recipientName"
     fun appointmentList(userId: Long) = "chat/appointments/$userId"
     fun review(revieweeId: Long, revieweeName: String) = "chat/review/$revieweeId/$revieweeName"
+    fun messengerProfile(userId: Long, userName: String) = "chat/profile/$userId/$userName"
 }
 
 @Composable
@@ -105,6 +120,7 @@ fun PetMatchNavGraph(
     val interVm: InteractionViewModel = viewModel()
     val authVm: AuthViewModel         = viewModel()
     val userVm: UserViewModel         = viewModel()
+    val adminVm: AdminViewModel       = viewModel()
     val chatbotVm: ChatbotViewModel   = viewModel()
     val chatVm: ChatViewModel         = viewModel()
     val communityVm: CommunityViewModel = viewModel()
@@ -122,6 +138,9 @@ fun PetMatchNavGraph(
 
         // ── Auth ─────────────────────────────────────────────
         composable(Routes.LOGIN) {
+            LaunchedEffect(Unit) {
+                chatbotVm.resetConversation()
+            }
             LoginScreen(
                 vm = authVm,
                 onLoginSuccess = { hasPetProfile ->
@@ -132,6 +151,57 @@ fun PetMatchNavGraph(
                 },
                 onNavigateToRegister = {
                     navController.navigate(Routes.REGISTER)
+                },
+                onNavigateToAdminLogin = {
+                    adminVm.resetAuthState()
+                    navController.navigate(Routes.ADMIN_LOGIN)
+                }
+            )
+        }
+
+        composable(Routes.ADMIN_LOGIN) {
+            AdminLoginScreen(
+                vm = adminVm,
+                onSuccess = {
+                    navController.navigate(Routes.ADMIN_DASHBOARD) {
+                        popUpTo(Routes.LOGIN) { inclusive = true }
+                    }
+                },
+                onBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(Routes.ADMIN_DASHBOARD) {
+            AdminDashboardScreen(
+                vm = adminVm,
+                onOpenUsers = { navController.navigate(Routes.ADMIN_USERS) },
+                onOpenPets = { navController.navigate(Routes.ADMIN_PETS) },
+                onOpenReports = { navController.navigate(Routes.ADMIN_REPORTS) }
+            )
+        }
+
+        composable(Routes.ADMIN_USERS) {
+            AdminUsersScreen(vm = adminVm)
+        }
+
+        composable(Routes.ADMIN_PETS) {
+            AdminPetsScreen(vm = adminVm)
+        }
+
+        composable(Routes.ADMIN_REPORTS) {
+            AdminReportsScreen(vm = adminVm)
+        }
+
+        composable(Routes.ADMIN_ACCOUNT) {
+            AdminAccountScreen(
+                vm = adminVm,
+                onLogout = {
+                    authVm.resetState()
+                    navController.navigate(Routes.LOGIN) {
+                        popUpTo(0) { inclusive = true }
+                    }
                 }
             )
         }
@@ -310,6 +380,23 @@ fun PetMatchNavGraph(
                 revieweeId    = revieweeId,
                 revieweeName  = revieweeName,
                 chatVm        = chatVm
+            )
+        }
+
+        // ── Messenger Profile ─────────────────────────────────
+        composable(
+            route = Routes.MESSENGER_PROFILE,
+            arguments = listOf(
+                navArgument("userId")   { type = NavType.LongType },
+                navArgument("userName") { type = NavType.StringType }
+            )
+        ) { back ->
+            val userId   = back.arguments!!.getLong("userId")
+            val userName = back.arguments!!.getString("userName") ?: ""
+            MessengerProfileScreen(
+                navController = navController,
+                userId        = userId,
+                userName      = userName
             )
         }
 

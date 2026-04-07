@@ -25,7 +25,11 @@ data class PetProfileResponse(
     val isHidden: Boolean,
     val avatarUrl: String?,
     val photoUrls: List<String>,
-    val createdAt: String?
+    val createdAt: String?,
+    
+    // Geolocation
+    val distanceKm: Double? = null,
+    val ownerAddress: String? = null
 )
 
 data class PetProfileRequest(
@@ -196,4 +200,60 @@ data class CommunityReportRequest(
     val targetId: Long,
     val targetType: String,
     val reason: String
+data class AdminDashboardResponse(
+    val totalUsers: Long,
+    val lockedUsers: Long,
+    val totalPets: Long,
+    val hiddenPets: Long,
+    val pendingReports: Long
+)
+
+data class AdminUserItemResponse(
+    val id: Long,
+    val fullName: String,
+    val email: String,
+    val phone: String?,
+    val avatarUrl: String?,
+    val locked: Boolean,
+    val warned: Boolean,
+    val warningCount: Int,
+    val lastWarnedAt: String?,
+    val createdAt: String?
+)
+
+data class AdminPetItemResponse(
+    val id: Long,
+    val ownerId: Long,
+    val ownerName: String,
+    val name: String,
+    val species: String,
+    val avatarUrl: String?,
+    val hidden: Boolean,
+    val createdAt: String?
+)
+
+data class AdminReportItemResponse(
+    val id: Long,
+    val reporterId: Long,
+    val reporterName: String,
+    val targetType: String,
+    val targetId: Long,
+    val reason: String,
+    val status: String,
+    val createdAt: String?,
+    val handledById: Long?,
+    val handledByName: String?,
+    val action: String?,
+    val adminNote: String?,
+    val handledAt: String?
+)
+
+data class AdminHandleReportRequest(
+    val action: String,
+    val note: String?
+)
+
+data class UpdateLocationRequest(
+    val latitude: Double,
+    val longitude: Double
 )

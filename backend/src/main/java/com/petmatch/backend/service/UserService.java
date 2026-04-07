@@ -58,6 +58,14 @@ public class UserService {
         return toResponse(userRepo.save(user));
     }
 
+    /** Lưu tọa độ GPS của user hiện tại */
+    public void updateLocation(double latitude, double longitude) {
+        User user = currentUser();
+        user.setLatitude(latitude);
+        user.setLongitude(longitude);
+        userRepo.save(user);
+    }
+
     private UserResponse toResponse(User u) {
         return UserResponse.builder()
                 .id(u.getId())

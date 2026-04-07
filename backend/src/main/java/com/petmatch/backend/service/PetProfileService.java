@@ -27,6 +27,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.Period;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.springframework.http.HttpStatus.*;
 
@@ -127,15 +128,31 @@ public class PetProfileService {
 
     // ── Suggestions & Search ─────────────────────────────
     @Transactional(readOnly = true)
-    public Page<PetProfileResponse> getSuggestions(int page, int size) {
+    public Page<PetProfileResponse> getSuggestions(int page, int size, Double maxDistanceKm) {
         User user = currentUser();
         PetProfile myPet = petProfileRepo.findByOwnerId(user.getId())
                 .orElseThrow(() -> new AppException("Bạn chưa tạo hồ sơ thú cưng", NOT_FOUND));
 
+        if (maxDistanceKm != null && user.getLatitude() != null) {
+            List<PetProfile> pool = petProfileRepo.findSuggestions(
+                    user.getId(), myPet.getId(), myPet.getSpecies(),
+                    com.petmatch.backend.enums.MatchStatus.PENDING,
+                    PageRequest.of(page, size * 4)).getContent();
+            List<PetProfileResponse> filtered = pool.stream()
+                    .filter(p -> p.getOwner().getLatitude() != null &&
+                            haversineKm(user.getLatitude(), user.getLongitude(),
+                                    p.getOwner().getLatitude(), p.getOwner().getLongitude()) <= maxDistanceKm)
+                    .limit(size)
+                    .map(p -> toResponseWithUser(p, user))
+                    .collect(Collectors.toList());
+            return new org.springframework.data.domain.PageImpl<>(filtered);
+        }
+
         return petProfileRepo.findSuggestions(
                         user.getId(), myPet.getId(), myPet.getSpecies(),
+                        com.petmatch.backend.enums.MatchStatus.PENDING,
                         PageRequest.of(page, size))
-                .map(this::toResponse);
+                .map(p -> toResponseWithUser(p, user));
     }
 
     /**
@@ -143,25 +160,27 @@ public class PetProfileService {
      * Nếu chưa đủ (smart = false), fallback về suggestions bình thường.
      */
     @Transactional(readOnly = true)
-    public List<PetProfileResponse> getSmartSuggestions(int page, int size) {
+    public List<PetProfileResponse> getSmartSuggestions(int page, int size, Double maxDistanceKm) {
         User user = currentUser();
         PetProfile myPet = petProfileRepo.findByOwnerId(user.getId())
                 .orElseThrow(() -> new AppException("Bạn chưa tạo hồ sơ thú cưng", NOT_FOUND));
 
-        // Lấy pool candidates từ query thường (chưa swipe, cùng loài)
         List<com.petmatch.backend.entity.PetProfile> candidates =
                 petProfileRepo.findSuggestions(
                         user.getId(), myPet.getId(), myPet.getSpecies(),
-                        PageRequest.of(page, Math.max(size * 3, 30)))  // lấy pool 3x để score
-                        .getContent();
+                        com.petmatch.backend.enums.MatchStatus.PENDING,
+                        PageRequest.of(page, Math.max(size * 3, 30))).getContent();
 
-        // Tính score cho từng candidate rồi sort DESC
         return candidates.stream()
+                .filter(c -> maxDistanceKm == null || user.getLatitude() == null ||
+                        c.getOwner().getLatitude() == null ||
+                        haversineKm(user.getLatitude(), user.getLongitude(),
+                                c.getOwner().getLatitude(), c.getOwner().getLongitude()) <= maxDistanceKm)
                 .map(c -> new Object[]{c, aiMatchingService.scorePet(myPet.getId(), c)})
                 .sorted((a, b) -> Integer.compare((int) b[1], (int) a[1]))
                 .limit(size)
-                .map(pair -> toResponse((com.petmatch.backend.entity.PetProfile) pair[0]))
-                .collect(java.util.stream.Collectors.toList());
+                .map(pair -> toResponseWithUser((com.petmatch.backend.entity.PetProfile) pair[0], user))
+                .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
@@ -170,13 +189,38 @@ public class PetProfileService {
                                            HealthStatus healthStatus,
                                            BigDecimal minWeight, BigDecimal maxWeight,
                                            Integer minAge, Integer maxAge,
+                                           Double maxDistanceKm,
                                            int page, int size) {
         LocalDate minDob = maxAge != null ? LocalDate.now().minusYears(maxAge) : null;
         LocalDate maxDob = minAge != null ? LocalDate.now().minusYears(minAge) : null;
         String safeBreed = breed == null ? "" : breed;
+        User user = currentUser();
+
+        if (maxDistanceKm != null && user.getLatitude() != null) {
+            List<PetProfile> pool = petProfileRepo.search(
+                    user.getId(),
+                    species != null, species,
+                    safeBreed != null && !safeBreed.trim().isEmpty(), safeBreed,
+                    gender != null, gender,
+                    lookingFor != null, lookingFor,
+                    healthStatus != null, healthStatus,
+                    minWeight != null, minWeight,
+                    maxWeight != null, maxWeight,
+                    minDob != null, minDob,
+                    maxDob != null, maxDob,
+                    PageRequest.of(page, size * 4)).getContent();
+            List<PetProfileResponse> filtered = pool.stream()
+                    .filter(p -> p.getOwner().getLatitude() != null &&
+                            haversineKm(user.getLatitude(), user.getLongitude(),
+                                    p.getOwner().getLatitude(), p.getOwner().getLongitude()) <= maxDistanceKm)
+                    .limit(size)
+                    .map(p -> toResponseWithUser(p, user))
+                    .collect(Collectors.toList());
+            return new org.springframework.data.domain.PageImpl<>(filtered);
+        }
 
         return petProfileRepo.search(
-                        currentUser().getId(),
+                        user.getId(),
                         species != null, species,
                         safeBreed != null && !safeBreed.trim().isEmpty(), safeBreed,
                         gender != null, gender,
@@ -187,7 +231,7 @@ public class PetProfileService {
                         minDob != null, minDob,
                         maxDob != null, maxDob,
                         PageRequest.of(page, size))
-                .map(this::toResponse);
+                .map(p -> toResponseWithUser(p, user));
     }
 
     // ── Vaccination CRUD ──────────────────────────────────
@@ -286,6 +330,15 @@ public class PetProfileService {
 
     // ── Mappers ───────────────────────────────────────────
     private PetProfileResponse toResponse(PetProfile p) {
+        User currentUser = null;
+        try {
+            String email = SecurityContextHolder.getContext().getAuthentication().getName();
+            currentUser = userRepo.findByEmail(email).orElse(null);
+        } catch (Exception ignored) {}
+        return toResponseWithUser(p, currentUser);
+    }
+
+    private PetProfileResponse toResponseWithUser(PetProfile p, User currentUser) {
         String avatarUrl = petPhotoRepo.findByPetIdAndIsAvatarTrue(p.getId())
                 .map(PetPhoto::getPhotoUrl).orElse(null);
         List<String> photoUrls = petPhotoRepo.findByPetId(p.getId())
@@ -295,6 +348,14 @@ public class PetProfileService {
         Integer age = null;
         if (p.getDateOfBirth() != null) {
             age = Period.between(p.getDateOfBirth(), LocalDate.now()).getYears();
+        }
+
+        Double distanceKm = null;
+        if (currentUser != null && currentUser.getLatitude() != null
+                && p.getOwner().getLatitude() != null) {
+            distanceKm = Math.round(haversineKm(
+                    currentUser.getLatitude(), currentUser.getLongitude(),
+                    p.getOwner().getLatitude(), p.getOwner().getLongitude()) * 10.0) / 10.0;
         }
 
         return PetProfileResponse.builder()
@@ -323,7 +384,20 @@ public class PetProfileService {
                 .avatarUrl(avatarUrl)
                 .photoUrls(photoUrls)
                 .createdAt(p.getCreatedAt())
+                .distanceKm(distanceKm)
+                .ownerAddress(p.getOwner().getAddress())
                 .build();
+    }
+
+    /** Haversine formula: trả về khoảng cách km giữa 2 điểm lat/lon */
+    private static double haversineKm(double lat1, double lon1, double lat2, double lon2) {
+        final double R = 6371.0;
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
     private VaccinationResponse toVaccinationResponse(PetVaccination v) {

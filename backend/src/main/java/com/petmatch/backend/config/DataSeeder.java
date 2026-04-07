@@ -102,6 +102,25 @@ public class DataSeeder implements CommandLineRunner {
             "Nemo", "Mochi", "Peach", "Pearl", "Ruby"
     };
 
+    record ProvinceInfo(String name, double lat, double lon) {}
+    private static final List<ProvinceInfo> NORTHERN_PROVINCES = List.of(
+            new ProvinceInfo("Hà Nội", 21.0285, 105.8542),
+            new ProvinceInfo("Hải Phòng", 20.8449, 106.6881),
+            new ProvinceInfo("Quảng Ninh", 21.0069, 107.2925),
+            new ProvinceInfo("Hải Dương", 20.9409, 106.3330),
+            new ProvinceInfo("Hưng Yên", 20.6535, 106.0504),
+            new ProvinceInfo("Hà Nam", 20.5453, 105.9122),
+            new ProvinceInfo("Nam Định", 20.4357, 106.1824),
+            new ProvinceInfo("Thái Bình", 20.4463, 106.3366),
+            new ProvinceInfo("Ninh Bình", 20.2539, 105.9750),
+            new ProvinceInfo("Vĩnh Phúc", 21.3089, 105.6039),
+            new ProvinceInfo("Bắc Ninh", 21.1861, 106.0763),
+            new ProvinceInfo("Bắc Giang", 21.2731, 106.1946),
+            new ProvinceInfo("Thái Nguyên", 21.5942, 105.8482),
+            new ProvinceInfo("Phú Thọ", 21.3168, 105.2173),
+            new ProvinceInfo("Hòa Bình", 20.8133, 105.3384)
+    );
+
     @Override
     @Transactional
     public void run(String... args) {
@@ -113,6 +132,7 @@ public class DataSeeder implements CommandLineRunner {
         if (communityPostsEnabled) {
             seedCommunityPostsIfNeeded();
         }
+        ensureDefaultAdmin();
 
         long count = userRepo.count();
         if (count >= skipWhenUsersGte) {
@@ -134,6 +154,16 @@ public class DataSeeder implements CommandLineRunner {
 
         for (int i = 1; i <= totalUsersToSeed; i++) {
             try {
+                ProvinceInfo prov;
+                double maxRadius = 15.0; // 15km quanh tâm
+                if (i <= 50) {
+                    prov = NORTHERN_PROVINCES.get(0); // Hà Nội
+                } else {
+                    prov = NORTHERN_PROVINCES.get(1 + RNG.nextInt(NORTHERN_PROVINCES.size() - 1));
+                    maxRadius = 25.0; // Các tỉnh khác cho rộng hơn tí
+                }
+                double[] coords = generateRandomCoordinate(prov.lat(), prov.lon(), maxRadius);
+
                 // 1. Tạo User
                 User user = userRepo.save(User.builder()
                         .fullName(randomFullName())
@@ -142,6 +172,9 @@ public class DataSeeder implements CommandLineRunner {
                         .phone("09" + String.format("%08d", RNG.nextInt(100000000)))
                         .role(Role.USER)
                         .isLocked(false)
+                        .latitude(coords[0])
+                        .longitude(coords[1])
+                        .address(prov.name())
                         .build());
 
                 // 2. Chọn species theo tỷ lệ: Chó 50%, Mèo 30%, Thỏ 10%, Hamster 10%
@@ -292,10 +325,18 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     private String uploadRandomPhoto(String species, int seed) {
-        String imageUrl = randomImageUrl(species, seed);
-        if (!uploadPhotos) {
-            return imageUrl;
-        }
+        try {
+            String imageUrl;
+            if ("Chó".equals(species)) {
+                imageUrl = "https://loremflickr.com/400/500/dog?lock=" + seed;
+            } else if ("Mèo".equals(species)) {
+                imageUrl = "https://loremflickr.com/400/500/cat?lock=" + seed;
+            } else {
+                // Thỏ / Hamster → dùng picsum với seed cố định (không dùng tiếng Việt có dấu
+                // trong URL)
+                String safeSeed = "Thỏ".equals(species) ? "rabbit" : "hamster";
+                imageUrl = "https://picsum.photos/seed/" + safeSeed + seed + "/400/500";
+            }
 
         try {
             // Download ảnh
@@ -365,9 +406,44 @@ public class DataSeeder implements CommandLineRunner {
                 + firstNames[RNG.nextInt(firstNames.length)];
     }
 
+    /**
+     * Tạo tọa độ ngẫu nhiên xung quanh tâm
+     * @param radiusKm bán kính phân bố (vd 20.0 km)
+     */
+    private double[] generateRandomCoordinate(double centerLat, double centerLon, double radiusKm) {
+        double radiusInDegrees = radiusKm / 111.0;
+        double u = RNG.nextDouble();
+        double v = RNG.nextDouble();
+        // Không skip đoạn tâm nữa:
+        double r = radiusInDegrees * Math.sqrt(u);
+        double theta = 2 * Math.PI * v;
+        double dx = r * Math.cos(theta);
+        double dy = r * Math.sin(theta);
+        double newLon = centerLon + dx / Math.cos(Math.toRadians(centerLat));
+        double newLat = centerLat + dy;
+        return new double[]{newLat, newLon};
+    }
+
     private List<String> pickRandom(String[] arr, int count) {
         List<String> list = new ArrayList<>(Arrays.asList(arr));
         Collections.shuffle(list, RNG);
         return list.subList(0, Math.min(count, list.size()));
+    }
+
+    private void ensureDefaultAdmin() {
+        final String adminEmail = "admin@petmatch.com";
+        if (userRepo.existsByEmail(adminEmail)) {
+            return;
+        }
+
+        userRepo.save(User.builder()
+                .fullName("System Admin")
+                .email(adminEmail)
+                .passwordHash(passwordEncoder.encode("Admin@123"))
+                .role(Role.ADMIN)
+                .isLocked(false)
+                .build());
+
+        log.info("DataSeeder: Đã tạo tài khoản admin mặc định {}", adminEmail);
     }
 }

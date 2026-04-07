@@ -33,9 +33,10 @@ fun MatchFilterScreen(navController: NavController, matchVm: MatchViewModel) {
     var healthStatus by remember { mutableStateOf(matchVm.filterHealthStatus.value) }
     var minAge      by remember { mutableFloatStateOf((matchVm.filterMinAge.value ?: 0).toFloat()) }
     var maxAge      by remember { mutableFloatStateOf((matchVm.filterMaxAge.value ?: 15).toFloat()) }
+    var maxDistance by remember { mutableFloatStateOf((matchVm.filterMaxDistance.value ?: 50.0).toFloat()) }
 
     val hasFilter = species != null || gender != null || lookingFor != null ||
-            healthStatus != null || minAge > 0f || maxAge < 15f
+            healthStatus != null || minAge > 0f || maxAge < 15f || maxDistance != 50f
 
     Scaffold(
         topBar = {
@@ -52,6 +53,7 @@ fun MatchFilterScreen(navController: NavController, matchVm: MatchViewModel) {
                             onClick = {
                                 species = null; gender = null; lookingFor = null
                                 healthStatus = null; minAge = 0f; maxAge = 15f
+                                maxDistance = 50f
                                 matchVm.clearFilters(ctx)
                                 navController.popBackStack()
                             }
@@ -73,6 +75,7 @@ fun MatchFilterScreen(navController: NavController, matchVm: MatchViewModel) {
                             minAge       = minAge.toInt().takeIf { it > 0 },
                             maxAge       = maxAge.toInt().takeIf { it < 15 },
                             healthStatus = healthStatus,
+                            maxDistanceKm = maxDistance.toDouble().takeIf { it != 50.0 },
                             ctx          = ctx
                         )
                         navController.popBackStack()
@@ -154,6 +157,18 @@ fun MatchFilterScreen(navController: NavController, matchVm: MatchViewModel) {
                         onValueChange = { maxAge = it.coerceAtLeast(minAge + 1) },
                         valueRange = 1f..15f,
                         steps = 13,
+                        colors = SliderDefaults.colors(thumbColor = PrimaryPink, activeTrackColor = PrimaryPink)
+                    )
+                }
+            }
+
+            // Khoảng cách
+            FilterSection(title = "Khoảng cách đối đa: ${maxDistance.toInt()} km") {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Slider(
+                        value = maxDistance,
+                        onValueChange = { maxDistance = it },
+                        valueRange = 5f..200f,
                         colors = SliderDefaults.colors(thumbColor = PrimaryPink, activeTrackColor = PrimaryPink)
                     )
                 }

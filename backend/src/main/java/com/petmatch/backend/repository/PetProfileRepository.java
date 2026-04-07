@@ -19,6 +19,7 @@ public interface PetProfileRepository extends JpaRepository<PetProfile, Long> {
 
     Optional<PetProfile> findByOwnerId(Long ownerId);
     boolean existsByOwnerId(Long ownerId);
+    long countByIsHiddenTrue();
 
     /**
      * Lấy suggestions: cùng loài, chưa bị ẩn, loại trừ pet của chính mình và pet bị block.
@@ -48,10 +49,26 @@ public interface PetProfileRepository extends JpaRepository<PetProfile, Long> {
             AND sl.isSuperLike = true
         ) DESC, p.createdAt DESC
         """)
-    Page<PetProfile> findSuggestions(
+        Page<PetProfile> findSuggestions(
             @Param("currentUserId") Long currentUserId,
             @Param("myPetId") Long myPetId,
             @Param("species") String species,
+            @Param("pendingStatus") com.petmatch.backend.enums.MatchStatus pendingStatus,
+            Pageable pageable);
+
+        @Query("""
+        SELECT p FROM PetProfile p
+        WHERE (:query IS NULL OR :query = ''
+               OR LOWER(p.name) LIKE LOWER(CONCAT('%', :query, '%'))
+               OR LOWER(p.species) LIKE LOWER(CONCAT('%', :query, '%'))
+               OR LOWER(p.breed) LIKE LOWER(CONCAT('%', :query, '%'))
+               OR LOWER(p.owner.fullName) LIKE LOWER(CONCAT('%', :query, '%')))
+          AND (:hidden IS NULL OR p.isHidden = :hidden)
+        ORDER BY p.createdAt DESC
+        """)
+        Page<PetProfile> searchPetsForAdmin(
+            @Param("query") String query,
+            @Param("hidden") Boolean hidden,
             Pageable pageable);
 
     /**

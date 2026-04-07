@@ -28,6 +28,7 @@ public class ChatService {
     private final BlockRepository blockRepository;
     private final MatchRepository matchRepository;
     private final CloudinaryService cloudinaryService;
+    private final NicknameRepository nicknameRepository;
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -64,9 +65,9 @@ public class ChatService {
                 return m.getContent();
             }).orElse(null);
 
-            // Nếu conversation bị xóa (deletedBySenderAt <= lastMsg.sentAt) và không có tin nhắn mới → ẩn
+            // Nếu conversation bị xóa (deletedAt >= lastMsg.sentAt) và không có tin mới → ẩn luôn
             boolean deletedConv = lastMsgOpt.map(m -> {
-                // Nếu me là sender
+                // Nếu me là sender thì check deletedBySenderAt, nếu me là receiver thì check deletedByReceiverAt
                 if (m.getSender().getId().equals(me.getId())) {
                     return m.getDeletedBySenderAt() != null && !m.getSentAt().isAfter(m.getDeletedBySenderAt());
                 } else {
@@ -74,15 +75,18 @@ public class ChatService {
                 }
             }).orElse(false);
 
-            if (deletedConv && lastMsg == null) return null;
+            if (deletedConv) return null;
 
-            String lastTime = lastMsgOpt.map(m -> m.getSentAt().toString()).orElse(match.getMatchedAt().toString());
+            String lastTime = lastMsgOpt.map(m -> m.getSentAt() != null ? m.getSentAt().toString() : "")
+                    .orElse(match.getMatchedAt() != null ? match.getMatchedAt().toString() : "");
+            
             long unread = lastMsgOpt.isPresent() ? messageRepository.countUnread(other, me) : 0;
 
-            // Avatar: lấy từ User.avatarUrl
+            String userName = other.getFullName() != null ? other.getFullName() : "Người dùng";
+
             return ConversationSummaryDto.builder()
                     .matchedUserId(other.getId())
-                    .userName(other.getFullName())
+                    .userName(userName)
                     .avatarUrl(other.getAvatarUrl())
                     .lastMessage(lastMsg)
                     .lastMessageTime(lastTime)
@@ -223,6 +227,31 @@ public class ChatService {
                 "theyBlockedMe", theyBlockedMe,
                 "myBlockLevel", myLevel != null ? myLevel.name() : ""
         );
+    }
+
+    // ── Nicknames ─────────────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public String getNickname(String email, Long receiverId) {
+        User setter = userRepository.findByEmail(email).orElse(null);
+        User receiver = getUser(receiverId);
+        if (setter == null || receiver == null) return null;
+        return nicknameRepository.findBySetterAndReceiver(setter, receiver)
+                .map(Nickname::getNickname).orElse(null);
+    }
+
+    @Transactional
+    public String setNickname(String email, Long receiverId, String nickname) {
+        User setter = userRepository.findByEmail(email)
+                .orElseThrow(() -> new AppException("User not found", HttpStatus.UNAUTHORIZED));
+        User receiver = getUser(receiverId);
+        
+        Nickname entry = nicknameRepository.findBySetterAndReceiver(setter, receiver).orElse(
+                Nickname.builder().setter(setter).receiver(receiver).build()
+        );
+        entry.setNickname(nickname);
+        nicknameRepository.save(entry);
+        return nickname;
     }
 
     // ── DTO Mapper ────────────────────────────────────────────────────────────

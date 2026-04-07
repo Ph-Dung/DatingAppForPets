@@ -43,13 +43,25 @@ interface ChatApi {
     @GET("api/chat/block-status/{otherUserId}")
     suspend fun getBlockStatus(@Path("otherUserId") otherUserId: Long): Response<BlockStatus>
 
-    /** Upload ảnh hoặc voice message */
+    /**Upload ảnh hoặc voice message */
     @Multipart
     @POST("api/chat/upload")
     suspend fun uploadMedia(
         @Part file: MultipartBody.Part,
         @Part("type") type: RequestBody
     ): Response<MediaUploadResponse>
+
+    /** Gửi tin nhắn Text qua REST */
+    @POST("api/chat/messages")
+    suspend fun sendMessage(@Body req: MessageRequest): Response<MessageResponse>
+
+    /** Lấy nickname */
+    @GET("api/chat/nicknames/{receiverId}")
+    suspend fun getNickname(@Path("receiverId") receiverId: Long): Response<Map<String, String>>
+
+    /** Đặt nickname */
+    @PUT("api/chat/nicknames/{receiverId}")
+    suspend fun setNickname(@Path("receiverId") receiverId: Long, @Body req: Map<String, String>): Response<Map<String, String>>
 }
 
 interface CallApi {

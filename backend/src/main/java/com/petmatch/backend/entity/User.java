@@ -23,6 +23,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.FieldDefaults;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "users")
@@ -65,6 +66,16 @@ public class User {
     @Column(name = "is_locked", nullable = false)
     @Builder.Default
     Boolean isLocked = false;
+
+    @Column(name = "is_warned")
+    Boolean isWarned = false;
+
+    @Column(name = "warning_count")
+    Integer warningCount = 0;
+
+    @Column(name = "last_warned_at")
+    LocalDateTime lastWarnedAt;
+
 
     @Column(name = "created_at", nullable = false, updatable = false)
     @CreationTimestamp
