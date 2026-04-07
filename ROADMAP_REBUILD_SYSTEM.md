@@ -29,7 +29,7 @@
 | T0-1 | Chot branch strategy va cach merge conflict | 0 | DONE | Cao | Nhanh toan bo branch hien tai | Rule merge ro rang |  |
 | T0-2 | Lap danh sach conflict nho le theo nhom file | 0 | DONE | Cao | Git status + diff | Backlog conflict co nhan |  |
 | T1-1 | Backend: config + security baseline | 1 | DONE | Cao | config, security, exception | Khoi dong on dinh, auth pass smoke test |  |
-| T1-2 | Backend: entity + repository consistency | 1 | TODO | Cao | entity, repository | Build pass, khong canh bao quan trong |  |
+| T1-2 | Backend: entity + repository consistency | 1 | DONE | Cao | entity, repository | Build pass, khong canh bao quan trong |  |
 | T1-3 | Backend: service layer refactor theo domain | 1 | TODO | Cao | service | Logic ro, test duong chinh |  |
 | T1-4 | Backend: controller + dto contract cleanup | 1 | TODO | Cao | controller, dto | Contract API on dinh |  |
 | T1-5 | Backend: seed + migration + startup flow | 1 | TODO | Trung binh | DataSeeder, config DB | Startup nhanh, seed co dieu kien |  |
@@ -102,8 +102,8 @@ Trang thai hop le: TODO | IN_PROGRESS | BLOCKED | REVIEW | DONE
 | Config | application, CORS, env, cloud setup | DONE | Da chuan hoa env placeholders + CORS baseline |
 | Security | JWT, auth context, role check | DONE | Da bo sung allowlist route + 401/403 JSON handler |
 | Exception | AppException + global handler | DONE | Da co baseline @RestControllerAdvice su dung duoc |
-| Entity | Builder default, relation, nullable | TODO |  |
-| Repository | query method naming + indexes logic | TODO |  |
+| Entity | Builder default, relation, nullable | DONE | Da chuan hoa builder defaults cho PetProfile + quan he collection |
+| Repository | query method naming + indexes logic | DONE | Da ra soat consistency naming, khong phat hien blocker |
 | Service-Community | post/comment/like/report | TODO |  |
 | Service-Chat | group/direct flow | TODO |  |
 | Service-Match/Profile | logic nghiep vu cot loi | TODO |  |
@@ -176,6 +176,7 @@ Trang thai hop le: TODO | IN_PROGRESS | BLOCKED | REVIEW | DONE
 | 2026-04-07 | T0-1 | Chot branch `feed`, chot commit convention, chot merge rule | DONE | Push remote bi 403 (quyen repo) | Tiep tuc T0-2 conflict backlog |
 | 2026-04-07 | T0-2 | Gom conflict nho le theo 7 nhom file/he thong | DONE | Khong | Bat dau T1-1 backend config + security baseline |
 | 2026-04-07 | T1-1 | Chuan hoa SecurityConfig + CORS + route allowlist + config env placeholders | DONE | Khong | Chuyen T1-2 entity + repository consistency |
+| 2026-04-07 | T1-2 | Chuan hoa PetProfile defaults/relations + ra soat repository consistency | DONE | Khong | Chuyen T1-3 service layer refactor theo domain |
 | YYYY-MM-DD | T?-? | ... | ... | ... | ... |
 
 ## 9.2 Blockers board

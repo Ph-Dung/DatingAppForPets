@@ -6,7 +6,6 @@ import com.petmatch.backend.enums.LookingFor;
 import com.petmatch.backend.enums.ReproductiveStatus;
 import jakarta.persistence.*;
 import lombok.*;
-import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -15,7 +14,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 @Entity
 @Getter
@@ -23,7 +21,6 @@ import java.util.UUID;
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-@FieldDefaults(level = AccessLevel.PRIVATE)
 public class PetProfile {
 
     @Id
@@ -65,6 +62,7 @@ public class PetProfile {
     ReproductiveStatus reproductiveStatus;
 
     @Column(name = "is_vaccinated", nullable = false)
+    @Builder.Default
     Boolean isVaccinated = false;
 
     @Column(name = "last_vaccine_date")
@@ -72,6 +70,7 @@ public class PetProfile {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "health_status", nullable = false, length = 30)
+    @Builder.Default
     HealthStatus healthStatus = HealthStatus.HEALTHY;
 
     @Column(name = "health_notes", columnDefinition = "TEXT")
@@ -89,6 +88,7 @@ public class PetProfile {
     String notes;
 
     @Column(name = "is_hidden", nullable = false)
+    @Builder.Default
     Boolean isHidden = false;
 
     @CreationTimestamp
@@ -101,14 +101,18 @@ public class PetProfile {
 
     // Relationships
     @OneToMany(mappedBy = "pet", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     List<PetPhoto> photos = new ArrayList<>();
 
     @OneToMany(mappedBy = "pet", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     List<PetVaccination> vaccinations = new ArrayList<>();
 
     @OneToMany(mappedBy = "senderPet", cascade = CascadeType.ALL)
+    @Builder.Default
     List<MatchRequest> sentRequests = new ArrayList<>();
 
     @OneToMany(mappedBy = "receiverPet", cascade = CascadeType.ALL)
+    @Builder.Default
     List<MatchRequest> receivedRequests = new ArrayList<>();
 }
