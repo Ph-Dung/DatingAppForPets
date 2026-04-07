@@ -179,7 +179,9 @@ public class MatchRequestService {
     @Transactional(readOnly = true)
     public List<MatchRequestResponse> getWhoLikedMe() {
         return matchRepo.findByReceiverPetIdOrderByIsSuperLikeDescCreatedAtDesc(myPet().getId())
-                .stream().map(this::toResponse).toList();
+                .stream()
+                .filter(m -> m.getStatus() == MatchStatus.PENDING)
+                .map(this::toResponse).toList();
     }
 
     @Transactional(readOnly = true)

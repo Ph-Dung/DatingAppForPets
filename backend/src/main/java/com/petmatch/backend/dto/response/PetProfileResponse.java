@@ -36,6 +36,7 @@ public class PetProfileResponse {
     private Boolean isHidden;
     private String avatarUrl;
     private List<String> photoUrls;
+    private List<PetPhotoDto> photos;
     private LocalDateTime createdAt;
     // Địa lý
     private Double distanceKm;    // null nếu chưa có GPS

@@ -25,11 +25,17 @@ data class PetProfileResponse(
     val isHidden: Boolean,
     val avatarUrl: String?,
     val photoUrls: List<String>,
+    val photos: List<PetPhotoDto> = emptyList(),
     val createdAt: String?,
     
     // Geolocation
     val distanceKm: Double? = null,
     val ownerAddress: String? = null
+)
+
+data class PetPhotoDto(
+    val id: Long,
+    val url: String
 )
 
 data class PetProfileRequest(
@@ -200,6 +206,7 @@ data class CommunityReportRequest(
     val targetId: Long,
     val targetType: String,
     val reason: String
+)
 data class AdminDashboardResponse(
     val totalUsers: Long,
     val lockedUsers: Long,
