@@ -52,6 +52,34 @@ public class CommunityService {
                 .orElseThrow(() -> new AppException("User không tồn tại", HttpStatus.NOT_FOUND));
     }
 
+    private Post requirePost(Long postId) {
+        return postRepository.findById(postId)
+                .orElseThrow(() -> new AppException("Post không tồn tại", HttpStatus.NOT_FOUND));
+    }
+
+    private Comment requireComment(Long commentId) {
+        return commentRepository.findById(commentId)
+                .orElseThrow(() -> new AppException("Comment không tồn tại", HttpStatus.NOT_FOUND));
+    }
+
+    private void assertCanManagePost(User actor, Post post, String action) {
+        if (!post.getUser().getId().equals(actor.getId()) && !canModerate(actor)) {
+            throw new AppException("Bạn không có quyền " + action + " bài viết này", HttpStatus.FORBIDDEN);
+        }
+    }
+
+    private void assertCanManageComment(User actor, Comment comment, String action) {
+        if (!comment.getUser().getId().equals(actor.getId()) && !canModerate(actor)) {
+            throw new AppException("Bạn không có quyền " + action + " bình luận này", HttpStatus.FORBIDDEN);
+        }
+    }
+
+    private List<PostResponse> toPostResponses(List<Post> posts, User actor) {
+        return posts.stream()
+                .map(post -> mapToPostResponse(post, actor))
+                .collect(Collectors.toList());
+    }
+
     private boolean canModerate(User user) {
         return user.getRole() == Role.ADMIN;
     }
@@ -71,35 +99,26 @@ public class CommunityService {
 
     @Transactional(readOnly = true)
     public List<PostResponse> getFeed() {
-        User currentUser = currentUser();
-        return postRepository.findAllByOrderByCreatedAtDesc().stream()
-                .map(post -> mapToPostResponse(post, currentUser))
-                .collect(Collectors.toList());
+        User actor = currentUser();
+        return toPostResponses(postRepository.findAllByOrderByCreatedAtDesc(), actor);
     }
 
     @Transactional(readOnly = true)
     public List<PostResponse> getMyPosts() {
-        User currentUser = currentUser();
-        return postRepository.findAllByUserOrderByCreatedAtDesc(currentUser).stream()
-                .map(post -> mapToPostResponse(post, currentUser))
-                .collect(Collectors.toList());
+        User actor = currentUser();
+        return toPostResponses(postRepository.findAllByUserOrderByCreatedAtDesc(actor), actor);
     }
 
     @Transactional(readOnly = true)
     public PostResponse getPostDetail(Long postId) {
-        User currentUser = currentUser();
-        Post post = postRepository.findById(postId)
-                .orElseThrow(() -> new AppException("Post không tồn tại", HttpStatus.NOT_FOUND));
-        return mapToPostResponse(post, currentUser);
+        User actor = currentUser();
+        return mapToPostResponse(requirePost(postId), actor);
     }
 
     @Transactional(readOnly = true)
     public List<PostResponse> getPostsByUserId(Long userId) {
-        User currentUser = currentUser();
-        return postRepository.findAllByUserIdOrderByCreatedAtDesc(userId)
-                .stream()
-                .map(post -> mapToPostResponse(post, currentUser))
-                .collect(Collectors.toList());
+        User actor = currentUser();
+        return toPostResponses(postRepository.findAllByUserIdOrderByCreatedAtDesc(userId), actor);
     }
 
     @Transactional
@@ -126,72 +145,61 @@ public class CommunityService {
 
     @Transactional
     public PostResponse updatePost(Long postId, String content, String imageUrl, String location) {
-        User currentUser = currentUser();
-        Post post = postRepository.findById(postId)
-                .orElseThrow(() -> new AppException("Post không tồn tại", HttpStatus.NOT_FOUND));
-
-        if (!post.getUser().getId().equals(currentUser.getId()) && !canModerate(currentUser)) {
-            throw new AppException("Bạn không có quyền chỉnh sửa bài viết này", HttpStatus.FORBIDDEN);
-        }
+        User actor = currentUser();
+        Post post = requirePost(postId);
+        assertCanManagePost(actor, post, "chỉnh sửa");
 
         validateContentForModeration(content);
         post.setContent(content);
         post.setImageUrl(imageUrl);
         post.setLocation(location);
 
-        return mapToPostResponse(postRepository.save(post), currentUser);
+        return mapToPostResponse(postRepository.save(post), actor);
     }
 
     @Transactional
     public void deletePost(Long postId) {
-        User currentUser = currentUser();
-        Post post = postRepository.findById(postId)
-                .orElseThrow(() -> new AppException("Post không tồn tại", HttpStatus.NOT_FOUND));
-
-        if (!post.getUser().getId().equals(currentUser.getId()) && !canModerate(currentUser)) {
-            throw new AppException("Bạn không có quyền xóa bài viết này", HttpStatus.FORBIDDEN);
-        }
+        User actor = currentUser();
+        Post post = requirePost(postId);
+        assertCanManagePost(actor, post, "xóa");
 
         postRepository.delete(post);
     }
 
     @Transactional
     public boolean toggleLike(Long postId) {
-        User currentUser = currentUser();
-        Post post = postRepository.findById(postId)
-                .orElseThrow(() -> new AppException("Post không tồn tại", HttpStatus.NOT_FOUND));
+        User actor = currentUser();
+        Post post = requirePost(postId);
 
-        return likeRepository.findByUserAndPost(currentUser, post)
+        return likeRepository.findByUserAndPost(actor, post)
                 .map(existingLike -> {
                     likeRepository.delete(existingLike);
                     return false;
                 })
                 .orElseGet(() -> {
-                    likeRepository.save(Like.builder().user(currentUser).post(post).build());
+                    likeRepository.save(Like.builder().user(actor).post(post).build());
                     return true;
                 });
     }
 
     @Transactional
     public void unlikePost(Long postId) {
-        User currentUser = currentUser();
-        Post post = postRepository.findById(postId)
-                .orElseThrow(() -> new AppException("Post không tồn tại", HttpStatus.NOT_FOUND));
+        User actor = currentUser();
+        Post post = requirePost(postId);
 
-        likeRepository.findByUserAndPost(currentUser, post)
+        likeRepository.findByUserAndPost(actor, post)
                 .ifPresent(likeRepository::delete);
     }
 
     @Transactional
     public CommentResponse addComment(Long postId, String content) {
-        User currentUser = currentUser();
-        Post post = postRepository.findById(postId)
-                .orElseThrow(() -> new AppException("Post không tồn tại", HttpStatus.NOT_FOUND));
+        User actor = currentUser();
+        Post post = requirePost(postId);
 
         validateContentForModeration(content);
         Comment comment = Comment.builder()
                 .content(content)
-                .user(currentUser)
+                .user(actor)
                 .post(post)
                 .build();
 
@@ -200,14 +208,13 @@ public class CommunityService {
 
     @Transactional
     public CommentResponse replyComment(Long commentId, String content) {
-        User currentUser = currentUser();
-        Comment parentComment = commentRepository.findById(commentId)
-                .orElseThrow(() -> new AppException("Comment không tồn tại", HttpStatus.NOT_FOUND));
+        User actor = currentUser();
+        Comment parentComment = requireComment(commentId);
 
         validateContentForModeration(content);
         Comment reply = Comment.builder()
                 .content(content)
-                .user(currentUser)
+                .user(actor)
                 .post(parentComment.getPost())
                 .parentComment(parentComment)
                 .build();
@@ -217,13 +224,9 @@ public class CommunityService {
 
     @Transactional
     public CommentResponse updateComment(Long commentId, String content) {
-        User currentUser = currentUser();
-        Comment comment = commentRepository.findById(commentId)
-                .orElseThrow(() -> new AppException("Comment không tồn tại", HttpStatus.NOT_FOUND));
-
-        if (!comment.getUser().getId().equals(currentUser.getId()) && !canModerate(currentUser)) {
-            throw new AppException("Bạn không có quyền chỉnh sửa bình luận này", HttpStatus.FORBIDDEN);
-        }
+        User actor = currentUser();
+        Comment comment = requireComment(commentId);
+        assertCanManageComment(actor, comment, "chỉnh sửa");
 
         validateContentForModeration(content);
         comment.setContent(content);
@@ -232,21 +235,16 @@ public class CommunityService {
 
     @Transactional
     public void deleteComment(Long commentId) {
-        User currentUser = currentUser();
-        Comment comment = commentRepository.findById(commentId)
-                .orElseThrow(() -> new AppException("Comment không tồn tại", HttpStatus.NOT_FOUND));
-
-        if (!comment.getUser().getId().equals(currentUser.getId()) && !canModerate(currentUser)) {
-            throw new AppException("Bạn không có quyền xóa bình luận này", HttpStatus.FORBIDDEN);
-        }
+        User actor = currentUser();
+        Comment comment = requireComment(commentId);
+        assertCanManageComment(actor, comment, "xóa");
 
         commentRepository.delete(comment);
     }
 
     @Transactional(readOnly = true)
     public List<CommentResponse> getCommentsByPost(Long postId) {
-        Post post = postRepository.findById(postId)
-                .orElseThrow(() -> new AppException("Post không tồn tại", HttpStatus.NOT_FOUND));
+        Post post = requirePost(postId);
 
         return commentRepository.findAllByPostAndParentCommentIsNullOrderByCreatedAtAsc(post)
                 .stream()
