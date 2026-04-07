@@ -324,10 +324,11 @@ public class DataSeeder implements CommandLineRunner {
         log.info("DataSeeder: Đã seed 3 community posts mẫu.");
     }
 
-    private String uploadRandomPhoto(String species, int seed) {
+        private String uploadRandomPhoto(String species, int seed) {
         try {
             String imageUrl;
             if ("Chó".equals(species)) {
+                imageUrl = "https://loremflickr.com/400/500/dog?lock=" + (seed % 50);
                 imageUrl = "https://loremflickr.com/400/500/dog?lock=" + seed;
             } else if ("Mèo".equals(species)) {
                 imageUrl = "https://loremflickr.com/400/500/cat?lock=" + seed;
@@ -338,7 +339,6 @@ public class DataSeeder implements CommandLineRunner {
                 imageUrl = "https://picsum.photos/seed/" + safeSeed + seed + "/400/500";
             }
 
-        try {
             // Download ảnh
             byte[] imageBytes;
             try (InputStream is = java.net.URI.create(imageUrl).toURL().openStream()) {
@@ -352,10 +352,15 @@ public class DataSeeder implements CommandLineRunner {
                             "resource_type", "image"));
             return result.get("secure_url").toString();
 
-        } catch (IOException e) {
+        } catch (Exception e) {
             log.warn("DataSeeder: Không thể upload ảnh: {}", e.getMessage());
             // Fallback: trả về URL trực tiếp không qua Cloudinary
-            return imageUrl;
+            if ("Chó".equals(species))
+                return "https://loremflickr.com/400/500/dog?lock=" + (seed % 50);
+            if ("Mèo".equals(species))
+                return "https://loremflickr.com/400/500/cat?lock=" + seed;
+            String safeSeed = "Thỏ".equals(species) ? "rabbit" : "hamster";
+            return "https://picsum.photos/seed/" + safeSeed + seed + "/400/500";
         }
     }
 
