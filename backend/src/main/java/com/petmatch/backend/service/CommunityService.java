@@ -15,6 +15,8 @@ import com.petmatch.backend.dto.request.CommunityReportRequest;
 import com.petmatch.backend.dto.response.CommentResponse;
 import com.petmatch.backend.entity.Comment;
 import com.petmatch.backend.entity.Like;
+import com.petmatch.backend.entity.PetPhoto;
+import com.petmatch.backend.entity.PetProfile;
 import com.petmatch.backend.entity.Post;
 import com.petmatch.backend.entity.Report;
 import com.petmatch.backend.entity.User;
@@ -24,6 +26,8 @@ import com.petmatch.backend.enums.Role;
 import com.petmatch.backend.exception.AppException;
 import com.petmatch.backend.repository.CommentRepository;
 import com.petmatch.backend.repository.LikeRepository;
+import com.petmatch.backend.repository.PetPhotoRepository;
+import com.petmatch.backend.repository.PetProfileRepository;
 import com.petmatch.backend.repository.PostRepository;
 import com.petmatch.backend.repository.ReportRepository;
 import com.petmatch.backend.repository.UserRepository;
@@ -38,6 +42,8 @@ public class CommunityService {
     private final CommentRepository commentRepository;
     private final ReportRepository reportRepository;
     private final UserRepository userRepository;
+    private final PetProfileRepository petProfileRepository;
+    private final PetPhotoRepository petPhotoRepository;
     private final CloudinaryService cloudinaryService;
 
     @Value("${community.moderation.enabled:false}")
@@ -307,14 +313,25 @@ public class CommunityService {
     }
 
     private PostResponse mapToPostResponse(Post post, User currentUser) {
+        PetProfile ownerPet = petProfileRepository.findByOwnerId(post.getUser().getId()).orElse(null);
+        String petAvatar = null;
+        if (ownerPet != null) {
+            petAvatar = petPhotoRepository.findByPetIdAndIsAvatarTrue(ownerPet.getId())
+                .map(PetPhoto::getPhotoUrl)
+                .orElseGet(() -> petPhotoRepository.findByPetId(ownerPet.getId()).stream()
+                    .findFirst()
+                    .map(PetPhoto::getPhotoUrl)
+                    .orElse(null));
+        }
+
         return PostResponse.builder()
                 .id(post.getId())
                 .content(post.getContent())
                 .imageUrl(post.getImageUrl())
                 .location(post.getLocation())
                 .ownerId(post.getUser().getId())
-                .ownerName(post.getUser().getFullName())
-                .ownerAvatar(post.getUser().getAvatarUrl())
+            .ownerName(ownerPet != null ? ownerPet.getName() : post.getUser().getFullName())
+            .ownerAvatar(petAvatar)
                 .createdAt(post.getCreatedAt())
                 .likesCount(likeRepository.countByPost(post))
                 .commentsCount(post.getComments().size())

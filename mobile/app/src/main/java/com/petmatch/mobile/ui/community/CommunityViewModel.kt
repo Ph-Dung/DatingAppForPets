@@ -202,14 +202,54 @@ class CommunityViewModel : ViewModel() {
         try {
             val res = RetrofitClient.communityApi(ctx).toggleLike(id)
             if (res.isSuccessful) {
-                loadFeed(ctx)
-                loadMyPosts(ctx)
+                val likedRaw = res.body()?.get("liked")
+                val liked = when (likedRaw) {
+                    is Boolean -> likedRaw
+                    is String -> likedRaw.equals("true", ignoreCase = true)
+                    else -> false
+                }
+                _feed.value = _feed.value.map { post ->
+                    if (post.id == id) {
+                        post.copy(
+                            isLiked = liked,
+                            likesCount = if (liked) post.likesCount + 1 else (post.likesCount - 1).coerceAtLeast(0)
+                        )
+                    } else post
+                }
+                _myPosts.value = _myPosts.value.map { post ->
+                    if (post.id == id) {
+                        post.copy(
+                            isLiked = liked,
+                            likesCount = if (liked) post.likesCount + 1 else (post.likesCount - 1).coerceAtLeast(0)
+                        )
+                    } else post
+                }
             } else {
-                _error.value = "Khong the cap nhat luot thich"
+                _error.value = "Không thể cập nhật lượt thích"
             }
         } catch (_: Exception) {
-            _error.value = "Khong the ket noi may chu"
+            _error.value = "Không thể kết nối máy chủ"
         }
+    }
+
+    fun replyComment(ctx: Context, postId: Long, parentCommentId: Long, content: String, onDone: (() -> Unit)? = null) = viewModelScope.launch {
+        _actionLoading.value = true
+        _error.value = null
+        try {
+            val res = RetrofitClient.communityApi(ctx)
+                .replyComment(parentCommentId, CommunityCreateCommentRequest(content.trim()))
+            if (res.isSuccessful) {
+                loadComments(ctx, postId)
+                loadFeed(ctx)
+                loadMyPosts(ctx)
+                onDone?.invoke()
+            } else {
+                _error.value = "Không gửi được phản hồi"
+            }
+        } catch (_: Exception) {
+            _error.value = "Không thể kết nối máy chủ"
+        }
+        _actionLoading.value = false
     }
 
     fun loadComments(ctx: Context, postId: Long) = viewModelScope.launch {
@@ -220,10 +260,10 @@ class CommunityViewModel : ViewModel() {
             if (res.isSuccessful) {
                 _comments.value = res.body() ?: emptyList()
             } else {
-                _error.value = "Khong tai duoc binh luan"
+                _error.value = "Không tải được bình luận"
             }
         } catch (_: Exception) {
-            _error.value = "Khong the ket noi may chu"
+            _error.value = "Không thể kết nối máy chủ"
         }
         _commentsLoading.value = false
     }
@@ -240,10 +280,10 @@ class CommunityViewModel : ViewModel() {
                 loadMyPosts(ctx)
                 onDone?.invoke()
             } else {
-                _error.value = "Khong gui duoc binh luan"
+                _error.value = "Không gửi được bình luận"
             }
         } catch (_: Exception) {
-            _error.value = "Khong the ket noi may chu"
+            _error.value = "Không thể kết nối máy chủ"
         }
         _actionLoading.value = false
     }
@@ -261,10 +301,10 @@ class CommunityViewModel : ViewModel() {
             if (res.isSuccessful) {
                 onDone?.invoke()
             } else {
-                _error.value = "Khong gui duoc bao cao"
+                _error.value = "Không gửi được báo cáo"
             }
         } catch (_: Exception) {
-            _error.value = "Khong the ket noi may chu"
+            _error.value = "Không thể kết nối máy chủ"
         }
         _actionLoading.value = false
     }

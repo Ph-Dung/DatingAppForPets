@@ -253,6 +253,12 @@ interface CommunityApi {
         @Body req: CommunityCreateCommentRequest
     ): Response<CommunityCommentResponse>
 
+    @POST("api/community/comments/{commentId}/replies")
+    suspend fun replyComment(
+        @Path("commentId") commentId: Long,
+        @Body req: CommunityCreateCommentRequest
+    ): Response<CommunityCommentResponse>
+
     @POST("api/community/reports")
     suspend fun submitReport(@Body req: CommunityReportRequest): Response<Any>
 }

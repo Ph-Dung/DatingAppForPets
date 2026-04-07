@@ -69,7 +69,7 @@ fun PostManagementScreen(navController: NavController, vm: CommunityViewModel) {
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("Quan ly bai dang", fontWeight = FontWeight.Bold) },
+                title = { Text("Quản lý bài đăng", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = PrimaryPink)
@@ -156,7 +156,7 @@ fun ManagePostItem(
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                     modifier = Modifier.height(30.dp)
                 ) {
-                    Text("Sua", color = PrimaryPink, fontSize = 12.sp)
+                    Text("Sửa", color = PrimaryPink, fontSize = 12.sp)
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Button(
@@ -167,7 +167,7 @@ fun ManagePostItem(
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                     modifier = Modifier.height(30.dp)
                 ) {
-                    Text("Xoa", color = Color.White, fontSize = 12.sp)
+                    Text("Xóa", color = Color.White, fontSize = 12.sp)
                 }
             }
         }
@@ -183,19 +183,19 @@ fun ManagePostItem(
                     value = editContent,
                     onValueChange = { editContent = it },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Noi dung") }
+                    label = { Text("Nội dung") }
                 )
                 OutlinedTextField(
                     value = editLocation,
                     onValueChange = { editLocation = it },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Dia diem") }
+                    label = { Text("Địa điểm") }
                 )
                 OutlinedTextField(
                     value = editImageUrl,
                     onValueChange = { editImageUrl = it },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("URL anh") }
+                    label = { Text("URL ảnh") }
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
@@ -209,7 +209,7 @@ fun ManagePostItem(
                         },
                         enabled = editContent.isNotBlank() && !actionLoading
                     ) {
-                        Text("Luu")
+                        Text("Lưu")
                     }
                     TextButton(onClick = {
                         editContent = post.content
@@ -217,7 +217,7 @@ fun ManagePostItem(
                         editLocation = post.location ?: ""
                         isEditing = false
                     }) {
-                        Text("Huy")
+                        Text("Hủy")
                     }
                 }
             }
@@ -229,7 +229,7 @@ fun ManagePostItem(
                 fontSize = 13.sp
             )
             Text(
-                "${post.likesCount} luot thich, ${post.commentsCount} binh luan",
+                "${post.likesCount} lượt thích, ${post.commentsCount} bình luận",
                 modifier = Modifier.padding(horizontal = 12.dp),
                 fontWeight = FontWeight.Bold,
                 fontSize = 13.sp

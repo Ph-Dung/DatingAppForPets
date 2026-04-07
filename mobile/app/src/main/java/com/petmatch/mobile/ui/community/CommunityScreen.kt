@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -27,26 +28,34 @@ import com.petmatch.mobile.data.model.CommunityPostResponse
 import com.petmatch.mobile.ui.common.GradientButton
 import com.petmatch.mobile.ui.common.PetMatchTopBar
 import com.petmatch.mobile.ui.navigation.Routes
+import com.petmatch.mobile.ui.petprofile.PetProfileViewModel
+import com.petmatch.mobile.ui.petprofile.PetUiState
 import com.petmatch.mobile.ui.theme.PrimaryPink
+import android.util.Log
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
-    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val ctx = LocalContext.current
     val posts by vm.feed.collectAsState()
     val loading by vm.loading.collectAsState()
     val actionLoading by vm.actionLoading.collectAsState()
     val error by vm.error.collectAsState()
     val comments by vm.comments.collectAsState()
     val commentsLoading by vm.commentsLoading.collectAsState()
+    val petVm: PetProfileViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+    val myPet by petVm.myPet.collectAsState()
+    val currentPet = (myPet as? PetUiState.Success)?.pet
 
     var commentPostId by remember { mutableStateOf<Long?>(null) }
+    var replyToCommentId by remember { mutableStateOf<Long?>(null) }
     var showReportDialogForPostId by remember { mutableStateOf<Long?>(null) }
     var reportReason by remember { mutableStateOf("") }
     var commentInput by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
         vm.loadFeed(ctx)
+        petVm.loadMyProfile(ctx)
     }
 
     Scaffold(
@@ -54,10 +63,10 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
             PetMatchTopBar(
                 title = "Cộng đồng",
                 actions = {
-                    IconButton(onClick = { /* TODO: Search */ }) {
+                    IconButton(onClick = { Log.d("CommunityScreen", "Search tapped - TODO") }) {
                         Icon(Icons.Default.Search, null, tint = Color.Black)
                     }
-                    IconButton(onClick = { /* TODO: Notification */ }) {
+                    IconButton(onClick = { Log.d("CommunityScreen", "Notification tapped - TODO") }) {
                         Icon(Icons.Default.NotificationsNone, null, tint = Color.Black)
                     }
                 }
@@ -71,6 +80,8 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
         ) {
             item {
                 CreatePostBar(
+                    petAvatarUrl = currentPet?.avatarUrl,
+                    petName = currentPet?.name,
                     onPostClick = { navController.navigate(Routes.POST_ADD) },
                     onManageClick = { navController.navigate(Routes.POST_MANAGEMENT) }
                 )
@@ -86,7 +97,6 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
             if (!loading && posts.isEmpty()) {
                 item {
                     CommunityEmptyState(
-                        onExplore = { navController.navigate(Routes.MATCH_SWIPE) { launchSingleTop = true } },
                         onCreatePost = { navController.navigate(Routes.POST_ADD) },
                         onRetry = { vm.loadFeed(ctx) }
                     )
@@ -116,19 +126,20 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
                                 style = MaterialTheme.typography.bodySmall
                             )
                             TextButton(onClick = { vm.clearError() }) {
-                                Text("Dong")
+                                Text("Đóng")
                             }
                         }
                     }
                 }
             }
 
-            items(posts) { post ->
+            items(posts, key = { it.id }) { post ->
                 CommunityPostItem(
                     post = post,
                     onToggleLike = { vm.toggleLike(ctx, post.id) },
                     onOpenComments = {
                         commentPostId = post.id
+                        replyToCommentId = null
                         commentInput = ""
                         vm.loadComments(ctx, post.id)
                     },
@@ -142,66 +153,126 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
     }
 
     if (commentPostId != null) {
-        AlertDialog(
-            onDismissRequest = { commentPostId = null },
-            title = { Text("Binh luan") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (commentsLoading) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp))
-                    } else if (comments.isEmpty()) {
-                        Text("Chua co binh luan nao")
-                    } else {
-                        LazyColumn(modifier = Modifier.heightIn(max = 220.dp)) {
-                            items(comments, key = { it.id }) { c ->
-                                Text("${c.userName}: ${c.content}")
-                                Spacer(modifier = Modifier.height(6.dp))
-                            }
-                        }
-                    }
+        ModalBottomSheet(
+            onDismissRequest = {
+                commentPostId = null
+                replyToCommentId = null
+            }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.88f)
+                    .padding(horizontal = 14.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = "Bình luận",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
 
-                    OutlinedTextField(
-                        value = commentInput,
-                        onValueChange = { commentInput = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Them binh luan") },
-                        singleLine = true
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    enabled = commentInput.isNotBlank() && !actionLoading,
-                    onClick = {
-                        val postId = commentPostId
-                        if (postId != null) {
-                            vm.addComment(ctx, postId, commentInput) {
-                                commentInput = ""
+                if (commentsLoading) {
+                    Box(modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                    }
+                } else if (comments.isEmpty()) {
+                    Text("Chưa có bình luận nào", color = Color.Gray)
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(comments, key = { it.id }) { c ->
+                            CommentItem(
+                                name = c.userName,
+                                avatarUrl = c.userAvatar,
+                                content = c.content,
+                                depth = 0,
+                                onReply = { replyToCommentId = c.id }
+                            )
+                            c.replies.forEach { r ->
+                                CommentItem(
+                                    name = r.userName,
+                                    avatarUrl = r.userAvatar,
+                                    content = r.content,
+                                    depth = 1,
+                                    onReply = { replyToCommentId = r.id }
+                                )
                             }
                         }
                     }
-                ) {
-                    Text(if (actionLoading) "Dang gui..." else "Gui")
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { commentPostId = null }) {
-                    Text("Dong")
+
+                if (replyToCommentId != null) {
+                    Text(
+                        text = "Đang trả lời bình luận #$replyToCommentId",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = PrimaryPink
+                    )
+                    TextButton(onClick = { replyToCommentId = null }) {
+                        Text("Hủy trả lời")
+                    }
+                }
+
+                OutlinedTextField(
+                    value = commentInput,
+                    onValueChange = { commentInput = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 90.dp),
+                    label = { Text(if (replyToCommentId != null) "Viết phản hồi" else "Viết bình luận") },
+                    minLines = 2,
+                    maxLines = 5
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = {
+                        commentPostId = null
+                        replyToCommentId = null
+                    }) {
+                        Text("Đóng")
+                    }
+                    TextButton(
+                        enabled = commentInput.isNotBlank() && !actionLoading,
+                        onClick = {
+                            val postId = commentPostId
+                            if (postId != null) {
+                                val replyingId = replyToCommentId
+                                if (replyingId != null) {
+                                    vm.replyComment(ctx, postId, replyingId, commentInput) {
+                                        commentInput = ""
+                                        replyToCommentId = null
+                                    }
+                                } else {
+                                    vm.addComment(ctx, postId, commentInput) {
+                                        commentInput = ""
+                                    }
+                                }
+                            }
+                        }
+                    ) {
+                        Text(if (actionLoading) "Đang gửi..." else "Gửi")
+                    }
                 }
             }
-        )
+        }
     }
 
     if (showReportDialogForPostId != null) {
         AlertDialog(
             onDismissRequest = { showReportDialogForPostId = null },
-            title = { Text("Bao cao bai viet") },
+            title = { Text("Báo cáo bài viết") },
             text = {
                 OutlinedTextField(
                     value = reportReason,
                     onValueChange = { reportReason = it },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Ly do") },
+                    label = { Text("Lý do") },
                     minLines = 2
                 )
             },
@@ -218,12 +289,12 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
                         }
                     }
                 ) {
-                    Text(if (actionLoading) "Dang gui..." else "Gui bao cao")
+                    Text(if (actionLoading) "Đang gửi..." else "Gửi báo cáo")
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showReportDialogForPostId = null }) {
-                    Text("Huy")
+                    Text("Hủy")
                 }
             }
         )
@@ -231,7 +302,12 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
 }
 
 @Composable
-fun CreatePostBar(onPostClick: () -> Unit, onManageClick: () -> Unit) {
+fun CreatePostBar(
+    petAvatarUrl: String?,
+    petName: String?,
+    onPostClick: () -> Unit,
+    onManageClick: () -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -239,8 +315,8 @@ fun CreatePostBar(onPostClick: () -> Unit, onManageClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         AsyncImage(
-            model = "https://images.unsplash.com/photo-1583511655857-d19b40a7a54e",
-            contentDescription = "Avatar",
+            model = petAvatarUrl ?: "https://placedog.net/120/120",
+            contentDescription = petName ?: "Avatar",
             modifier = Modifier
                 .size(40.dp)
                 .clip(CircleShape),
@@ -257,7 +333,7 @@ fun CreatePostBar(onPostClick: () -> Unit, onManageClick: () -> Unit) {
                 .padding(horizontal = 16.dp),
             contentAlignment = Alignment.CenterStart
         ) {
-            Text("Bạn đang nghĩ gì?", color = Color.Gray, fontSize = 14.sp)
+            Text("Bạn đang nghĩ gì, ${petName ?: "thú cưng của bạn"}?", color = Color.Gray, fontSize = 14.sp)
         }
         Spacer(modifier = Modifier.width(12.dp))
         Column(
@@ -297,7 +373,9 @@ fun CommunityPostItem(
             Spacer(modifier = Modifier.width(8.dp))
             Column {
                 Text(post.ownerName, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                Text(post.location ?: "", color = Color.Gray, fontSize = 11.sp)
+                if (!post.location.isNullOrBlank()) {
+                    Text(post.location, color = Color.Gray, fontSize = 11.sp)
+                }
             }
             Spacer(Modifier.weight(1f))
             Box {
@@ -306,7 +384,7 @@ fun CommunityPostItem(
             }
                 DropdownMenu(expanded = showMoreMenu, onDismissRequest = { showMoreMenu = false }) {
                     DropdownMenuItem(
-                        text = { Text("Bao cao bai viet") },
+                        text = { Text("Báo cáo bài viết") },
                         onClick = {
                             showMoreMenu = false
                             onReportPost()
@@ -345,7 +423,7 @@ fun CommunityPostItem(
                 Icon(
                     if (post.isLiked) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
                     null,
-                    tint = if (post.isLiked) PrimaryPink else Color.Unspecified,
+                    tint = if (post.isLiked) Color(0xFFE53935) else Color.Unspecified,
                     modifier = Modifier.size(24.dp)
                 )
             }
@@ -362,17 +440,53 @@ fun CommunityPostItem(
             )
             Spacer(modifier = Modifier.width(4.dp))
             Text("${post.commentsCount}", fontSize = 13.sp)
-
-            Spacer(Modifier.weight(1f))
-            Icon(Icons.Outlined.BookmarkBorder, null, modifier = Modifier.size(24.dp))
         }
         HorizontalDivider(color = Color(0xFFEEEEEE), thickness = 1.dp)
     }
 }
 
 @Composable
+private fun CommentItem(
+    name: String,
+    avatarUrl: String?,
+    content: String,
+    depth: Int,
+    onReply: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = (depth * 18).dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        AsyncImage(
+            model = avatarUrl ?: "https://placedog.net/80/80",
+            contentDescription = name,
+            modifier = Modifier
+                .size(28.dp)
+                .clip(CircleShape),
+            contentScale = ContentScale.Crop
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Surface(
+                color = Color(0xFFF3F4F6),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+                    Text(name, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                    Text(content, fontSize = 13.sp)
+                }
+            }
+            TextButton(onClick = onReply, modifier = Modifier.height(28.dp)) {
+                Text("Trả lời", fontSize = 12.sp)
+            }
+        }
+    }
+}
+
+@Composable
 private fun CommunityEmptyState(
-    onExplore: () -> Unit,
     onCreatePost: () -> Unit,
     onRetry: () -> Unit
 ) {
@@ -389,7 +503,7 @@ private fun CommunityEmptyState(
             style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold)
         )
         Text(
-            text = "Chia sẻ khoảnh khắc thú cưng của bạn hoặc đi vào khám phá ngay để kết nối với mọi người.",
+            text = "Chia sẻ khoảnh khắc thú cưng của bạn để kết nối với mọi người.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -399,13 +513,6 @@ private fun CommunityEmptyState(
             onClick = onCreatePost,
             modifier = Modifier.fillMaxWidth(0.78f)
         )
-        OutlinedButton(
-            onClick = onExplore,
-            shape = RoundedCornerShape(22.dp),
-            modifier = Modifier.fillMaxWidth(0.78f)
-        ) {
-            Text("Đi vào khám phá ngay")
-        }
         TextButton(onClick = onRetry) {
             Text("Làm mới")
         }

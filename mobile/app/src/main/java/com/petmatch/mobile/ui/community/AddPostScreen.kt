@@ -29,17 +29,30 @@ import coil.compose.AsyncImage
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.petmatch.mobile.ui.account.UserInfoState
+import com.petmatch.mobile.ui.account.UserViewModel
+import com.petmatch.mobile.ui.common.LocationUpdateButton
+import com.petmatch.mobile.ui.petprofile.PetProfileViewModel
+import com.petmatch.mobile.ui.petprofile.PetUiState
 import com.petmatch.mobile.ui.theme.PrimaryPink
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddPostScreen(navController: NavController, vm: CommunityViewModel) {
     val ctx = LocalContext.current
+    val petVm: PetProfileViewModel = viewModel()
+    val userVm: UserViewModel = viewModel()
+    val myPet by petVm.myPet.collectAsState()
+    val userInfo by userVm.userInfo.collectAsState()
+    val currentPet = (myPet as? PetUiState.Success)?.pet
+    val currentUser = (userInfo as? UserInfoState.Success)?.user
+
     val contentFocusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
     var content by rememberSaveable { mutableStateOf("") }
     var selectedImageUri by remember { mutableStateOf<android.net.Uri?>(null) }
-    var location by rememberSaveable { mutableStateOf("Văn Quán, Hà Nội") }
+    var location by rememberSaveable { mutableStateOf("") }
     val actionLoading by vm.actionLoading.collectAsState()
     val actionDone by vm.actionDone.collectAsState()
     val photoPicker = rememberLauncherForActivityResult(
@@ -58,6 +71,14 @@ fun AddPostScreen(navController: NavController, vm: CommunityViewModel) {
     LaunchedEffect(Unit) {
         contentFocusRequester.requestFocus()
         keyboardController?.show()
+        petVm.loadMyProfile(ctx)
+        userVm.loadMyInfo(ctx)
+    }
+
+    LaunchedEffect(currentUser?.address) {
+        if (location.isBlank()) {
+            location = currentUser?.address.orEmpty()
+        }
     }
 
     Scaffold(
@@ -103,7 +124,7 @@ fun AddPostScreen(navController: NavController, vm: CommunityViewModel) {
             // User Info
             Row(verticalAlignment = Alignment.CenterVertically) {
                 AsyncImage(
-                    model = "https://images.unsplash.com/photo-1583511655857-d19b40a7a54e",
+                    model = currentPet?.avatarUrl ?: "https://placedog.net/120/120",
                     contentDescription = null,
                     modifier = Modifier
                         .size(45.dp)
@@ -112,13 +133,26 @@ fun AddPostScreen(navController: NavController, vm: CommunityViewModel) {
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
-                    Text("Bánh mì hoa cúc", fontWeight = FontWeight.Bold)
+                    Text(currentPet?.name ?: "Thú cưng của bạn", fontWeight = FontWeight.Bold)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.LocationOn, null, modifier = Modifier.size(14.dp), tint = Color.Gray)
-                        Text(location, fontSize = 12.sp, color = Color.Gray)
+                        Text(
+                            if (location.isBlank()) "Chưa cập nhật vị trí" else location,
+                            fontSize = 12.sp,
+                            color = Color.Gray
+                        )
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            LocationUpdateButton(
+                onLocationObtained = { lat, lon ->
+                    userVm.updateLocation(ctx, lat, lon)
+                    location = "GPS: %.5f, %.5f".format(lat, lon)
+                }
+            )
 
             Spacer(modifier = Modifier.height(16.dp))
 
