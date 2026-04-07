@@ -66,5 +66,10 @@ object RetrofitClient {
     fun authApi(context: Context): AuthApi = getInstance(context).create(AuthApi::class.java)
     fun userApi(context: Context): UserApi = getInstance(context).create(UserApi::class.java)
     fun chatbotApi(context: Context): ChatbotApi = getInstance(context).create(ChatbotApi::class.java)
+    fun chatApi(context: Context): ChatApi = getInstance(context).create(ChatApi::class.java)
+    fun callApi(context: Context): CallApi = getInstance(context).create(CallApi::class.java)
+    fun appointmentApi(context: Context): AppointmentApi = getInstance(context).create(AppointmentApi::class.java)
+    fun reviewApi(context: Context): ReviewApi = getInstance(context).create(ReviewApi::class.java)
+    fun groupChatApi(context: Context): GroupChatApi = getInstance(context).create(GroupChatApi::class.java)
 }
 

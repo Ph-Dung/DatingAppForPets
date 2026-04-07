@@ -10,6 +10,7 @@ import com.petmatch.backend.enums.ReportStatus;
 import com.petmatch.backend.enums.ReportTargetType;
 import com.petmatch.backend.exception.AppException;
 import com.petmatch.backend.repository.BlockRepository;
+import com.petmatch.backend.repository.MatchRepository;
 import com.petmatch.backend.repository.ReportRepository;
 import com.petmatch.backend.repository.ReviewRepository;
 import com.petmatch.backend.repository.UserRepository;
@@ -30,6 +31,7 @@ public class InteractionService {
     private final BlockRepository blockRepository;
     private final ReportRepository reportRepository;
     private final UserRepository userRepository;
+    private final MatchRepository matchRepository;
     private final com.petmatch.backend.repository.PetProfileRepository petProfileRepo;
     private final com.petmatch.backend.repository.PetPhotoRepository petPhotoRepo;
 
@@ -45,6 +47,21 @@ public class InteractionService {
         User reviewer = currentUser();
         User reviewee = userRepository.findById(revieweeId)
                 .orElseThrow(() -> new AppException("Người dùng không tồn tại", NOT_FOUND));
+
+        if (reviewer.getId().equals(revieweeId)) {
+            throw new AppException("Không thể tự đánh giá bản thân", BAD_REQUEST);
+        }
+
+        // Fix #7: Kiểm tra 2 người có match không — chỉ cho phép review sau khi match
+        boolean hasMatch = matchRepository.findMatchByUsers(reviewer, reviewee).isPresent();
+        if (!hasMatch) {
+            throw new AppException("Chỉ có thể đánh giá người mà bạn đã match", FORBIDDEN);
+        }
+
+        // Fix #7: Ngăn review trùng lặp
+        if (reviewRepository.existsByReviewerAndReviewee(reviewer, reviewee)) {
+            throw new AppException("Bạn đã đánh giá người này rồi", CONFLICT);
+        }
 
         if (request.getRating() < 1 || request.getRating() > 5)
             throw new AppException("Điểm đánh giá phải từ 1 đến 5", BAD_REQUEST);
