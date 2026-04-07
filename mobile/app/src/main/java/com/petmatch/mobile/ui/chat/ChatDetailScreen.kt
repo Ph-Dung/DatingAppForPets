@@ -238,16 +238,7 @@ fun ChatDetailScreen(
                         onTextChange = { messageText = it },
                         onSend = {
                             if (messageText.isNotBlank()) {
-                                val localMsg = MessageResponse(
-                                    id = System.currentTimeMillis(),
-                                    senderId = currentUserId,
-                                    receiverId = otherUserId,
-                                    content = messageText.trim(),
-                                    sentAt = LocalDateTime.now().toString(),
-                                    isRead = false,
-                                    type = "TEXT"
-                                )
-                                chatVm.addLocalMessage(localMsg)
+                                chatVm.sendTextMessage(ctx, currentUserId, otherUserId, messageText.trim())
                                 messageText = ""
                             }
                         },
@@ -362,6 +353,7 @@ private fun MessageBubble(msg: MessageResponse, isMe: Boolean) {
             when (msg.type) {
                 "IMAGE" -> ImageBubble(msg, isMe)
                 "VOICE" -> VoiceBubble(msg, isMe)
+                "CALL" -> CallBubble(msg, isMe)
                 else -> TextBubble(msg, isMe)
             }
             Row(
@@ -396,6 +388,37 @@ private fun TextBubble(msg: MessageResponse, isMe: Boolean) {
             .padding(horizontal = 14.dp, vertical = 10.dp)
     ) {
         Text(msg.content ?: "", style = MaterialTheme.typography.bodyMedium, color = if (isMe) Color.White else TextPrimary)
+    }
+}
+
+@Composable
+private fun CallBubble(msg: MessageResponse, isMe: Boolean) {
+    Box(
+        modifier = Modifier
+            .clip(bubbleShape(isMe))
+            .background(
+                if (isMe)
+                    Brush.linearGradient(listOf(GradientStart, GradientEnd), Offset.Zero, Offset(Float.POSITIVE_INFINITY, 0f))
+                else Brush.linearGradient(listOf(SurfaceVariant, SurfaceVariant))
+            )
+            .padding(horizontal = 14.dp, vertical = 10.dp)
+            .clickable { /* Tương lai có thể bấm gọi lại rảnh tay */ }
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            val isMissed = msg.content?.contains("nhỡ") == true
+            val icon = if (msg.content?.contains("video", ignoreCase = true) == true) Icons.Default.VideoCall else Icons.Default.PhoneCallback
+            val tint = if (isMissed) DislikeRed else if (isMe) Color.White else PrimaryPink
+
+            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(24.dp))
+            Text(
+                msg.content ?: "",
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = if (isMe) Color.White else TextPrimary
+            )
+        }
     }
 }
 

@@ -249,6 +249,42 @@ class ChatViewModel : ViewModel() {
         }
     }
 
+    fun sendTextMessage(ctx: Context, currentUserId: Long, receiverId: Long, text: String) {
+        viewModelScope.launch {
+            try {
+                // Optimistic UI update
+                val localMsg = MessageResponse(
+                    id = System.currentTimeMillis(),
+                    senderId = currentUserId,
+                    receiverId = receiverId,
+                    content = text,
+                    sentAt = java.time.LocalDateTime.now().toString(),
+                    isRead = false,
+                    type = "TEXT"
+                )
+                addLocalMessage(localMsg)
+
+                // Network request
+                val req = MessageRequest(
+                    senderId = currentUserId,
+                    receiverId = receiverId,
+                    content = text,
+                    type = "TEXT"
+                )
+                val resp = RetrofitClient.chatApi(ctx).sendMessage(req)
+                if (resp.isSuccessful) {
+                    val serverMsg = resp.body()
+                    if (serverMsg != null) {
+                        // Cập nhật id thật từ server (optional: replace the local message by id match)
+                        // Trong bài toán demo, optimistic UI đã hiển thị đủ.
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("ChatViewModel", "Lỗi gửi tin nhắn: ${e.message}")
+            }
+        }
+    }
+
     // ── Media Upload (Image / Voice) ──────────────────────────────────────────
     private val _mediaUploadLoading = MutableStateFlow(false)
     val mediaUploadLoading: StateFlow<Boolean> = _mediaUploadLoading

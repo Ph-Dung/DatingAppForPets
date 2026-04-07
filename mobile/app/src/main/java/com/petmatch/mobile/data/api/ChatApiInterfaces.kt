@@ -50,6 +50,10 @@ interface ChatApi {
         @Part file: MultipartBody.Part,
         @Part("type") type: RequestBody
     ): Response<MediaUploadResponse>
+
+    /** Gửi tin nhắn Text qua REST */
+    @POST("api/chat/messages")
+    suspend fun sendMessage(@Body req: MessageRequest): Response<MessageResponse>
 }
 
 interface CallApi {

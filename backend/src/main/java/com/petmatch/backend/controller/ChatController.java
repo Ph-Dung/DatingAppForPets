@@ -55,6 +55,27 @@ public class ChatController {
         );
     }
 
+    // ── REST: Gửi tin nhắn Text ──────────────────────────────────────────────
+
+    @PostMapping("/messages")
+    public ResponseEntity<MessageDto> sendRestMessage(@RequestBody MessageDto messageDto, Authentication auth) {
+        String email = auth.getName();
+        Long senderId = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalStateException("User not found: " + email))
+                .getId();
+        messageDto.setSenderId(senderId);
+
+        MessageDto savedMessage = chatService.saveMessage(messageDto);
+
+        // Gửi qua WebSocket cho người nhận real-time
+        messagingTemplate.convertAndSendToUser(
+                String.valueOf(savedMessage.getReceiverId()),
+                "/queue/messages",
+                savedMessage
+        );
+        return ResponseEntity.ok(savedMessage);
+    }
+
     // ── WebSocket: WebRTC Signaling ──────────────────────────────────────────
 
     @MessageMapping("/chat.signal")

@@ -58,16 +58,22 @@ fun ChatListScreen(
                 title = {
                     Text(
                         "Tin nhắn",
-                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                        color = Color.White
+                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                        color = TextPrimary
                     )
                 },
                 actions = {
-                    IconButton(onClick = { navController.navigate("chat/group/create") }) {
-                        Icon(Icons.Default.GroupAdd, "Tạo nhóm", tint = Color.White)
+                    IconButton(
+                        onClick = { navController.navigate("chat/group/create") },
+                        modifier = Modifier
+                            .padding(end = 8.dp)
+                            .background(SurfaceVariant, CircleShape)
+                            .size(40.dp)
+                    ) {
+                        Icon(Icons.Default.GroupAdd, "Tạo nhóm", tint = TextPrimary)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = PrimaryPink)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
         }
     ) { padding ->
@@ -142,20 +148,98 @@ fun ChatListScreen(
                 if (conversationsLoading) {
                     PetMatchLoading()
                 } else {
-                    val filtered = conversations.filter {
-                        searchQuery.isEmpty() || it.userName.contains(searchQuery, ignoreCase = true)
-                    }
-                    if (filtered.isEmpty()) {
-                        EmptyConversationsPlaceholder()
+                    if (searchQuery.isNotEmpty()) {
+                        val filtered = conversations.filter { it.userName.contains(searchQuery, ignoreCase = true) }
+                        if (filtered.isEmpty()) {
+                            EmptyConversationsPlaceholder()
+                        } else {
+                            LazyColumn(contentPadding = PaddingValues(vertical = 8.dp)) {
+                                items(filtered, key = { it.userId }) { conv ->
+                                    SwipeableConversationItem(
+                                        conv = conv,
+                                        onClick = { navController.navigate("chat/direct/${conv.userId}/${conv.userName}") },
+                                        onDelete = { chatVm.deleteConversation(ctx, conv.userId) },
+                                        onMute = { chatVm.muteConversation(conv.userId) }
+                                    )
+                                }
+                            }
+                        }
                     } else {
-                        LazyColumn(contentPadding = PaddingValues(vertical = 8.dp)) {
-                            items(filtered, key = { it.userId }) { conv ->
-                                SwipeableConversationItem(
-                                    conv = conv,
-                                    onClick = { navController.navigate("chat/direct/${conv.userId}/${conv.userName}") },
-                                    onDelete = { chatVm.deleteConversation(ctx, conv.userId) },
-                                    onMute = { chatVm.muteConversation(conv.userId) }
-                                )
+                        val newMatches = conversations.filter { it.lastMessage == null }
+                        val activeChats = conversations.filter { it.lastMessage != null }
+
+                        if (newMatches.isEmpty() && activeChats.isEmpty()) {
+                            EmptyConversationsPlaceholder()
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(bottom = 8.dp)
+                            ) {
+                                // 1. Hoạt động (Activities / New Matches)
+                                if (newMatches.isNotEmpty() || activeChats.isNotEmpty()) {
+                                    item {
+                                        Column {
+                                            Text(
+                                                "Hoạt động",
+                                                style = MaterialTheme.typography.titleMedium.copy(
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = TextPrimary
+                                                ),
+                                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                                            )
+                                            LazyRow(
+                                                contentPadding = PaddingValues(horizontal = 16.dp),
+                                                horizontalArrangement = Arrangement.spacedBy(14.dp)
+                                            ) {
+                                                item {
+                                                    NewMatchItem(match = null, onClick = { /* TODO: Add Story */ })
+                                                }
+                                                items(newMatches, key = { it.userId }) { match ->
+                                                    NewMatchItem(
+                                                        match = match,
+                                                        onClick = { navController.navigate("chat/direct/${match.userId}/${match.userName}") }
+                                                    )
+                                                }
+                                            }
+                                            Spacer(Modifier.height(16.dp))
+                                        }
+                                    }
+                                }
+
+                                // 2. Tin nhắn
+                                if (activeChats.isNotEmpty()) {
+                                    item {
+                                        Text(
+                                            "Tin nhắn",
+                                            style = MaterialTheme.typography.titleMedium.copy(
+                                                fontWeight = FontWeight.Bold,
+                                                color = TextPrimary
+                                            ),
+                                            modifier = Modifier.padding(horizontal = 16.dp, bottom = 8.dp)
+                                        )
+                                    }
+                                    items(activeChats, key = { it.userId }) { conv ->
+                                        SwipeableConversationItem(
+                                            conv = conv,
+                                            onClick = { navController.navigate("chat/direct/${conv.userId}/${conv.userName}") },
+                                            onDelete = { chatVm.deleteConversation(ctx, conv.userId) },
+                                            onMute = { chatVm.muteConversation(conv.userId) }
+                                        )
+                                    }
+                                } else if (newMatches.isNotEmpty()) {
+                                    item {
+                                        Box(
+                                            modifier = Modifier.fillMaxWidth().padding(32.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                "Gửi lời chào đến tương hợp mới!",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = TextSecondary
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -505,4 +589,69 @@ private fun formatConvTime(isoTime: String?): String {
             else -> java.time.format.DateTimeFormatter.ofPattern("dd/MM").format(dt)
         }
     } catch (_: Exception) { isoTime }
+}
+
+// ── Component: New Match Item ─────────────────────────────────────────────────
+@Composable
+private fun NewMatchItem(match: ConversationItem?, onClick: () -> Unit) {
+    val isCurrentUser = match == null
+    
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .width(72.dp)
+            .clickable(onClick = onClick)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Box(
+                modifier = Modifier
+                    .size(68.dp)
+                    .clip(CircleShape)
+                    .border(
+                        width = 2.5.dp,
+                        brush = if (isCurrentUser) Brush.linearGradient(listOf(Divider, Divider)) else petMatchGradient,
+                        shape = CircleShape
+                    )
+                    .padding(4.dp)
+                    .clip(CircleShape)
+                    .background(SurfaceVariant)
+            ) {
+                if (isCurrentUser) {
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = "Thêm hoạt động",
+                        tint = TextSecondary,
+                        modifier = Modifier.align(Alignment.Center).size(28.dp)
+                    )
+                } else {
+                    AsyncImage(
+                        model = match?.userAvatar ?: "https://placedog.net/60/60?r=${match?.userId}",
+                        contentDescription = match?.userName,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+            }
+            if (!isCurrentUser && match?.isOnline == true) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 4.dp, bottom = 4.dp)
+                        .size(14.dp)
+                        .background(LikeGreen, CircleShape)
+                        .border(2.dp, MaterialTheme.colorScheme.background, CircleShape)
+                )
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = if (isCurrentUser) "Bạn" else match?.userName?.split(" ")?.lastOrNull() ?: "",
+            style = MaterialTheme.typography.labelMedium.copy(
+                fontWeight = if (isCurrentUser) FontWeight.Normal else FontWeight.SemiBold
+            ),
+            color = if (isCurrentUser) TextSecondary else TextPrimary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
 }

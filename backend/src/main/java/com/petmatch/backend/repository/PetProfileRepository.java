@@ -22,8 +22,8 @@ public interface PetProfileRepository extends JpaRepository<PetProfile, Long> {
 
     /**
      * Lấy suggestions: cùng loài, chưa bị ẩn, loại trừ pet của chính mình và pet bị block.
-     * Loại trừ pet đã từng swipe (đã có match request từ mình).
-     * Pet được super-like (có người super like mình) xếp trước.
+     * Loại trừ pet đã từng swipe (mình đã gửi request).
+     * LỌC THÊM: Loại trừ những pet ĐÃ GỬI request cho mình và mình ĐÃ XỬ LÝ (khác PENDING).
      */
     @Query("""
         SELECT p FROM PetProfile p
@@ -40,6 +40,9 @@ public interface PetProfileRepository extends JpaRepository<PetProfile, Long> {
           AND p.id NOT IN (
               SELECT mr.receiverPet.id FROM MatchRequest mr WHERE mr.senderPet.id = :myPetId
           )
+          AND p.id NOT IN (
+              SELECT mr.senderPet.id FROM MatchRequest mr WHERE mr.receiverPet.id = :myPetId AND mr.status != :pendingStatus
+          )
         ORDER BY (
           SELECT CASE WHEN COUNT(sl) > 0 THEN 1 ELSE 0 END
           FROM MatchRequest sl
@@ -52,6 +55,7 @@ public interface PetProfileRepository extends JpaRepository<PetProfile, Long> {
             @Param("currentUserId") Long currentUserId,
             @Param("myPetId") Long myPetId,
             @Param("species") String species,
+            @Param("pendingStatus") com.petmatch.backend.enums.MatchStatus pendingStatus,
             Pageable pageable);
 
     /**

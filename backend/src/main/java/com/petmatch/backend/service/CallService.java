@@ -20,6 +20,7 @@ public class CallService {
     private final UserRepository userRepository;
     private final MatchRepository matchRepository;
     private final BlockRepository blockRepository;
+    private final MessageRepository messageRepository;
 
     @Transactional
     public CallHistory initiateCall(Long callerId, CallRequest request) {
@@ -67,7 +68,34 @@ public class CallService {
         if (durationSeconds != null && durationSeconds > 0) {
             call.setDurationSeconds(durationSeconds);
         }
-        return callHistoryRepository.save(call);
+        
+        callHistoryRepository.save(call);
+
+        // Lưu log cuộc gọi vào đoạn chat
+        if (finalStatus != CallStatus.ONGOING) {
+            String callTypeStr = call.getType() != null && call.getType().name().equals("AUDIO") ? "Cuộc gọi thoại" : "Cuộc gọi video";
+            String content;
+            if (finalStatus == CallStatus.MISSED) {
+                content = "Cuộc gọi nhỡ";
+            } else if (finalStatus == CallStatus.REJECTED) {
+                content = "Cuộc gọi bị từ chối";
+            } else {
+                int duration = call.getDurationSeconds() != null ? call.getDurationSeconds() : 0;
+                int m = duration / 60;
+                int s = duration % 60;
+                content = callTypeStr + " - " + m + " phút " + s + " giây";
+            }
+            
+            Message callMsg = Message.builder()
+                    .sender(call.getCaller())
+                    .receiver(call.getCallee())
+                    .type(MessageType.CALL)
+                    .content(content)
+                    .build();
+            messageRepository.save(callMsg);
+        }
+
+        return call;
     }
 
     @Transactional(readOnly = true)

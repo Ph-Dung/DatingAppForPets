@@ -64,9 +64,9 @@ public class ChatService {
                 return m.getContent();
             }).orElse(null);
 
-            // Nếu conversation bị xóa (deletedBySenderAt <= lastMsg.sentAt) và không có tin nhắn mới → ẩn
+            // Nếu conversation bị xóa (deletedAt >= lastMsg.sentAt) và không có tin mới → ẩn luôn
             boolean deletedConv = lastMsgOpt.map(m -> {
-                // Nếu me là sender
+                // Nếu me là sender thì check deletedBySenderAt, nếu me là receiver thì check deletedByReceiverAt
                 if (m.getSender().getId().equals(me.getId())) {
                     return m.getDeletedBySenderAt() != null && !m.getSentAt().isAfter(m.getDeletedBySenderAt());
                 } else {
@@ -74,15 +74,18 @@ public class ChatService {
                 }
             }).orElse(false);
 
-            if (deletedConv && lastMsg == null) return null;
+            if (deletedConv) return null;
 
-            String lastTime = lastMsgOpt.map(m -> m.getSentAt().toString()).orElse(match.getMatchedAt().toString());
+            String lastTime = lastMsgOpt.map(m -> m.getSentAt() != null ? m.getSentAt().toString() : "")
+                    .orElse(match.getMatchedAt() != null ? match.getMatchedAt().toString() : "");
+            
             long unread = lastMsgOpt.isPresent() ? messageRepository.countUnread(other, me) : 0;
 
-            // Avatar: lấy từ User.avatarUrl
+            String userName = other.getFullName() != null ? other.getFullName() : "Người dùng";
+
             return ConversationSummaryDto.builder()
                     .matchedUserId(other.getId())
-                    .userName(other.getFullName())
+                    .userName(userName)
                     .avatarUrl(other.getAvatarUrl())
                     .lastMessage(lastMsg)
                     .lastMessageTime(lastTime)

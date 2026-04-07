@@ -205,4 +205,23 @@ public class MatchRequestService {
                 .canOpenConversation(m.getStatus() == MatchStatus.ACCEPTED && isMutual(m))
                 .build();
     }
+
+    // ── Data Migration for existing Matches ─────────────────
+    @org.springframework.context.event.EventListener(org.springframework.boot.context.event.ApplicationReadyEvent.class)
+    @Transactional
+    public void syncOldMatches() {
+        System.out.println("Running data migration: Syncing old MatchRequests to User Matches...");
+        List<MatchRequest> acceptedRequests = matchRepo.findAll().stream()
+                .filter(m -> m.getStatus() == MatchStatus.ACCEPTED)
+                .toList();
+
+        for (MatchRequest req : acceptedRequests) {
+            try {
+                createOrUpdateUserMatch(req.getSenderPet().getOwner(), req.getReceiverPet().getOwner());
+            } catch (Exception e) {
+                System.err.println("Failed to sync match for req " + req.getId() + ": " + e.getMessage());
+            }
+        }
+        System.out.println("Data migration completed!");
+    }
 }

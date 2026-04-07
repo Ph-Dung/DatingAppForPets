@@ -134,6 +134,7 @@ public class PetProfileService {
 
         return petProfileRepo.findSuggestions(
                         user.getId(), myPet.getId(), myPet.getSpecies(),
+                        com.petmatch.backend.enums.MatchStatus.PENDING,
                         PageRequest.of(page, size))
                 .map(this::toResponse);
     }
@@ -152,6 +153,7 @@ public class PetProfileService {
         List<com.petmatch.backend.entity.PetProfile> candidates =
                 petProfileRepo.findSuggestions(
                         user.getId(), myPet.getId(), myPet.getSpecies(),
+                        com.petmatch.backend.enums.MatchStatus.PENDING,
                         PageRequest.of(page, Math.max(size * 3, 30)))  // lấy pool 3x để score
                         .getContent();
 
