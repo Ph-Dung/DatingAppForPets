@@ -2,9 +2,9 @@ spring:
   profiles:
     include: secret
   datasource:
-    url: jdbc:postgresql://localhost:5433/petmatch_db
-    username: postgres
-    password: 123456
+    url: jdbc:postgresql://localhost:5432/petmatch
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
 
   jpa:
     hibernate:
@@ -15,19 +15,44 @@ spring:
         format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
+  jackson:
+    date-format: yyyy-MM-dd
+
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 20MB
+
 server:
   port: ${SERVER_PORT:8080}
 
 jwt:
-  secret: qwertyuiopasdfghjklzxcvbnmqwertyuiop
-  expiration: 86400000
+  secret: ${JWT_SECRET:change-this-jwt-secret-to-at-least-32-chars}
+  expiration: ${JWT_EXPIRATION_MS:86400000}
+
+app:
+  cors:
+    allowed-origins:
+      - "*"
+  seed:
+    enabled: ${APP_SEED_ENABLED:true}
+    users-count: ${APP_SEED_USERS_COUNT:30}
+    skip-when-users-gte: ${APP_SEED_SKIP_USERS_GTE:5}
+    upload-photos: ${APP_SEED_UPLOAD_PHOTOS:false}
+    community-posts:
+      enabled: ${APP_SEED_COMMUNITY_POSTS_ENABLED:true}
 
 cloudinary:
-  cloud-name: ${CLOUDINARY_NAME}
-  api-key: ${CLOUDINARY_API_KEY}
-  api-secret: ${CLOUDINARY_API_SECRET}
+  cloud-name: ${CLOUDINARY_CLOUD_NAME:}
+  api-key: ${CLOUDINARY_API_KEY:}
+  api-secret: ${CLOUDINARY_API_SECRET:}
 
 openai:
-  api-key: ${OPENAI_API_KEY}
-  base-url: "https://api.groq.com/openai/v1"
-  model: "llama-3.3-70b-versatile"
+  api-key: ${OPENAI_API_KEY:}
+  base-url: "https://api.openai.com/v1"
+  model: "gpt-4-turbo"
+
+community:
+  moderation:
+    enabled: false
+    blocked-keywords: []

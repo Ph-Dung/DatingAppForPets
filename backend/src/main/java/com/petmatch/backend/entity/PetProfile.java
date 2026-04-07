@@ -6,7 +6,6 @@ import com.petmatch.backend.enums.LookingFor;
 import com.petmatch.backend.enums.ReproductiveStatus;
 import jakarta.persistence.*;
 import lombok.*;
-import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -22,7 +21,6 @@ import java.util.List;
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-@FieldDefaults(level = AccessLevel.PRIVATE)
 public class PetProfile {
 
     @Id
@@ -65,6 +63,7 @@ public class PetProfile {
     ReproductiveStatus reproductiveStatus;
 
     @Column(name = "is_vaccinated", nullable = false)
+    @Builder.Default
     Boolean isVaccinated = false;
 
     @Column(name = "last_vaccine_date")
@@ -72,6 +71,7 @@ public class PetProfile {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "health_status", nullable = false, length = 30)
+    @Builder.Default
     HealthStatus healthStatus = HealthStatus.HEALTHY;
 
     @Column(name = "health_notes", columnDefinition = "TEXT")
@@ -89,6 +89,7 @@ public class PetProfile {
     String notes;
 
     @Column(name = "is_hidden", nullable = false)
+    @Builder.Default
     Boolean isHidden = false;
 
     @CreationTimestamp

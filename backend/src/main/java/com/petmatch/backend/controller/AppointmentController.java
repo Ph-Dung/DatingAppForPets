@@ -3,9 +3,12 @@ package com.petmatch.backend.controller;
 import com.petmatch.backend.dto.AppointmentRequest;
 import com.petmatch.backend.entity.Appointment;
 import com.petmatch.backend.entity.AppointmentStatus;
+import com.petmatch.backend.exception.AppException;
 import com.petmatch.backend.repository.UserRepository;
 import com.petmatch.backend.service.AppointmentService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -27,13 +30,14 @@ public class AppointmentController {
     @PostMapping
     public ResponseEntity<Appointment> createAppointment(
             Authentication auth,
-            @RequestBody AppointmentRequest request) {
+            @Valid @RequestBody AppointmentRequest request) {
 
         Long requesterId = userRepository.findByEmail(auth.getName())
-                .orElseThrow(() -> new RuntimeException("User not found"))
+            .orElseThrow(() -> new AppException("User not found", HttpStatus.NOT_FOUND))
                 .getId();
 
-        return ResponseEntity.ok(appointmentService.createAppointment(requesterId, request));
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .body(appointmentService.createAppointment(requesterId, request));
     }
 
     @GetMapping("/user/{userId}")
@@ -56,9 +60,9 @@ public class AppointmentController {
     public ResponseEntity<Appointment> updateDetails(
             Authentication auth,
             @PathVariable Long id,
-            @RequestBody AppointmentRequest request) {
+            @Valid @RequestBody AppointmentRequest request) {
         Long currentUserId = userRepository.findByEmail(auth.getName())
-                .orElseThrow(() -> new RuntimeException("User not found"))
+                .orElseThrow(() -> new AppException("User not found", HttpStatus.NOT_FOUND))
                 .getId();
         return ResponseEntity.ok(appointmentService.updateAppointmentDetails(id, request, currentUserId));
     }

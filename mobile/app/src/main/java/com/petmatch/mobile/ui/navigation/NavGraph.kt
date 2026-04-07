@@ -31,7 +31,10 @@ import com.petmatch.mobile.ui.auth.RegisterScreen
 import com.petmatch.mobile.ui.chat.*
 import com.petmatch.mobile.ui.chatbot.AiChatbotScreen
 import com.petmatch.mobile.ui.chatbot.ChatbotViewModel
+import com.petmatch.mobile.ui.community.AddPostScreen
+import com.petmatch.mobile.ui.community.CommunityViewModel
 import com.petmatch.mobile.ui.community.CommunityScreen
+import com.petmatch.mobile.ui.community.PostManagementScreen
 import com.petmatch.mobile.ui.interaction.BlockListScreen
 import com.petmatch.mobile.ui.interaction.InteractionViewModel
 import com.petmatch.mobile.ui.interaction.ReportScreen
@@ -71,6 +74,8 @@ object Routes {
     const val MESSENGER_PROFILE = "chat/profile/{userId}/{userName}"
 
     const val COMMUNITY         = "community"
+    const val POST_MANAGEMENT   = "community/management"
+    const val POST_ADD          = "community/add"
     const val REGISTER          = "register"
     const val ACCOUNT           = "account"
     const val MY_PET            = "pet/mypet"
@@ -118,6 +123,7 @@ fun PetMatchNavGraph(
     val adminVm: AdminViewModel       = viewModel()
     val chatbotVm: ChatbotViewModel   = viewModel()
     val chatVm: ChatViewModel         = viewModel()
+    val communityVm: CommunityViewModel = viewModel()
 
     // ── Keep signaling alive globally so INCOMING_CALL works on all screens ──
     LaunchedEffect(Unit) {
@@ -251,7 +257,9 @@ fun PetMatchNavGraph(
 
         // ── Chat & Community ──────────────────────────────────
         composable(Routes.CHAT_LIST) { ChatListScreen(navController, chatVm) }
-        composable(Routes.COMMUNITY)  { CommunityScreen(navController) }
+        composable(Routes.COMMUNITY)  { CommunityScreen(navController, communityVm) }
+        composable(Routes.POST_MANAGEMENT) { PostManagementScreen(navController, communityVm) }
+        composable(Routes.POST_ADD) { AddPostScreen(navController, communityVm) }
 
         // ── Chat Detail (Direct) ─────────────────────────────
         composable(
