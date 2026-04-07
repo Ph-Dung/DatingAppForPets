@@ -11,6 +11,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.petmatch.mobile.ui.navigation.AdminBottomNav
+import com.petmatch.mobile.ui.navigation.adminBottomNavRoutes
 import com.petmatch.mobile.ui.navigation.PetMatchBottomNav
 import com.petmatch.mobile.ui.navigation.PetMatchNavGraph
 import com.petmatch.mobile.ui.navigation.Routes
@@ -26,11 +28,14 @@ class MainActivity : ComponentActivity() {
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentRoute = navBackStackEntry?.destination?.route
                 val showBottomBar = currentRoute in bottomNavRoutes
+                val showAdminBottomBar = currentRoute in adminBottomNavRoutes
 
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     bottomBar = {
-                        if (showBottomBar) {
+                        if (showAdminBottomBar) {
+                            AdminBottomNav(navController = navController)
+                        } else if (showBottomBar) {
                             PetMatchBottomNav(navController = navController)
                         }
                     }

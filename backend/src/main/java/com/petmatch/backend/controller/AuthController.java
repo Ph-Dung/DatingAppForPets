@@ -29,4 +29,10 @@ public class AuthController {
             @Valid @RequestBody LoginRequest req) {
         return ResponseEntity.ok(authService.login(req));
     }
+
+    @PostMapping("/admin/login")
+    public ResponseEntity<AuthResponse> loginAdmin(
+            @Valid @RequestBody LoginRequest req) {
+        return ResponseEntity.ok(authService.loginAdmin(req));
+    }
 }

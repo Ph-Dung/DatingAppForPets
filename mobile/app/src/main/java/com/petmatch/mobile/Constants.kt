@@ -5,6 +5,7 @@ object Constants {
     // Emulator: 10.0.2.2 = localhost của máy host
     const val BASE_URL = "http://10.0.2.2:8080/"
     const val TOKEN_KEY = "auth_token"
+    const val ADMIN_TOKEN_KEY = "admin_auth_token"
     const val DATASTORE_NAME = "petmatch_prefs"
 
     // Personality tags predefined (tiếng Việt)

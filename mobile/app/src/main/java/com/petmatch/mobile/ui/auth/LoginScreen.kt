@@ -30,7 +30,8 @@ import com.petmatch.mobile.ui.theme.*
 fun LoginScreen(
     vm: AuthViewModel,
     onLoginSuccess: (hasPetProfile: Boolean) -> Unit,
-    onNavigateToRegister: () -> Unit = {}
+    onNavigateToRegister: () -> Unit = {},
+    onNavigateToAdminLogin: () -> Unit = {}
 ) {
     val ctx = LocalContext.current
     val authState by vm.authState.collectAsState()
@@ -202,6 +203,20 @@ fun LoginScreen(
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
+                }
+
+                TextButton(
+                    onClick = {
+                        vm.resetState()
+                        onNavigateToAdminLogin()
+                    },
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                ) {
+                    Text(
+                        "Đăng nhập admin",
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
 
                 Spacer(Modifier.height(8.dp))
