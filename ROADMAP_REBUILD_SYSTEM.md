@@ -27,7 +27,7 @@
 | ID | Hang muc | Phase | Trang thai | Uu tien | Dau vao | Dau ra mong doi | Blocker |
 |---|---|---|---|---|---|---|---|
 | T0-1 | Chot branch strategy va cach merge conflict | 0 | DONE | Cao | Nhanh toan bo branch hien tai | Rule merge ro rang |  |
-| T0-2 | Lap danh sach conflict nho le theo nhom file | 0 | IN_PROGRESS | Cao | Git status + diff | Backlog conflict co nhan |  |
+| T0-2 | Lap danh sach conflict nho le theo nhom file | 0 | DONE | Cao | Git status + diff | Backlog conflict co nhan |  |
 | T1-1 | Backend: config + security baseline | 1 | TODO | Cao | config, security, exception | Khoi dong on dinh, auth pass smoke test |  |
 | T1-2 | Backend: entity + repository consistency | 1 | TODO | Cao | entity, repository | Build pass, khong canh bao quan trong |  |
 | T1-3 | Backend: service layer refactor theo domain | 1 | TODO | Cao | service | Logic ro, test duong chinh |  |
@@ -50,11 +50,11 @@ Trang thai hop le: TODO | IN_PROGRESS | BLOCKED | REVIEW | DONE
 - [x] Chot branch chinh de rebuild (de xuat: feed lam integration branch tam).
 - [x] Chot quy tac commit message (de xuat: WIP/BACKEND/FRONTEND/INTEGRATION).
 - [ ] Chia conflict backlog theo nhom:
-  - [ ] Backend config/security
-  - [ ] Backend domain community
-  - [ ] Backend domain chat/match/profile
-  - [ ] Frontend community
-  - [ ] Frontend navigation/state
+  - [x] Backend config/security
+  - [x] Backend domain community
+  - [x] Backend domain chat/match/profile
+  - [x] Frontend community
+  - [x] Frontend navigation/state
 - [ ] Dat gioi han conflict fix moi ngay (de tranh drift): max 3 conflict chunks/ngay.
 
 ### 5.3 Quy tac da chot (T0-1)
@@ -69,6 +69,17 @@ Trang thai hop le: TODO | IN_PROGRESS | BLOCKED | REVIEW | DONE
 - Merge conflict handling:
   - Uu tien giai conflict theo pham vi phase hien tai.
   - Conflict ngoai phase: ghi vao Blockers board, khong sua lan.
+
+### 5.4 Conflict backlog theo nhom file (T0-2)
+| Nhom | File/chung loai | Van de xay ra | Muc do | Cach xu ly phase |
+|---|---|---|---|---|
+| Backend config/security | `application.yaml`, auth/security config | Drift config, secret handling, env mismatch | High | Chot env placeholder + profile secret tach rieng trong Phase 1 |
+| Backend community service | controller/service/dto/repository community | Lech contract API, conflict method signature | High | Chot contract DTO truoc, sau do dong bo service/controller |
+| Backend entity/repository | `User`, `Post`, `Comment`, repo methods | Builder default + relation mismatch + query naming | Medium | Uu tien consistency entity truoc khi sua service |
+| Backend chat/match/profile | service layer khac domain | Conflict import, style, nullability nho le | Medium | Chia task theo module, commit nho va compile nhanh |
+| Frontend community | `CommunityScreen`, `AddPostScreen`, `PostManagementScreen`, VM | UI state conflict, luong anh/post conflict | High | Chot mock interaction state truoc, API that sau |
+| Frontend navigation/state | `NavGraph`, route wiring, back stack | Route drift, back-stack behavior conflict | High | Khoa route contract trong Phase 2, test back stack tung luong |
+| Build/run workflow | startup emulator/backend lap lai | Mat thoi gian restart khi sua loi nho | Medium | Dung chu trinh compile nhanh + smoke test theo dot |
 
 ### 5.2 Definition of Done
 - [ ] Co danh sach conflict backlog ro rang.
@@ -163,6 +174,7 @@ Trang thai hop le: TODO | IN_PROGRESS | BLOCKED | REVIEW | DONE
 | Ngay | Task ID | Viec da lam | Ket qua | Loi/Blocker | Buoc tiep theo |
 |---|---|---|---|---|---|
 | 2026-04-07 | T0-1 | Chot branch `feed`, chot commit convention, chot merge rule | DONE | Push remote bi 403 (quyen repo) | Tiep tuc T0-2 conflict backlog |
+| 2026-04-07 | T0-2 | Gom conflict nho le theo 7 nhom file/he thong | DONE | Khong | Bat dau T1-1 backend config + security baseline |
 | YYYY-MM-DD | T?-? | ... | ... | ... | ... |
 
 ## 9.2 Blockers board
