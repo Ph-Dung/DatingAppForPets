@@ -9,6 +9,7 @@ import java.util.List;
 @Builder
 public class ChatbotResponse {
     private String reply;
+    @com.fasterxml.jackson.annotation.JsonProperty("isReadyToSuggest")
     private boolean isReadyToSuggest;
     private List<PetProfileResponse> suggestions;
 }

@@ -7,7 +7,6 @@ import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
-import java.util.UUID;
 
 @Entity
 @Table(name = "users")
@@ -48,6 +47,16 @@ public class User {
 
     @Column(name = "is_locked", nullable = false)
     Boolean isLocked = false;
+
+    @Column(name = "is_warned")
+    Boolean isWarned = false;
+
+    @Column(name = "warning_count")
+    Integer warningCount = 0;
+
+    @Column(name = "last_warned_at")
+    LocalDateTime lastWarnedAt;
+
 
     @Column(name = "created_at", nullable = false, updatable = false)
     @CreationTimestamp

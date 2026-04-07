@@ -15,7 +15,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 @Entity
 @Getter
@@ -33,6 +32,7 @@ public class PetProfile {
     // UNIQUE → đảm bảo 1 chủ 1 pet ở tầng DB
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id", nullable = false, unique = true)
+    @com.fasterxml.jackson.annotation.JsonIgnore
     User owner;
 
     @Column(nullable = false, length = 100)
@@ -101,14 +101,18 @@ public class PetProfile {
 
     // Relationships
     @OneToMany(mappedBy = "pet", cascade = CascadeType.ALL, orphanRemoval = true)
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties("pet")
     List<PetPhoto> photos = new ArrayList<>();
 
     @OneToMany(mappedBy = "pet", cascade = CascadeType.ALL, orphanRemoval = true)
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties("pet")
     List<PetVaccination> vaccinations = new ArrayList<>();
 
     @OneToMany(mappedBy = "senderPet", cascade = CascadeType.ALL)
+    @com.fasterxml.jackson.annotation.JsonIgnore
     List<MatchRequest> sentRequests = new ArrayList<>();
 
     @OneToMany(mappedBy = "receiverPet", cascade = CascadeType.ALL)
+    @com.fasterxml.jackson.annotation.JsonIgnore
     List<MatchRequest> receivedRequests = new ArrayList<>();
 }

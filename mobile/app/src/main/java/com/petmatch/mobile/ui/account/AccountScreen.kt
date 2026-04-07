@@ -55,14 +55,6 @@ fun AccountScreen(
                         color = Color.White
                     )
                 },
-                actions = {
-                    IconButton(onClick = {
-                        authVm.logout(ctx)
-                        navController.navigate(Routes.LOGIN) { popUpTo(0) { inclusive = true } }
-                    }) {
-                        Icon(Icons.Default.Logout, "Đăng xuất", tint = Color.White)
-                    }
-                },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = PrimaryPink)
             )
         }
@@ -269,7 +261,7 @@ fun AccountScreen(
                     .padding(horizontal = 16.dp)
                     .clickable {
                         authVm.logout(ctx)
-                        navController.navigate(Routes.LOGIN) { popUpTo(0) { inclusive = true } }
+                        navController.navigate(Routes.LOGIN) { popUpTo(navController.graph.id) { inclusive = true } }
                     },
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(0.3f))

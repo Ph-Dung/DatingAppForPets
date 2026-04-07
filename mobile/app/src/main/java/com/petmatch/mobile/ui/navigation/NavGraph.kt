@@ -116,6 +116,9 @@ fun PetMatchNavGraph(
 
         // ── Auth ─────────────────────────────────────────────
         composable(Routes.LOGIN) {
+            LaunchedEffect(Unit) {
+                chatbotVm.resetConversation()
+            }
             LoginScreen(
                 vm = authVm,
                 onLoginSuccess = { hasPetProfile ->

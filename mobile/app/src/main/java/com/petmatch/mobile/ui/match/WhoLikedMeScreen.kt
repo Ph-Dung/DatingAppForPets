@@ -189,51 +189,56 @@ private fun WhoLikedMeCard(
                 }
             }
 
-            // Name
             Column(
-                modifier = Modifier.align(Alignment.BottomStart).padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
+                modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(
-                    req.senderPetName ?: "?",
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                    color = Color.White
-                )
-                if (isSuperLike) {
-                    Text("⭐ Siêu thích bạn!", style = MaterialTheme.typography.labelSmall, color = SuperLikeGold)
-                }
-            }
-
-            // Action Buttons (Accept/Reject)
-            Row(
-                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(8.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                // Reject button
-                Surface(
-                    modifier = Modifier.weight(1f).height(40.dp),
-                    shape = RoundedCornerShape(10.dp),
-                    color = DislikeRed.copy(0.8f),
-                    onClick = { matchVm.respondToMatch(ctx, req.id, false) }
+                // Name
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier = Modifier.padding(horizontal = 4.dp)
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Close, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                    Text(
+                        req.senderPetName ?: "?",
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                        color = Color.White
+                    )
+                    if (isSuperLike) {
+                        Text("⭐ Siêu thích bạn!", style = MaterialTheme.typography.labelSmall, color = SuperLikeGold)
                     }
                 }
 
-                // Accept button
-                Surface(
-                    modifier = Modifier.weight(1f).height(40.dp),
-                    shape = RoundedCornerShape(10.dp),
-                    color = LikeGreen.copy(0.9f),
-                    onClick = {
-                        matchVm.respondToMatch(ctx, req.id, true) {
-                            chatVm.loadConversations(ctx)  // Refresh chat list
+                // Action Buttons (Accept/Reject)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    // Reject button
+                    Surface(
+                        modifier = Modifier.weight(1f).height(40.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        color = DislikeRed.copy(0.8f),
+                        onClick = { matchVm.respondToMatch(ctx, req.id, false) }
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.Close, null, tint = Color.White, modifier = Modifier.size(20.dp))
                         }
                     }
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(20.dp))
+
+                    // Accept button
+                    Surface(
+                        modifier = Modifier.weight(1f).height(40.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        color = LikeGreen.copy(0.9f),
+                        onClick = {
+                            matchVm.respondToMatch(ctx, req.id, true) {
+                                chatVm.loadConversations(ctx)  // Refresh chat list
+                            }
+                        }
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                        }
                     }
                 }
             }
