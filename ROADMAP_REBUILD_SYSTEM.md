@@ -50,7 +50,7 @@
 | TB-2 | Backend scope: B2 Tuong tac cong dong | 1 | DONE | Cao | like/comment/reply | Like/comment/reply dong bo dung |  |
 | TB-3 | Backend scope: B3 Bao cao + kiem duyet | 1 | DONE | Cao | report/moderation config | Report luu dung + moderation tuy chon |  |
 | T2-1 | Frontend: chot real flow theo domain | 2 | DONE | Cao | UI flow hien tai | Danh sach man hinh + state map + route map + API map baseline |  |
-| T2-2 | Frontend: flow Auth chi tiet | 2 | TODO | Cao | login/register/token/session | Auth diem vao app that |  |
+| T2-2 | Frontend: flow Auth chi tiet | 2 | DONE | Cao | login/register/token/session | Auth diem vao app that |  |
 | T2-3 | Frontend: flow Match/Explore chi tiet | 2 | TODO | Cao | swipe/filter/match list | Match experience that, khong con mock |  |
 | T2-4 | Frontend: flow Community chi tiet | 2 | TODO | Cao | feed/create/edit/delete/engage | Community real flow on dinh |  |
 | T2-5 | Frontend: flow Chat chi tiet | 2 | TODO | Cao | direct/group/call/appointment/review | Chat handoff that, khong vo state |  |
@@ -350,6 +350,7 @@ Checklist lock T2-1:
 | 2026-04-07 | T1-5 | Toi uu DataSeeder va them app.seed config de giam startup time/restart cost | DONE | Khong | Chuyen sang Phase 2 (frontend real flow + interaction) |
 | 2026-04-07 | T1-6 | Chot gate test backend bang profile `test` (H2), tranh phu thuoc password Postgres local | DONE | Khong | San sang bat dau T2-1 |
 | 2026-04-08 | T2-1 | Chot baseline real flow frontend: route map + state owner + API map theo domain | DONE | Khong | Chuyen sang T2-2 (Auth chi tiet) |
+| 2026-04-08 | T2-2 | Hoan tat Auth flow: login/register + session resume theo token/profile + logout route gate | DONE | Khong | Chuyen sang T2-3 (Match/Explore chi tiet) |
 | 2026-04-07 | TB-1 | Hoan tat B1 post CRUD (create/update/delete) + owner permission + edge-case test | DONE | Khong | Chuyen sang TB-2 (like/comment/reply) |
 | 2026-04-07 | TB-2 | Hoan tat B2 like/comment/reply + edge-case test (toggle, post/comment not-found) | DONE | Khong | Chuyen sang TB-3 (report/moderation) |
 | 2026-04-07 | TB-3 | Hoan tat B3 report + moderation test (target validation, unsupported target, moderation on/off) | DONE | Khong | Chuyen sang T3-1 (integration mock -> API that) |

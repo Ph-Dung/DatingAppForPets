@@ -35,15 +35,52 @@ fun LoginScreen(
 ) {
     val ctx = LocalContext.current
     val authState by vm.authState.collectAsState()
+    var checkingSession by remember { mutableStateOf(true) }
+    var hasNavigated by remember { mutableStateOf(false) }
 
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var showPassword by remember { mutableStateOf(false) }
 
+    LaunchedEffect(Unit) {
+        vm.resolveSessionDestination(ctx) { hasPetProfile ->
+            when (hasPetProfile) {
+                true -> {
+                    if (!hasNavigated) {
+                        hasNavigated = true
+                        onLoginSuccess(true)
+                    }
+                }
+                false -> {
+                    if (!hasNavigated) {
+                        hasNavigated = true
+                        onLoginSuccess(false)
+                    }
+                }
+                null -> {
+                    checkingSession = false
+                }
+            }
+        }
+    }
+
     LaunchedEffect(authState) {
         if (authState is AuthState.Success) {
-            onLoginSuccess((authState as AuthState.Success).hasPetProfile)
+            if (!hasNavigated) {
+                hasNavigated = true
+                onLoginSuccess((authState as AuthState.Success).hasPetProfile)
+            }
         }
+    }
+
+    if (checkingSession) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator(color = Color.White)
+        }
+        return
     }
 
     Box(

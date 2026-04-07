@@ -200,6 +200,8 @@ data class CommunityReportRequest(
     val targetId: Long,
     val targetType: String,
     val reason: String
+)
+
 data class AdminDashboardResponse(
     val totalUsers: Long,
     val lockedUsers: Long,
