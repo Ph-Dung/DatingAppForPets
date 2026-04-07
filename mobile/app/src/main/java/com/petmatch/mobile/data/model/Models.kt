@@ -207,6 +207,7 @@ data class CommunityReportRequest(
     val targetType: String,
     val reason: String
 )
+
 data class AdminDashboardResponse(
     val totalUsers: Long,
     val lockedUsers: Long,
@@ -228,6 +229,11 @@ data class AdminUserItemResponse(
     val createdAt: String?
 )
 
+data class AdminUserDetailResponse(
+    val user: AdminUserItemResponse,
+    val violations: List<AdminReportItemResponse>
+)
+
 data class AdminPetItemResponse(
     val id: Long,
     val ownerId: Long,
@@ -237,6 +243,11 @@ data class AdminPetItemResponse(
     val avatarUrl: String?,
     val hidden: Boolean,
     val createdAt: String?
+)
+
+data class AdminPetDetailResponse(
+    val pet: PetProfileResponse,
+    val violations: List<AdminReportItemResponse>
 )
 
 data class AdminReportItemResponse(

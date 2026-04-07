@@ -12,7 +12,9 @@ import com.petmatch.backend.repository.UserRepository;
 import com.petmatch.backend.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -54,14 +56,20 @@ public class AuthService {
     }
 
     public AuthResponse login(LoginRequest req) {
-        authManager.authenticate(
-                new UsernamePasswordAuthenticationToken(req.getEmail(), req.getPassword()));
+        try {
+            authManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(req.getEmail(), req.getPassword()));
+        } catch (LockedException e) {
+            throw new AppException("Tài khoản đã bị khoá vui lòng liên hệ admin", HttpStatus.FORBIDDEN);
+        } catch (BadCredentialsException e) {
+            throw new AppException("Email hoặc mật khẩu không đúng", HttpStatus.UNAUTHORIZED);
+        }
 
         User user = userRepo.findByEmail(req.getEmail())
                 .orElseThrow(() -> new AppException("Không tìm thấy user", HttpStatus.NOT_FOUND));
 
         if (user.getIsLocked())
-            throw new AppException("Tài khoản đã bị khóa", HttpStatus.FORBIDDEN);
+            throw new AppException("Tài khoản đã bị khoá vui lòng liên hệ admin", HttpStatus.FORBIDDEN);
 
         String token = jwtUtil.generateToken(user.getEmail(), user.getId());
         return AuthResponse.builder()
@@ -74,14 +82,20 @@ public class AuthService {
     }
 
     public AuthResponse loginAdmin(LoginRequest req) {
-        authManager.authenticate(
-                new UsernamePasswordAuthenticationToken(req.getEmail(), req.getPassword()));
+        try {
+            authManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(req.getEmail(), req.getPassword()));
+        } catch (LockedException e) {
+            throw new AppException("Tài khoản đã bị khoá vui lòng liên hệ admin", HttpStatus.FORBIDDEN);
+        } catch (BadCredentialsException e) {
+            throw new AppException("Email hoặc mật khẩu không đúng", HttpStatus.UNAUTHORIZED);
+        }
 
         User user = userRepo.findByEmail(req.getEmail())
                 .orElseThrow(() -> new AppException("Không tìm thấy user", HttpStatus.NOT_FOUND));
 
         if (user.getIsLocked())
-            throw new AppException("Tài khoản đã bị khóa", HttpStatus.FORBIDDEN);
+            throw new AppException("Tài khoản đã bị khoá vui lòng liên hệ admin", HttpStatus.FORBIDDEN);
 
         if (user.getRole() != Role.ADMIN)
             throw new AppException("Tài khoản không có quyền admin", HttpStatus.FORBIDDEN);

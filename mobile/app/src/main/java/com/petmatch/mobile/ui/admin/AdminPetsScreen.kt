@@ -15,6 +15,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import com.petmatch.mobile.data.model.AdminPetItemResponse
+
+private val petActionButtonColor = Color(0xFFD64550)
 
 @Composable
 fun AdminPetsScreen(vm: AdminViewModel) {
@@ -22,6 +27,8 @@ fun AdminPetsScreen(vm: AdminViewModel) {
     val state by vm.uiState.collectAsState()
 
     var query by remember { mutableStateOf("") }
+    var activeFilter by remember { mutableStateOf("all") } // "all", "hidden"
+    var deleteTarget by remember { mutableStateOf<AdminPetItemResponse?>(null) }
     val listState = rememberLazyListState()
 
     LaunchedEffect(Unit) {
@@ -46,20 +53,52 @@ fun AdminPetsScreen(vm: AdminViewModel) {
 
         Spacer(Modifier.height(10.dp))
 
-        OutlinedTextField(
-            value = query,
-            onValueChange = { query = it },
-            label = { Text("Tìm theo tên pet/chủng loại/chủ nuôi") },
+        // Search bar with search button
+        Row(
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true
-        )
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                label = { Text("Tìm theo tên pet/chủng loại/chủ nuôi") },
+                modifier = Modifier.weight(1f),
+                singleLine = true
+            )
+            Button(
+                onClick = { vm.loadPets(ctx, query = query) },
+                modifier = Modifier.height(56.dp)
+            ) {
+                Text("Tìm")
+            }
+        }
 
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(12.dp))
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            Button(onClick = { vm.loadPets(ctx, query = query) }) { Text("Tìm") }
-            OutlinedButton(onClick = { vm.loadPets(ctx, hidden = true) }) { Text("Đang ẩn") }
-            OutlinedButton(onClick = { vm.loadPets(ctx) }) { Text("Tất cả") }
+        // Filter buttons
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            FilterButton(
+                text = "Tất cả",
+                isActive = activeFilter == "all",
+                onClick = {
+                    activeFilter = "all"
+                    vm.loadPets(ctx)
+                },
+                modifier = Modifier.weight(1f)
+            )
+            FilterButton(
+                text = "Đang ẩn",
+                isActive = activeFilter == "hidden",
+                onClick = {
+                    activeFilter = "hidden"
+                    vm.loadPets(ctx, hidden = true)
+                },
+                modifier = Modifier.weight(1f)
+            )
         }
 
         if (state.loading) {
@@ -84,23 +123,27 @@ fun AdminPetsScreen(vm: AdminViewModel) {
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            val text = if (pet.hidden) "Đã ẩn khỏi gợi ý" else "Đang hiển thị"
-                            val color = if (pet.hidden) Color(0xFFD64550) else Color(0xFF2A9D8F)
-                            Surface(color = color.copy(alpha = 0.16f), shape = RoundedCornerShape(10.dp)) {
-                                Text(
-                                    text,
-                                    color = color,
-                                    style = MaterialTheme.typography.labelLarge,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                                )
-                            }
-                            Button(onClick = {
-                                vm.setPetHidden(ctx, pet.id, !pet.hidden)
-                            }) {
+                            UserActionButton(
+                                text = "Chi tiết",
+                                onClick = { vm.loadPetDetail(ctx, pet.id) },
+                                modifier = Modifier.weight(1f)
+                            )
+                            Button(
+                                onClick = { vm.setPetHidden(ctx, pet.id, !pet.hidden) },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = petActionButtonColor, contentColor = Color.White)
+                            ) {
                                 Text(if (pet.hidden) "Hiện lại" else "Ẩn hồ sơ")
+                            }
+                            Button(
+                                onClick = { deleteTarget = pet },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = petActionButtonColor, contentColor = Color.White)
+                            ) {
+                                Text("Xoá")
                             }
                         }
                     }
@@ -115,5 +158,125 @@ fun AdminPetsScreen(vm: AdminViewModel) {
                 }
             }
         }
+    }
+
+    state.petDetail?.let { detail ->
+        AlertDialog(
+            onDismissRequest = { vm.clearPetDetail() },
+            confirmButton = {
+                TextButton(onClick = { vm.clearPetDetail() }) {
+                    Text("Đóng")
+                }
+            },
+            title = { Text("Chi tiết hồ sơ thú cưng") },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 500.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val pet = detail.pet
+                    Text("Tên: ${pet.name}")
+                    Text("Chủ: ${pet.ownerName ?: "-"}")
+                    Text("Loài / giống: ${pet.species} / ${pet.breed ?: "-"}")
+                    Text("Giới tính: ${pet.gender ?: "-"}")
+                    Text("Ngày sinh: ${pet.dateOfBirth ?: "-"}")
+                    Text("Tuổi: ${pet.age ?: "-"}")
+                    Text("Cân nặng: ${pet.weightKg ?: "-"}")
+                    Text("Màu lông: ${pet.color ?: "-"}")
+                    Text("Kích cỡ: ${pet.size ?: "-"}")
+                    Text("Trạng thái sinh sản: ${pet.reproductiveStatus ?: "-"}")
+                    Text("Tiêm vaccine: ${if (pet.isVaccinated) "Có" else "Chưa"}")
+                    Text("Lần tiêm: ${pet.vaccinationCount}")
+                    Text("Tình trạng sức khỏe: ${pet.healthStatus ?: "-"}")
+                    Text("Mô tả: ${pet.notes ?: "-"}")
+                    Text("Ẩn hiển thị: ${if (pet.isHidden) "Có" else "Không"}")
+
+                    Spacer(Modifier.height(6.dp))
+                    Text("Lịch sử vi phạm", fontWeight = FontWeight.Bold)
+                    if (detail.violations.isEmpty()) {
+                        Text("Chưa có vi phạm nào.")
+                    } else {
+                        detail.violations.forEach { violation ->
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = Color(0xFFF5F8FF),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text("#${violation.id} • ${violation.targetType}(${violation.targetId})", fontWeight = FontWeight.SemiBold)
+                                    Text(violation.reason)
+                                    Text("Trạng thái: ${violation.status}")
+                                    Text("Thời gian: ${violation.createdAt ?: "-"}")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        )
+    }
+
+    deleteTarget?.let { pet ->
+        AlertDialog(
+            onDismissRequest = { deleteTarget = null },
+            title = { Text("Xoá hồ sơ thú cưng") },
+            text = { Text("Xoá hồ sơ của ${pet.name}? Hành động này không thể hoàn tác.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        vm.deletePet(ctx, pet.id)
+                        deleteTarget = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = petActionButtonColor, contentColor = Color.White)
+                ) {
+                    Text("Xoá")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteTarget = null }) { Text("Hủy") }
+            }
+        )
+    }
+}
+
+@Composable
+private fun FilterButton(
+    text: String,
+    isActive: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val backgroundColor = if (isActive) Color(0xFF1D3557) else Color(0xFF1D3557).copy(alpha = 0.2f)
+    val contentColor = if (isActive) Color.White else Color(0xFF1D3557)
+    
+    Button(
+        onClick = onClick,
+        modifier = modifier,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = backgroundColor,
+            contentColor = contentColor
+        ),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Text(text)
+    }
+}
+
+@Composable
+private fun UserActionButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Button(
+        onClick = onClick,
+        modifier = modifier,
+        colors = ButtonDefaults.buttonColors(containerColor = petActionButtonColor, contentColor = Color.White),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Text(text)
     }
 }

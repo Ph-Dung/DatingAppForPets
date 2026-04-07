@@ -27,6 +27,8 @@ public interface MatchRequestRepository extends JpaRepository<MatchRequest, Long
     // Ai đã like/super-like mình → super like xếp trước, rồi theo thời gian mới nhất
     List<MatchRequest> findByReceiverPetIdOrderByIsSuperLikeDescCreatedAtDesc(Long receiverPetId);
 
+                void deleteBySenderPetIdOrReceiverPetId(Long senderPetId, Long receiverPetId);
+
     // Kiểm tra 2 pet có mutual match không (cả 2 đều accepted)
     @Query("""
         SELECT CASE WHEN COUNT(m) > 0 THEN true ELSE false END
