@@ -125,7 +125,13 @@ fun CallScreen(
             // Gửi HANG_UP nếu chưa ended
             if (callStatus != CallStatus.ENDED) {
                 chatVm.sendRtcSignal(SignalingMessage(0L, peerId, "HANG_UP", null))
-                currentCallId.let { id -> if (id > 0) chatVm.endCall(ctx, id, "MISSED", if (callDuration > 0) callDuration else null) }
+                currentCallId.let { id -> 
+                    if (id > 0) {
+                        chatVm.endCall(ctx, id, "MISSED", if (callDuration > 0) callDuration else null, peerId)
+                    } else {
+                        chatVm.isCallCancelled = true
+                    }
+                }
             }
             webRtcManager.release()
             // Do NOT disconnect signaling — it is shared globally across all screens
@@ -227,7 +233,7 @@ fun CallScreen(
             delay(60_000L)
             if (callStatus == CallStatus.RINGING) {
                 chatVm.sendRtcSignal(SignalingMessage(0L, peerId, "HANG_UP", null))
-                currentCallId.let { if (it > 0) chatVm.endCall(ctx, it, "MISSED", null) }
+                currentCallId.let { if (it > 0) chatVm.endCall(ctx, it, "MISSED", null, peerId) }
                 navController.popBackStack()
             }
         }
@@ -421,7 +427,13 @@ fun CallScreen(
                     val finalStatus = if (callDuration > 0) "ACCEPTED" else "MISSED"
                     callStatus = CallStatus.ENDED
                     chatVm.sendRtcSignal(SignalingMessage(0L, peerId, "HANG_UP", null))
-                    currentCallId.let { id -> if (id > 0) chatVm.endCall(ctx, id, finalStatus, if (callDuration > 0) callDuration else null) }
+                    currentCallId.let { id -> 
+                        if (id > 0) {
+                            chatVm.endCall(ctx, id, finalStatus, if (callDuration > 0) callDuration else null, peerId)
+                        } else {
+                            chatVm.isCallCancelled = true
+                        }
+                    }
                     navController.popBackStack()
                 }
             )

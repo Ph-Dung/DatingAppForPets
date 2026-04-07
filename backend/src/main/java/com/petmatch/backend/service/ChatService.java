@@ -28,6 +28,7 @@ public class ChatService {
     private final BlockRepository blockRepository;
     private final MatchRepository matchRepository;
     private final CloudinaryService cloudinaryService;
+    private final NicknameRepository nicknameRepository;
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -226,6 +227,31 @@ public class ChatService {
                 "theyBlockedMe", theyBlockedMe,
                 "myBlockLevel", myLevel != null ? myLevel.name() : ""
         );
+    }
+
+    // ── Nicknames ─────────────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public String getNickname(String email, Long receiverId) {
+        User setter = userRepository.findByEmail(email).orElse(null);
+        User receiver = getUser(receiverId);
+        if (setter == null || receiver == null) return null;
+        return nicknameRepository.findBySetterAndReceiver(setter, receiver)
+                .map(Nickname::getNickname).orElse(null);
+    }
+
+    @Transactional
+    public String setNickname(String email, Long receiverId, String nickname) {
+        User setter = userRepository.findByEmail(email)
+                .orElseThrow(() -> new AppException("User not found", HttpStatus.UNAUTHORIZED));
+        User receiver = getUser(receiverId);
+        
+        Nickname entry = nicknameRepository.findBySetterAndReceiver(setter, receiver).orElse(
+                Nickname.builder().setter(setter).receiver(receiver).build()
+        );
+        entry.setNickname(nickname);
+        nicknameRepository.save(entry);
+        return nickname;
     }
 
     // ── DTO Mapper ────────────────────────────────────────────────────────────

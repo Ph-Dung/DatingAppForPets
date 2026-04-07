@@ -55,6 +55,7 @@ object Routes {
     const val APPOINTMENT       = "chat/appointment/{recipientId}/{recipientName}"
     const val APPOINTMENT_LIST  = "chat/appointments/{userId}"
     const val REVIEW            = "chat/review/{revieweeId}/{revieweeName}"
+    const val MESSENGER_PROFILE = "chat/profile/{userId}/{userName}"
 
     const val COMMUNITY         = "community"
     const val REGISTER          = "register"
@@ -87,6 +88,7 @@ object Routes {
     fun appointment(recipientId: Long, recipientName: String) = "chat/appointment/$recipientId/$recipientName"
     fun appointmentList(userId: Long) = "chat/appointments/$userId"
     fun review(revieweeId: Long, revieweeName: String) = "chat/review/$revieweeId/$revieweeName"
+    fun messengerProfile(userId: Long, userName: String) = "chat/profile/$userId/$userName"
 }
 
 @Composable
@@ -305,6 +307,23 @@ fun PetMatchNavGraph(
                 revieweeId    = revieweeId,
                 revieweeName  = revieweeName,
                 chatVm        = chatVm
+            )
+        }
+
+        // ── Messenger Profile ─────────────────────────────────
+        composable(
+            route = Routes.MESSENGER_PROFILE,
+            arguments = listOf(
+                navArgument("userId")   { type = NavType.LongType },
+                navArgument("userName") { type = NavType.StringType }
+            )
+        ) { back ->
+            val userId   = back.arguments!!.getLong("userId")
+            val userName = back.arguments!!.getString("userName") ?: ""
+            MessengerProfileScreen(
+                navController = navController,
+                userId        = userId,
+                userName      = userName
             )
         }
 

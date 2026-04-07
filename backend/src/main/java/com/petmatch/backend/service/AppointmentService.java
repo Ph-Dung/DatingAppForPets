@@ -23,6 +23,7 @@ public class AppointmentService {
     private final UserRepository userRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final com.petmatch.backend.repository.MatchRepository matchRepository;
+    private final com.petmatch.backend.repository.MessageRepository messageRepository;
 
     @Transactional
     public Appointment createAppointment(Long requesterId, AppointmentRequest request) {
@@ -47,7 +48,7 @@ public class AppointmentService {
 
         Appointment saved = appointmentRepository.save(appointment);
 
-        // Thông báo real-time cho người nhận có lịch hẹn mới (cần xác nhận)
+        // Gửi thông báo noti lịch hẹn
         messagingTemplate.convertAndSendToUser(
                 String.valueOf(request.getRecipientId()),
                 "/queue/appointments",
@@ -56,6 +57,35 @@ public class AppointmentService {
                         "appointmentId", saved.getId(),
                         "from", requester.getFullName()
                 )
+        );
+
+        // Sinh thẻ tin nhắn trong Chat
+        String contentJson = String.format("{\"id\":%d,\"location\":\"%s\",\"time\":\"%s\",\"status\":\"PENDING\"}",
+                saved.getId(),
+                request.getLocation().replace("\"", "\\\""),
+                request.getMeetingTime()
+        );
+        com.petmatch.backend.entity.Message msg = com.petmatch.backend.entity.Message.builder()
+                .sender(requester)
+                .receiver(recipient)
+                .type(com.petmatch.backend.entity.MessageType.APPOINTMENT)
+                .content(contentJson)
+                .build();
+        com.petmatch.backend.entity.Message savedMsg = messageRepository.save(msg);
+
+        com.petmatch.backend.dto.MessageDto dto = com.petmatch.backend.dto.MessageDto.builder()
+                .id(savedMsg.getId())
+                .senderId(requester.getId())
+                .receiverId(recipient.getId())
+                .type(com.petmatch.backend.entity.MessageType.APPOINTMENT)
+                .content(contentJson)
+                .sentAt(savedMsg.getSentAt())
+                .isRead(false)
+                .build();
+        messagingTemplate.convertAndSendToUser(
+                String.valueOf(recipient.getId()),
+                "/queue/messages",
+                dto
         );
 
         return saved;
@@ -88,7 +118,7 @@ public class AppointmentService {
         appointment.setStatus(newStatus);
         Appointment saved = appointmentRepository.save(appointment);
 
-        // Fix #14: Thông báo cập nhật status cho cả 2 bên
+        // Fix #14: Thông báo cập nhật status cho cả 2 bên (noti)
         Long notifyUserId = appointment.getRequester().getId().equals(currentUserId)
                 ? appointment.getRecipient().getId()
                 : appointment.getRequester().getId();
@@ -101,6 +131,32 @@ public class AppointmentService {
                         "newStatus", newStatus.name()
                 )
         );
+
+        // Phát thêm 1 tin nhắn TEXT thông báo vào chat
+        User sender = appointment.getRequester().getId().equals(currentUserId) ? appointment.getRequester() : appointment.getRecipient();
+        User receiver = appointment.getRequester().getId().equals(currentUserId) ? appointment.getRecipient() : appointment.getRequester();
+        String replyText = "Đã thay đổi trạng thái cuộc hẹn thành: " + newStatus.name();
+        if (newStatus == AppointmentStatus.CONFIRMED) replyText = "Tôi đã CHẤP NHẬN lời mời hẹn của bạn ❤️";
+        if (newStatus == AppointmentStatus.CANCELLED) replyText = "Rất tiếc tôi phải TỪ CHỐI lời mời hẹn này 💔";
+        
+        com.petmatch.backend.entity.Message textMsg = com.petmatch.backend.entity.Message.builder()
+                .sender(sender)
+                .receiver(receiver)
+                .type(com.petmatch.backend.entity.MessageType.TEXT)
+                .content(replyText)
+                .build();
+        messageRepository.save(textMsg);
+        
+        com.petmatch.backend.dto.MessageDto textDto = com.petmatch.backend.dto.MessageDto.builder()
+                .id(textMsg.getId())
+                .senderId(sender.getId())
+                .receiverId(receiver.getId())
+                .type(com.petmatch.backend.entity.MessageType.TEXT)
+                .content(replyText)
+                .sentAt(textMsg.getSentAt())
+                .isRead(false)
+                .build();
+        messagingTemplate.convertAndSendToUser(String.valueOf(receiver.getId()), "/queue/messages", textDto);
 
         return saved;
     }

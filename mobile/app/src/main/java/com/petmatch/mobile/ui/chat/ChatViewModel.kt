@@ -33,6 +33,8 @@ data class IncomingCallState(
 
 class ChatViewModel : ViewModel() {
 
+    var isCallCancelled = false
+
     // ── Current user ID (from DataStore) ──────────────────────────────────────
     private val _currentUserId = MutableStateFlow(0L)
     val currentUserId: StateFlow<Long> = _currentUserId
@@ -359,9 +361,15 @@ class ChatViewModel : ViewModel() {
         }
     }
 
-    fun endCall(ctx: Context, callId: Long, status: String = "ACCEPTED", durationSeconds: Int? = null) {
+    fun endCall(ctx: Context, callId: Long, status: String = "ACCEPTED", durationSeconds: Int? = null, peerId: Long? = null) {
         viewModelScope.launch {
-            try { RetrofitClient.callApi(ctx).endCall(callId, status, durationSeconds); _currentCall.value = null }
+            try { 
+                RetrofitClient.callApi(ctx).endCall(callId, status, durationSeconds)
+                _currentCall.value = null
+                if (peerId != null && _currentUserId.value > 0) {
+                    loadChatHistory(ctx, _currentUserId.value, peerId)
+                }
+            }
             catch (_: Exception) {}
         }
     }

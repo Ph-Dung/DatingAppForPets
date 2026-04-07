@@ -166,4 +166,18 @@ public class ChatController {
             @RequestParam("type") String type) {
         return ResponseEntity.ok(chatService.uploadMedia(file, type));
     }
+
+    // ── REST: Nicknames ──────────────────────────────────────────────────────
+
+    @GetMapping("/nicknames/{receiverId}")
+    public ResponseEntity<Map<String, String>> getNickname(@PathVariable Long receiverId, Authentication auth) {
+        String nickname = chatService.getNickname(auth.getName(), receiverId);
+        return ResponseEntity.ok(Map.of("nickname", nickname != null ? nickname : ""));
+    }
+
+    @PutMapping("/nicknames/{receiverId}")
+    public ResponseEntity<Map<String, String>> setNickname(@PathVariable Long receiverId, @RequestBody Map<String, String> body, Authentication auth) {
+        String nickname = chatService.setNickname(auth.getName(), receiverId, body.get("nickname"));
+        return ResponseEntity.ok(Map.of("nickname", nickname));
+    }
 }

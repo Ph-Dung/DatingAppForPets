@@ -215,7 +215,7 @@ fun ChatListScreen(
                                                 fontWeight = FontWeight.Bold,
                                                 color = TextPrimary
                                             ),
-                                            modifier = Modifier.padding(horizontal = 16.dp, bottom = 8.dp)
+                                            modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
                                         )
                                     }
                                     items(activeChats, key = { it.userId }) { conv ->
