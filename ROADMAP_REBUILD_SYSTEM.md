@@ -31,7 +31,7 @@
 | T1-1 | Backend: config + security baseline | 1 | DONE | Cao | config, security, exception | Khoi dong on dinh, auth pass smoke test |  |
 | T1-2 | Backend: entity + repository consistency | 1 | DONE | Cao | entity, repository | Build pass, khong canh bao quan trong |  |
 | T1-3 | Backend: service layer refactor theo domain | 1 | DONE | Cao | service | Logic ro, test duong chinh |  |
-| T1-4 | Backend: controller + dto contract cleanup | 1 | TODO | Cao | controller, dto | Contract API on dinh |  |
+| T1-4 | Backend: controller + dto contract cleanup | 1 | DONE | Cao | controller, dto | Contract API on dinh |  |
 | T1-5 | Backend: seed + migration + startup flow | 1 | TODO | Trung binh | DataSeeder, config DB | Startup nhanh, seed co dieu kien |  |
 | T2-1 | Frontend: map man hinh theo domain | 2 | TODO | Cao | UI flow hien tai | Danh sach man hinh + state map |  |
 | T2-2 | Frontend: dong bo mock models voi API contract | 2 | TODO | Cao | model mock, DTO map | Mock data sat voi API that |  |
@@ -107,8 +107,8 @@ Trang thai hop le: TODO | IN_PROGRESS | BLOCKED | REVIEW | DONE
 | Service-Community | post/comment/like/report | DONE | Da tach helper lookup/permission + giam lap logic |
 | Service-Chat | group/direct flow | DONE | Da chuan hoa helper user/group/member + check quyen |
 | Service-Match/Profile | logic nghiep vu cot loi | DONE | Da giam lap logic lookup pet/user o MatchRequestService |
-| Controller | endpoint contract, status code | TODO |  |
-| DTO | request/response alignment | TODO |  |
+| Controller | endpoint contract, status code | DONE | Da dong bo status code create/delete + not-found handling |
+| DTO | request/response alignment | DONE | Da bo sung validation cho request body thieu @Valid |
 | DataSeeder | seed co dieu kien, khong gay cham startup | TODO |  |
 
 ### 6.3 Definition of Done
@@ -178,6 +178,7 @@ Trang thai hop le: TODO | IN_PROGRESS | BLOCKED | REVIEW | DONE
 | 2026-04-07 | T1-1 | Chuan hoa SecurityConfig + CORS + route allowlist + config env placeholders | DONE | Khong | Chuyen T1-2 entity + repository consistency |
 | 2026-04-07 | T1-2 | Chuan hoa PetProfile defaults/relations + ra soat repository consistency | DONE | Khong | Chuyen T1-3 service layer refactor theo domain |
 | 2026-04-07 | T1-3 | Refactor Community/GroupChat/MatchRequest service de giam lap va chuan quyen truy cap | DONE | Khong | Chuyen T1-4 controller + dto contract cleanup |
+| 2026-04-07 | T1-4 | Chuan hoa controller + DTO contracts, them validation va status code nhat quan | DONE | Khong | Chuyen T1-5 seed + startup flow |
 | YYYY-MM-DD | T?-? | ... | ... | ... | ... |
 
 ## 9.2 Blockers board
