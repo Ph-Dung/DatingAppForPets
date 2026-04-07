@@ -1,4 +1,3 @@
-import org.json.JSONObject
 package com.petmatch.mobile.ui.auth
 
 import android.content.Context
@@ -43,14 +42,7 @@ class AuthViewModel : ViewModel() {
                 }
                 _authState.value = AuthState.Success(hasPetProfile = body.hasPetProfile)
             } else {
-                val err = res.errorBody()?.string() ?: ""
-                val errorMsg = try {
-                    val json = JSONObject(err)
-                    json.optString("error", "Email hoặc mật khẩu không đúng")
-                } catch (e: Exception) {
-                    "Email hoặc mật khẩu không đúng"
-                }
-                _authState.value = AuthState.Error(errorMsg)
+                _authState.value = AuthState.Error("Email hoặc mật khẩu không đúng")
             }
         } catch (e: Exception) {
             _authState.value = AuthState.Error("Lỗi kết nối: ${e.message}")
