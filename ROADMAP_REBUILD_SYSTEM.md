@@ -48,7 +48,7 @@
 | T1-6 | Backend: test gate on dinh (tach khoi DB local) | 1 | DONE | Cao | ApplicationTests, test profile | `mvn test` pass on dinh, khong phu thuoc password Postgres local |  |
 | TB-1 | Backend scope: B1 Quan ly bai viet ca nhan | 1 | DONE | Cao | post CRUD, owner check | Tao/sua/xoa bai viet on dinh |  |
 | TB-2 | Backend scope: B2 Tuong tac cong dong | 1 | DONE | Cao | like/comment/reply | Like/comment/reply dong bo dung |  |
-| TB-3 | Backend scope: B3 Bao cao + kiem duyet | 1 | TODO | Cao | report/moderation config | Report luu dung + moderation tuy chon |  |
+| TB-3 | Backend scope: B3 Bao cao + kiem duyet | 1 | DONE | Cao | report/moderation config | Report luu dung + moderation tuy chon |  |
 | T2-1 | Frontend: chot real flow theo domain | 2 | IN_PROGRESS | Cao | UI flow hien tai | Danh sach man hinh + state map + route map |  |
 | T2-2 | Frontend: flow Auth chi tiet | 2 | TODO | Cao | login/register/token/session | Auth diem vao app that |  |
 | T2-3 | Frontend: flow Match/Explore chi tiet | 2 | TODO | Cao | swipe/filter/match list | Match experience that, khong con mock |  |
@@ -336,6 +336,7 @@ Ghi chu verify cuoi Phase 1 (2026-04-07):
 | 2026-04-07 | T2-1 | Khoi dong Phase 2, tach flow Auth/Match/Community/Chat/Profile/Shared UI | IN_PROGRESS | Khong | Chot danh sach flow va thu tu uu tien |
 | 2026-04-07 | TB-1 | Hoan tat B1 post CRUD (create/update/delete) + owner permission + edge-case test | DONE | Khong | Chuyen sang TB-2 (like/comment/reply) |
 | 2026-04-07 | TB-2 | Hoan tat B2 like/comment/reply + edge-case test (toggle, post/comment not-found) | DONE | Khong | Chuyen sang TB-3 (report/moderation) |
+| 2026-04-07 | TB-3 | Hoan tat B3 report + moderation test (target validation, unsupported target, moderation on/off) | DONE | Khong | Chuyen sang T3-1 (integration mock -> API that) |
 | YYYY-MM-DD | T?-? | ... | ... | ... | ... |
 
 ## 9.2 Blockers board
