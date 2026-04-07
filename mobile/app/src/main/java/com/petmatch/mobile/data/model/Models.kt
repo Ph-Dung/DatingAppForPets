@@ -196,6 +196,22 @@ data class CommunityUpdatePostRequest(
     val location: String?
 )
 
+data class CommunityCreateCommentRequest(
+    val content: String
+)
+
+data class CommunityCommentResponse(
+    val id: Long,
+    val content: String,
+    val userId: Long,
+    val userName: String,
+    val userAvatar: String?,
+    val createdAt: String?,
+    val postId: Long,
+    val parentCommentId: Long?,
+    val replies: List<CommunityCommentResponse> = emptyList()
+)
+
 data class CommunityReportRequest(
     val targetId: Long,
     val targetType: String,

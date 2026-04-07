@@ -2,6 +2,7 @@ package com.petmatch.mobile.ui.community
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -34,6 +35,15 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val posts by vm.feed.collectAsState()
     val loading by vm.loading.collectAsState()
+    val actionLoading by vm.actionLoading.collectAsState()
+    val error by vm.error.collectAsState()
+    val comments by vm.comments.collectAsState()
+    val commentsLoading by vm.commentsLoading.collectAsState()
+
+    var commentPostId by remember { mutableStateOf<Long?>(null) }
+    var showReportDialogForPostId by remember { mutableStateOf<Long?>(null) }
+    var reportReason by remember { mutableStateOf("") }
+    var commentInput by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
         vm.loadFeed(ctx)
@@ -83,10 +93,140 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
                 }
             }
 
+            if (!error.isNullOrBlank()) {
+                item {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = error ?: "",
+                                modifier = Modifier.weight(1f),
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            TextButton(onClick = { vm.clearError() }) {
+                                Text("Dong")
+                            }
+                        }
+                    }
+                }
+            }
+
             items(posts) { post ->
-                CommunityPostItem(post = post, onToggleLike = { vm.toggleLike(ctx, post.id) })
+                CommunityPostItem(
+                    post = post,
+                    onToggleLike = { vm.toggleLike(ctx, post.id) },
+                    onOpenComments = {
+                        commentPostId = post.id
+                        commentInput = ""
+                        vm.loadComments(ctx, post.id)
+                    },
+                    onReportPost = {
+                        showReportDialogForPostId = post.id
+                        reportReason = ""
+                    }
+                )
             }
         }
+    }
+
+    if (commentPostId != null) {
+        AlertDialog(
+            onDismissRequest = { commentPostId = null },
+            title = { Text("Binh luan") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (commentsLoading) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                    } else if (comments.isEmpty()) {
+                        Text("Chua co binh luan nao")
+                    } else {
+                        LazyColumn(modifier = Modifier.heightIn(max = 220.dp)) {
+                            items(comments, key = { it.id }) { c ->
+                                Text("${c.userName}: ${c.content}")
+                                Spacer(modifier = Modifier.height(6.dp))
+                            }
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = commentInput,
+                        onValueChange = { commentInput = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Them binh luan") },
+                        singleLine = true
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = commentInput.isNotBlank() && !actionLoading,
+                    onClick = {
+                        val postId = commentPostId
+                        if (postId != null) {
+                            vm.addComment(ctx, postId, commentInput) {
+                                commentInput = ""
+                            }
+                        }
+                    }
+                ) {
+                    Text(if (actionLoading) "Dang gui..." else "Gui")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { commentPostId = null }) {
+                    Text("Dong")
+                }
+            }
+        )
+    }
+
+    if (showReportDialogForPostId != null) {
+        AlertDialog(
+            onDismissRequest = { showReportDialogForPostId = null },
+            title = { Text("Bao cao bai viet") },
+            text = {
+                OutlinedTextField(
+                    value = reportReason,
+                    onValueChange = { reportReason = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Ly do") },
+                    minLines = 2
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = reportReason.isNotBlank() && !actionLoading,
+                    onClick = {
+                        val postId = showReportDialogForPostId
+                        if (postId != null) {
+                            vm.submitReport(ctx, postId, reportReason) {
+                                showReportDialogForPostId = null
+                                reportReason = ""
+                            }
+                        }
+                    }
+                ) {
+                    Text(if (actionLoading) "Dang gui..." else "Gui bao cao")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showReportDialogForPostId = null }) {
+                    Text("Huy")
+                }
+            }
+        )
     }
 }
 
@@ -131,7 +271,14 @@ fun CreatePostBar(onPostClick: () -> Unit, onManageClick: () -> Unit) {
 }
 
 @Composable
-fun CommunityPostItem(post: CommunityPostResponse, onToggleLike: () -> Unit) {
+fun CommunityPostItem(
+    post: CommunityPostResponse,
+    onToggleLike: () -> Unit,
+    onOpenComments: () -> Unit,
+    onReportPost: () -> Unit
+) {
+    var showMoreMenu by remember { mutableStateOf(false) }
+
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
@@ -153,8 +300,19 @@ fun CommunityPostItem(post: CommunityPostResponse, onToggleLike: () -> Unit) {
                 Text(post.location ?: "", color = Color.Gray, fontSize = 11.sp)
             }
             Spacer(Modifier.weight(1f))
-            IconButton(onClick = { /* Options */ }) {
+            Box {
+            IconButton(onClick = { showMoreMenu = true }) {
                 Icon(Icons.Default.MoreVert, null)
+            }
+                DropdownMenu(expanded = showMoreMenu, onDismissRequest = { showMoreMenu = false }) {
+                    DropdownMenuItem(
+                        text = { Text("Bao cao bai viet") },
+                        onClick = {
+                            showMoreMenu = false
+                            onReportPost()
+                        }
+                    )
+                }
             }
         }
 
@@ -195,7 +353,13 @@ fun CommunityPostItem(post: CommunityPostResponse, onToggleLike: () -> Unit) {
             Text("${post.likesCount}", fontSize = 13.sp)
             
             Spacer(modifier = Modifier.width(16.dp))
-            Icon(Icons.Outlined.ChatBubbleOutline, null, modifier = Modifier.size(24.dp))
+            Icon(
+                Icons.Outlined.ChatBubbleOutline,
+                null,
+                modifier = Modifier
+                    .size(24.dp)
+                    .clickable { onOpenComments() }
+            )
             Spacer(modifier = Modifier.width(4.dp))
             Text("${post.commentsCount}", fontSize = 13.sp)
 

@@ -244,6 +244,15 @@ interface CommunityApi {
     @DELETE("api/community/posts/{id}/like")
     suspend fun unlikePost(@Path("id") id: Long): Response<Unit>
 
+    @GET("api/community/posts/{id}/comments")
+    suspend fun getComments(@Path("id") id: Long): Response<List<CommunityCommentResponse>>
+
+    @POST("api/community/posts/{id}/comments")
+    suspend fun addComment(
+        @Path("id") id: Long,
+        @Body req: CommunityCreateCommentRequest
+    ): Response<CommunityCommentResponse>
+
     @POST("api/community/reports")
     suspend fun submitReport(@Body req: CommunityReportRequest): Response<Any>
 }

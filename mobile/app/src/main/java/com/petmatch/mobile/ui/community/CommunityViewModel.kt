@@ -5,8 +5,11 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.petmatch.mobile.data.api.RetrofitClient
+import com.petmatch.mobile.data.model.CommunityCommentResponse
+import com.petmatch.mobile.data.model.CommunityCreateCommentRequest
 import com.petmatch.mobile.data.model.CommunityCreatePostRequest
 import com.petmatch.mobile.data.model.CommunityPostResponse
+import com.petmatch.mobile.data.model.CommunityReportRequest
 import com.petmatch.mobile.data.model.CommunityUpdatePostRequest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,6 +34,12 @@ class CommunityViewModel : ViewModel() {
 
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
+
+    private val _comments = MutableStateFlow<List<CommunityCommentResponse>>(emptyList())
+    val comments: StateFlow<List<CommunityCommentResponse>> = _comments
+
+    private val _commentsLoading = MutableStateFlow(false)
+    val commentsLoading: StateFlow<Boolean> = _commentsLoading
 
     private val _actionDone = MutableStateFlow(false)
     val actionDone: StateFlow<Boolean> = _actionDone
@@ -189,14 +198,79 @@ class CommunityViewModel : ViewModel() {
     }
 
     fun toggleLike(ctx: Context, id: Long) = viewModelScope.launch {
+        _error.value = null
         try {
             val res = RetrofitClient.communityApi(ctx).toggleLike(id)
             if (res.isSuccessful) {
                 loadFeed(ctx)
                 loadMyPosts(ctx)
+            } else {
+                _error.value = "Khong the cap nhat luot thich"
             }
         } catch (_: Exception) {
+            _error.value = "Khong the ket noi may chu"
         }
+    }
+
+    fun loadComments(ctx: Context, postId: Long) = viewModelScope.launch {
+        _commentsLoading.value = true
+        _error.value = null
+        try {
+            val res = RetrofitClient.communityApi(ctx).getComments(postId)
+            if (res.isSuccessful) {
+                _comments.value = res.body() ?: emptyList()
+            } else {
+                _error.value = "Khong tai duoc binh luan"
+            }
+        } catch (_: Exception) {
+            _error.value = "Khong the ket noi may chu"
+        }
+        _commentsLoading.value = false
+    }
+
+    fun addComment(ctx: Context, postId: Long, content: String, onDone: (() -> Unit)? = null) = viewModelScope.launch {
+        _actionLoading.value = true
+        _error.value = null
+        try {
+            val res = RetrofitClient.communityApi(ctx)
+                .addComment(postId, CommunityCreateCommentRequest(content.trim()))
+            if (res.isSuccessful) {
+                loadComments(ctx, postId)
+                loadFeed(ctx)
+                loadMyPosts(ctx)
+                onDone?.invoke()
+            } else {
+                _error.value = "Khong gui duoc binh luan"
+            }
+        } catch (_: Exception) {
+            _error.value = "Khong the ket noi may chu"
+        }
+        _actionLoading.value = false
+    }
+
+    fun submitReport(ctx: Context, postId: Long, reason: String, onDone: (() -> Unit)? = null) = viewModelScope.launch {
+        _actionLoading.value = true
+        _error.value = null
+        try {
+            val req = CommunityReportRequest(
+                targetId = postId,
+                targetType = "POST",
+                reason = reason.trim()
+            )
+            val res = RetrofitClient.communityApi(ctx).submitReport(req)
+            if (res.isSuccessful) {
+                onDone?.invoke()
+            } else {
+                _error.value = "Khong gui duoc bao cao"
+            }
+        } catch (_: Exception) {
+            _error.value = "Khong the ket noi may chu"
+        }
+        _actionLoading.value = false
+    }
+
+    fun clearError() {
+        _error.value = null
     }
 
     fun clearActionState() {
