@@ -1,4 +1,3 @@
-import org.json.JSONObject
 package com.petmatch.mobile.ui.auth
 
 import android.content.Context
@@ -14,6 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import org.json.JSONObject
 
 sealed class AuthState {
     object Idle    : AuthState()
@@ -36,24 +36,29 @@ class AuthViewModel : ViewModel() {
                 val body = res.body()!!
                 ctx.dataStore.edit { prefs ->
                     prefs[stringPreferencesKey(Constants.TOKEN_KEY)] = body.token
-                    // Persist user ID so other ViewModels can use it
                     body.userId?.let { uid ->
                         prefs[stringPreferencesKey("current_user_id")] = uid.toString()
                     }
+                    prefs.remove(stringPreferencesKey(Constants.ADMIN_TOKEN_KEY))
                 }
                 _authState.value = AuthState.Success(hasPetProfile = body.hasPetProfile)
             } else {
-                val err = res.errorBody()?.string() ?: ""
-                val errorMsg = try {
-                    val json = JSONObject(err)
-                    json.optString("error", "Email hoặc mật khẩu không đúng")
-                } catch (e: Exception) {
-                    "Email hoặc mật khẩu không đúng"
-                }
-                _authState.value = AuthState.Error(errorMsg)
+                _authState.value = AuthState.Error(
+                    readErrorMessage(res.errorBody()?.string(), "Email hoặc mật khẩu không đúng")
+                )
             }
         } catch (e: Exception) {
             _authState.value = AuthState.Error("Lỗi kết nối: ${e.message}")
+        }
+    }
+
+    private fun readErrorMessage(raw: String?, fallback: String): String {
+        if (raw.isNullOrBlank()) return fallback
+        return try {
+            val json = JSONObject(raw)
+            json.optString("error", fallback)
+        } catch (_: Exception) {
+            fallback
         }
     }
 

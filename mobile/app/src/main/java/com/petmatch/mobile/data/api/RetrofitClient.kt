@@ -36,8 +36,28 @@ class AuthInterceptor(private val context: Context) : Interceptor {
     }
 }
 
+class AdminAuthInterceptor(private val context: Context) : Interceptor {
+    override fun intercept(chain: Interceptor.Chain): okhttp3.Response {
+        val token = runBlocking {
+            context.dataStore.data.map { prefs ->
+                prefs[stringPreferencesKey(Constants.ADMIN_TOKEN_KEY)]
+            }.firstOrNull()
+        }
+        val request = if (token != null) {
+            chain.request().newBuilder()
+                .addHeader("Authorization", "Bearer $token")
+                .build()
+        } else {
+            chain.request()
+        }
+        return chain.proceed(request)
+    }
+}
+
 object RetrofitClient {
     private var retrofit: Retrofit? = null
+    private var adminRetrofit: Retrofit? = null
+    private var adminAuthRetrofit: Retrofit? = null
 
     fun getInstance(context: Context): Retrofit {
         if (retrofit == null) {
@@ -60,6 +80,47 @@ object RetrofitClient {
         return retrofit!!
     }
 
+    private fun getAdminInstance(context: Context): Retrofit {
+        if (adminRetrofit == null) {
+            val logging = HttpLoggingInterceptor().apply {
+                level = HttpLoggingInterceptor.Level.BODY
+            }
+            val client = OkHttpClient.Builder()
+                .addInterceptor(AdminAuthInterceptor(context))
+                .addInterceptor(logging)
+                .connectTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
+                .build()
+
+            adminRetrofit = Retrofit.Builder()
+                .baseUrl(Constants.BASE_URL)
+                .client(client)
+                .addConverterFactory(GsonConverterFactory.create())
+                .build()
+        }
+        return adminRetrofit!!
+    }
+
+    private fun getAdminAuthInstance(): Retrofit {
+        if (adminAuthRetrofit == null) {
+            val logging = HttpLoggingInterceptor().apply {
+                level = HttpLoggingInterceptor.Level.BODY
+            }
+            val client = OkHttpClient.Builder()
+                .addInterceptor(logging)
+                .connectTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
+                .build()
+
+            adminAuthRetrofit = Retrofit.Builder()
+                .baseUrl(Constants.BASE_URL)
+                .client(client)
+                .addConverterFactory(GsonConverterFactory.create())
+                .build()
+        }
+        return adminAuthRetrofit!!
+    }
+
     fun petApi(context: Context): PetApi = getInstance(context).create(PetApi::class.java)
     fun matchApi(context: Context): MatchApi = getInstance(context).create(MatchApi::class.java)
     fun interactionApi(context: Context): InteractionApi = getInstance(context).create(InteractionApi::class.java)
@@ -71,5 +132,9 @@ object RetrofitClient {
     fun appointmentApi(context: Context): AppointmentApi = getInstance(context).create(AppointmentApi::class.java)
     fun reviewApi(context: Context): ReviewApi = getInstance(context).create(ReviewApi::class.java)
     fun groupChatApi(context: Context): GroupChatApi = getInstance(context).create(GroupChatApi::class.java)
+
+    fun adminAuthApi(context: Context): AdminAuthApi = getAdminAuthInstance().create(AdminAuthApi::class.java)
+    fun adminApi(context: Context): AdminApi = getAdminInstance(context).create(AdminApi::class.java)
+    fun adminUserApi(context: Context): UserApi = getAdminInstance(context).create(UserApi::class.java)
 }
 

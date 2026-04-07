@@ -1,5 +1,6 @@
 package com.petmatch.backend.entity;
 
+import com.petmatch.backend.enums.AdminReportAction;
 import com.petmatch.backend.enums.ReportStatus;
 import com.petmatch.backend.enums.ReportTargetType;
 import jakarta.persistence.*;
@@ -40,6 +41,20 @@ public class Report {
     @Column(nullable = false, length = 20)
     @Builder.Default
     ReportStatus status = ReportStatus.PENDING;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "handled_by")
+    User handledBy;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "action", length = 30)
+    AdminReportAction action;
+
+    @Column(name = "admin_note", columnDefinition = "TEXT")
+    String adminNote;
+
+    @Column(name = "handled_at")
+    LocalDateTime handledAt;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

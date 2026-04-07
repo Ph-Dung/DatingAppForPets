@@ -123,6 +123,64 @@ interface AuthApi {
     suspend fun register(@Body req: RegisterRequest): Response<AuthResponse>
 }
 
+interface AdminAuthApi {
+    @POST("api/auth/admin/login")
+    suspend fun adminLogin(@Body req: LoginRequest): Response<AuthResponse>
+}
+
+interface AdminApi {
+    @GET("api/admin/dashboard")
+    suspend fun getDashboard(): Response<AdminDashboardResponse>
+
+    @GET("api/admin/users")
+    suspend fun getUsers(
+        @Query("query") query: String? = null,
+        @Query("locked") locked: Boolean? = null,
+        @Query("warned") warned: Boolean? = null,
+        @Query("page") page: Int = 0,
+        @Query("size") size: Int = 20
+    ): Response<PageResponse<AdminUserItemResponse>>
+
+    @PATCH("api/admin/users/{userId}/lock")
+    suspend fun setUserLocked(
+        @Path("userId") userId: Long,
+        @Query("locked") locked: Boolean
+    ): Response<AdminUserItemResponse>
+
+    @POST("api/admin/users/{userId}/warn")
+    suspend fun warnUser(
+        @Path("userId") userId: Long,
+        @Query("note") note: String? = null
+    ): Response<AdminUserItemResponse>
+
+    @GET("api/admin/pets")
+    suspend fun getPets(
+        @Query("query") query: String? = null,
+        @Query("hidden") hidden: Boolean? = null,
+        @Query("page") page: Int = 0,
+        @Query("size") size: Int = 20
+    ): Response<PageResponse<AdminPetItemResponse>>
+
+    @PATCH("api/admin/pets/{petId}/hidden")
+    suspend fun setPetHidden(
+        @Path("petId") petId: Long,
+        @Query("hidden") hidden: Boolean
+    ): Response<AdminPetItemResponse>
+
+    @GET("api/admin/reports")
+    suspend fun getReports(
+        @Query("status") status: String? = null,
+        @Query("page") page: Int = 0,
+        @Query("size") size: Int = 20
+    ): Response<PageResponse<AdminReportItemResponse>>
+
+    @POST("api/admin/reports/{reportId}/handle")
+    suspend fun handleReport(
+        @Path("reportId") reportId: Long,
+        @Body req: AdminHandleReportRequest
+    ): Response<AdminReportItemResponse>
+}
+
 interface UserApi {
 
     @GET("api/users/me")

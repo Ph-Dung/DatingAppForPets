@@ -73,6 +73,8 @@ public class DataSeeder implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
+        ensureDefaultAdmin();
+
         long count = userRepo.count();
         if (count >= 5) {
             log.info("DataSeeder: DB đã có {} users, bỏ qua seeding.", count);
@@ -268,5 +270,22 @@ public class DataSeeder implements CommandLineRunner {
         List<String> list = new ArrayList<>(Arrays.asList(arr));
         Collections.shuffle(list, RNG);
         return list.subList(0, Math.min(count, list.size()));
+    }
+
+    private void ensureDefaultAdmin() {
+        final String adminEmail = "admin@petmatch.com";
+        if (userRepo.existsByEmail(adminEmail)) {
+            return;
+        }
+
+        userRepo.save(User.builder()
+                .fullName("System Admin")
+                .email(adminEmail)
+                .passwordHash(passwordEncoder.encode("Admin@123"))
+                .role(Role.ADMIN)
+                .isLocked(false)
+                .build());
+
+        log.info("DataSeeder: Đã tạo tài khoản admin mặc định {}", adminEmail);
     }
 }

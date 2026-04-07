@@ -19,11 +19,12 @@ public interface PetProfileRepository extends JpaRepository<PetProfile, Long> {
 
     Optional<PetProfile> findByOwnerId(Long ownerId);
     boolean existsByOwnerId(Long ownerId);
+    long countByIsHiddenTrue();
 
     /**
      * Lấy suggestions: cùng loài, chưa bị ẩn, loại trừ pet của chính mình và pet bị block.
-     * Loại trừ pet đã từng swipe (mình đã gửi request).
-     * LỌC THÊM: Loại trừ những pet ĐÃ GỬI request cho mình và mình ĐÃ XỬ LÝ (khác PENDING).
+     * Loại trừ pet đã từng swipe (đã có match request từ mình).
+     * Pet được super-like (có người super like mình) xếp trước.
      */
     @Query("""
         SELECT p FROM PetProfile p
@@ -40,9 +41,6 @@ public interface PetProfileRepository extends JpaRepository<PetProfile, Long> {
           AND p.id NOT IN (
               SELECT mr.receiverPet.id FROM MatchRequest mr WHERE mr.senderPet.id = :myPetId
           )
-          AND p.id NOT IN (
-              SELECT mr.senderPet.id FROM MatchRequest mr WHERE mr.receiverPet.id = :myPetId AND mr.status != :pendingStatus
-          )
         ORDER BY (
           SELECT CASE WHEN COUNT(sl) > 0 THEN 1 ELSE 0 END
           FROM MatchRequest sl
@@ -51,11 +49,26 @@ public interface PetProfileRepository extends JpaRepository<PetProfile, Long> {
             AND sl.isSuperLike = true
         ) DESC, p.createdAt DESC
         """)
-    Page<PetProfile> findSuggestions(
+        Page<PetProfile> findSuggestions(
             @Param("currentUserId") Long currentUserId,
             @Param("myPetId") Long myPetId,
             @Param("species") String species,
             @Param("pendingStatus") com.petmatch.backend.enums.MatchStatus pendingStatus,
+            Pageable pageable);
+
+        @Query("""
+        SELECT p FROM PetProfile p
+        WHERE (:query IS NULL OR :query = ''
+               OR LOWER(p.name) LIKE LOWER(CONCAT('%', :query, '%'))
+               OR LOWER(p.species) LIKE LOWER(CONCAT('%', :query, '%'))
+               OR LOWER(p.breed) LIKE LOWER(CONCAT('%', :query, '%'))
+               OR LOWER(p.owner.fullName) LIKE LOWER(CONCAT('%', :query, '%')))
+          AND (:hidden IS NULL OR p.isHidden = :hidden)
+        ORDER BY p.createdAt DESC
+        """)
+        Page<PetProfile> searchPetsForAdmin(
+            @Param("query") String query,
+            @Param("hidden") Boolean hidden,
             Pageable pageable);
 
     /**

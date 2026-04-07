@@ -72,4 +72,27 @@ public class AuthService {
                 .hasPetProfile(petProfileRepo.existsByOwnerId(user.getId()))
                 .build();
     }
+
+    public AuthResponse loginAdmin(LoginRequest req) {
+        authManager.authenticate(
+                new UsernamePasswordAuthenticationToken(req.getEmail(), req.getPassword()));
+
+        User user = userRepo.findByEmail(req.getEmail())
+                .orElseThrow(() -> new AppException("Không tìm thấy user", HttpStatus.NOT_FOUND));
+
+        if (user.getIsLocked())
+            throw new AppException("Tài khoản đã bị khóa", HttpStatus.FORBIDDEN);
+
+        if (user.getRole() != Role.ADMIN)
+            throw new AppException("Tài khoản không có quyền admin", HttpStatus.FORBIDDEN);
+
+        String token = jwtUtil.generateToken(user.getEmail(), user.getId());
+        return AuthResponse.builder()
+                .token(token)
+                .email(user.getEmail())
+                .fullName(user.getFullName())
+                .userId(user.getId())
+                .hasPetProfile(true)
+                .build();
+    }
 }
