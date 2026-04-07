@@ -14,7 +14,7 @@ import com.petmatch.mobile.ui.account.UserViewModel
 import com.petmatch.mobile.ui.auth.AuthViewModel
 import com.petmatch.mobile.ui.auth.LoginScreen
 import com.petmatch.mobile.ui.auth.RegisterScreen
-import com.petmatch.mobile.ui.chat.ChatListScreen
+import com.petmatch.mobile.ui.chat.*
 import com.petmatch.mobile.ui.chatbot.AiChatbotScreen
 import com.petmatch.mobile.ui.chatbot.ChatbotViewModel
 import com.petmatch.mobile.ui.community.CommunityScreen
@@ -40,6 +40,14 @@ object Routes {
     const val MATCHED_LIST      = "match/matched"
 
     const val CHAT_LIST         = "chat"
+    const val CHAT_DETAIL       = "chat/direct/{otherUserId}/{otherUserName}"
+    const val CALL              = "chat/call/{calleeId}/{calleeName}/{callType}"
+    const val GROUP_CHAT_DETAIL = "chat/group/{groupId}/{groupName}"
+    const val GROUP_CHAT_CREATE = "chat/group/create"
+    const val APPOINTMENT       = "chat/appointment/{recipientId}/{recipientName}"
+    const val APPOINTMENT_LIST  = "chat/appointments/{userId}"
+    const val REVIEW            = "chat/review/{revieweeId}/{revieweeName}"
+
     const val COMMUNITY         = "community"
     const val REGISTER          = "register"
     const val ACCOUNT           = "account"
@@ -59,6 +67,12 @@ object Routes {
     fun report(petId: Long, ownerId: Long) = "report/$petId/$ownerId"
     fun vacForm(vacId: Long? = null) = if (vacId != null) "pet/vaccinations/form?vacId=$vacId"
                                        else "pet/vaccinations/form?vacId=-1"
+    fun chatDetail(otherUserId: Long, otherUserName: String) = "chat/direct/$otherUserId/$otherUserName"
+    fun call(calleeId: Long, calleeName: String, callType: String) = "chat/call/$calleeId/$calleeName/$callType"
+    fun groupChatDetail(groupId: Long, groupName: String) = "chat/group/$groupId/$groupName"
+    fun appointment(recipientId: Long, recipientName: String) = "chat/appointment/$recipientId/$recipientName"
+    fun appointmentList(userId: Long) = "chat/appointments/$userId"
+    fun review(revieweeId: Long, revieweeName: String) = "chat/review/$revieweeId/$revieweeName"
 }
 
 @Composable
@@ -72,6 +86,7 @@ fun PetMatchNavGraph(
     val authVm: AuthViewModel         = viewModel()
     val userVm: UserViewModel         = viewModel()
     val chatbotVm: ChatbotViewModel   = viewModel()
+    val chatVm: ChatViewModel         = viewModel()
 
     NavHost(navController = navController, startDestination = startDestination) {
 
@@ -141,8 +156,124 @@ fun PetMatchNavGraph(
         composable(Routes.MATCHED_LIST) { MatchedListScreen(navController, matchVm) }
 
         // ── Chat & Community ──────────────────────────────────
-        composable(Routes.CHAT_LIST) { ChatListScreen(navController) }
+        composable(Routes.CHAT_LIST) { ChatListScreen(navController, chatVm) }
         composable(Routes.COMMUNITY)  { CommunityScreen(navController) }
+
+        // ── Chat Detail (Direct) ─────────────────────────────
+        composable(
+            route = Routes.CHAT_DETAIL,
+            arguments = listOf(
+                navArgument("otherUserId")   { type = NavType.LongType },
+                navArgument("otherUserName") { type = NavType.StringType }
+            )
+        ) { back ->
+            val otherUserId   = back.arguments!!.getLong("otherUserId")
+            val otherUserName = back.arguments!!.getString("otherUserName") ?: ""
+            ChatDetailScreen(
+                navController = navController,
+                otherUserId   = otherUserId,
+                otherUserName = otherUserName,
+                chatVm        = chatVm
+            )
+        }
+
+        // ── Call (Audio / Video) ──────────────────────────────
+        composable(
+            route = Routes.CALL,
+            arguments = listOf(
+                navArgument("calleeId")   { type = NavType.LongType },
+                navArgument("calleeName") { type = NavType.StringType },
+                navArgument("callType")   { type = NavType.StringType }
+            )
+        ) { back ->
+            val calleeId   = back.arguments!!.getLong("calleeId")
+            val calleeName = back.arguments!!.getString("calleeName") ?: ""
+            val callType   = back.arguments!!.getString("callType") ?: "AUDIO"
+            CallScreen(
+                navController = navController,
+                calleeId      = calleeId,
+                calleeName    = calleeName,
+                callType      = callType,
+                chatVm        = chatVm
+            )
+        }
+
+        // ── Group Chat Detail ─────────────────────────────────
+        composable(
+            route = Routes.GROUP_CHAT_DETAIL,
+            arguments = listOf(
+                navArgument("groupId")   { type = NavType.LongType },
+                navArgument("groupName") { type = NavType.StringType }
+            )
+        ) { back ->
+            val groupId   = back.arguments!!.getLong("groupId")
+            val groupName = back.arguments!!.getString("groupName") ?: ""
+            GroupChatDetailScreen(
+                navController = navController,
+                groupId       = groupId,
+                groupName     = groupName,
+                chatVm        = chatVm
+            )
+        }
+
+        // ── Create Group Chat ─────────────────────────────────
+        composable(Routes.GROUP_CHAT_CREATE) {
+            CreateGroupChatScreen(
+                navController = navController,
+                chatVm        = chatVm
+            )
+        }
+
+        // ── Appointment ───────────────────────────────────────
+        composable(
+            route = Routes.APPOINTMENT,
+            arguments = listOf(
+                navArgument("recipientId")   { type = NavType.LongType },
+                navArgument("recipientName") { type = NavType.StringType }
+            )
+        ) { back ->
+            val recipientId   = back.arguments!!.getLong("recipientId")
+            val recipientName = back.arguments!!.getString("recipientName") ?: ""
+            AppointmentScreen(
+                navController  = navController,
+                recipientId    = recipientId,
+                recipientName  = recipientName,
+                chatVm         = chatVm
+            )
+        }
+
+        // ── Appointment List ──────────────────────────────────
+        composable(
+            route = Routes.APPOINTMENT_LIST,
+            arguments = listOf(
+                navArgument("userId") { type = NavType.LongType }
+            )
+        ) { back ->
+            val userId = back.arguments!!.getLong("userId")
+            AppointmentListScreen(
+                navController = navController,
+                userId        = userId,
+                chatVm        = chatVm
+            )
+        }
+
+        // ── Review After Meeting ──────────────────────────────
+        composable(
+            route = Routes.REVIEW,
+            arguments = listOf(
+                navArgument("revieweeId")   { type = NavType.LongType },
+                navArgument("revieweeName") { type = NavType.StringType }
+            )
+        ) { back ->
+            val revieweeId   = back.arguments!!.getLong("revieweeId")
+            val revieweeName = back.arguments!!.getString("revieweeName") ?: ""
+            ReviewScreen(
+                navController = navController,
+                revieweeId    = revieweeId,
+                revieweeName  = revieweeName,
+                chatVm        = chatVm
+            )
+        }
 
         // ── Interaction ───────────────────────────────────────
         composable(

@@ -10,4 +10,8 @@ import java.util.List;
 @Repository
 public interface ReviewRepository extends JpaRepository<Review, Long> {
     List<Review> findByRevieweeOrderByCreatedAtDesc(User reviewee);
+
+    /** Kiểm tra reviewer đã review reviewee này chưa — tránh review trùng lặp */
+    boolean existsByReviewerAndReviewee(User reviewer, User reviewee);
 }
+

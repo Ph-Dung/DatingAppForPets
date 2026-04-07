@@ -43,9 +43,8 @@ public class CallService {
                 .orElseThrow(() -> new RuntimeException("Call not found"));
         
         call.setStatus(finalStatus);
-        if (finalStatus == CallStatus.COMPLETED) {
-            call.setEndedAt(LocalDateTime.now());
-        }
+        // Fix #8: Gán endedAt cho mọi trạng thái kết thúc (COMPLETED, MISSED, REJECTED)
+        call.setEndedAt(LocalDateTime.now());
         
         return callHistoryRepository.save(call);
     }

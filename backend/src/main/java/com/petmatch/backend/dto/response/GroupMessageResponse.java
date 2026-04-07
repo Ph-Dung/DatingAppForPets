@@ -1,4 +1,4 @@
-package com.petmatch.backend.dto;
+package com.petmatch.backend.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -11,13 +11,12 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class MessageDto {
+public class GroupMessageResponse {
     private Long id;
+    private Long groupId;
     private Long senderId;
-    private Long receiverId;
+    private String senderName;
+    private String senderAvatarUrl;
     private String content;
     private LocalDateTime sentAt;
-    /** Người nhận đã đọc chưa */
-    private Boolean isRead;
 }
-

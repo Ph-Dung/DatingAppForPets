@@ -32,8 +32,15 @@ public class Message {
     @Column(updatable = false)
     private LocalDateTime sentAt;
 
+    /** Người nhận đã đọc tin nhắn này chưa — dùng để hiển thị badge chưa đọc */
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean isRead = false;
+
     @PrePersist
     protected void onCreate() {
         sentAt = LocalDateTime.now();
+        if (isRead == null) isRead = false;
     }
 }
+

@@ -1,8 +1,10 @@
 spring:
+  profiles:
+    include: secret
   datasource:
     url: jdbc:postgresql://localhost:5432/petmatch_db
     username: postgres
-    password: 123
+    password: 123456
 
   jpa:
     hibernate:
@@ -41,4 +43,3 @@ openai:
   api-key: ${OPENAI_API_KEY}
   base-url: "https://api.groq.com/openai/v1"
   model: "llama-3.3-70b-versatile"
-
