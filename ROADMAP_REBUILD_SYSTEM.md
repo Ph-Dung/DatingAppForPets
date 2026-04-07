@@ -32,7 +32,7 @@
 | T1-2 | Backend: entity + repository consistency | 1 | DONE | Cao | entity, repository | Build pass, khong canh bao quan trong |  |
 | T1-3 | Backend: service layer refactor theo domain | 1 | DONE | Cao | service | Logic ro, test duong chinh |  |
 | T1-4 | Backend: controller + dto contract cleanup | 1 | DONE | Cao | controller, dto | Contract API on dinh |  |
-| T1-5 | Backend: seed + migration + startup flow | 1 | TODO | Trung binh | DataSeeder, config DB | Startup nhanh, seed co dieu kien |  |
+| T1-5 | Backend: seed + migration + startup flow | 1 | DONE | Trung binh | DataSeeder, config DB | Startup nhanh, seed co dieu kien |  |
 | T2-1 | Frontend: map man hinh theo domain | 2 | TODO | Cao | UI flow hien tai | Danh sach man hinh + state map |  |
 | T2-2 | Frontend: dong bo mock models voi API contract | 2 | TODO | Cao | model mock, DTO map | Mock data sat voi API that |  |
 | T2-3 | Frontend: interaction states (loading, empty, error) | 2 | TODO | Cao | tung screen | UX on dinh, khong ket UI |  |
@@ -109,7 +109,7 @@ Trang thai hop le: TODO | IN_PROGRESS | BLOCKED | REVIEW | DONE
 | Service-Match/Profile | logic nghiep vu cot loi | DONE | Da giam lap logic lookup pet/user o MatchRequestService |
 | Controller | endpoint contract, status code | DONE | Da dong bo status code create/delete + not-found handling |
 | DTO | request/response alignment | DONE | Da bo sung validation cho request body thieu @Valid |
-| DataSeeder | seed co dieu kien, khong gay cham startup | TODO |  |
+| DataSeeder | seed co dieu kien, khong gay cham startup | DONE | Da them config bat/tat seeding + gioi han users + bo upload anh mac dinh |
 
 ### 6.3 Definition of Done
 - [ ] Backend compile pass.
@@ -179,6 +179,7 @@ Trang thai hop le: TODO | IN_PROGRESS | BLOCKED | REVIEW | DONE
 | 2026-04-07 | T1-2 | Chuan hoa PetProfile defaults/relations + ra soat repository consistency | DONE | Khong | Chuyen T1-3 service layer refactor theo domain |
 | 2026-04-07 | T1-3 | Refactor Community/GroupChat/MatchRequest service de giam lap va chuan quyen truy cap | DONE | Khong | Chuyen T1-4 controller + dto contract cleanup |
 | 2026-04-07 | T1-4 | Chuan hoa controller + DTO contracts, them validation va status code nhat quan | DONE | Khong | Chuyen T1-5 seed + startup flow |
+| 2026-04-07 | T1-5 | Toi uu DataSeeder va them app.seed config de giam startup time/restart cost | DONE | Khong | Chuyen sang Phase 2 (frontend mock + interaction) |
 | YYYY-MM-DD | T?-? | ... | ... | ... | ... |
 
 ## 9.2 Blockers board

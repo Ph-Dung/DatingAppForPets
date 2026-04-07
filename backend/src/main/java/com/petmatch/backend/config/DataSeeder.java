@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.Random;
 
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,6 +49,21 @@ public class DataSeeder implements CommandLineRunner {
     private final PostRepository postRepo;
     private final PasswordEncoder passwordEncoder;
     private final Cloudinary cloudinary;
+
+    @Value("${app.seed.enabled:true}")
+    private boolean seedEnabled;
+
+    @Value("${app.seed.users-count:30}")
+    private int usersSeedCount;
+
+    @Value("${app.seed.skip-when-users-gte:5}")
+    private long skipWhenUsersGte;
+
+    @Value("${app.seed.upload-photos:false}")
+    private boolean uploadPhotos;
+
+    @Value("${app.seed.community-posts.enabled:true}")
+    private boolean communityPostsEnabled;
 
     private static final Random RNG = new Random(42);
 
@@ -89,18 +105,34 @@ public class DataSeeder implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
-        seedCommunityPostsIfNeeded();
+        if (!seedEnabled) {
+            log.info("DataSeeder: app.seed.enabled=false, bỏ qua toàn bộ seeding.");
+            return;
+        }
+
+        if (communityPostsEnabled) {
+            seedCommunityPostsIfNeeded();
+        }
 
         long count = userRepo.count();
-        if (count >= 5) {
+        if (count >= skipWhenUsersGte) {
             log.info("DataSeeder: DB đã có {} users, bỏ qua seeding.", count);
             return;
         }
 
-        log.info("DataSeeder: Đang tạo 100 tài khoản test...");
+        int totalUsersToSeed = Math.max(0, usersSeedCount);
+        if (totalUsersToSeed == 0) {
+            log.info("DataSeeder: app.seed.users-count=0, bỏ qua seeding user.");
+            if (communityPostsEnabled) {
+                seedCommunityPostsIfNeeded();
+            }
+            return;
+        }
+
+        log.info("DataSeeder: Đang tạo {} tài khoản test...", totalUsersToSeed);
         String encodedPass = passwordEncoder.encode("12345678");
 
-        for (int i = 1; i <= 100; i++) {
+        for (int i = 1; i <= totalUsersToSeed; i++) {
             try {
                 // 1. Tạo User
                 User user = userRepo.save(User.builder()
@@ -187,7 +219,7 @@ public class DataSeeder implements CommandLineRunner {
                         .isHidden(false)
                         .build());
 
-                // 4. Upload 1-2 ảnh lên Cloudinary
+                // 4. Tạo 1-2 ảnh mẫu
                 int photoCount = 1 + RNG.nextInt(2);
                 boolean firstPhoto = true;
                 for (int p = 0; p < photoCount; p++) {
@@ -203,17 +235,23 @@ public class DataSeeder implements CommandLineRunner {
                 }
 
                 if (i % 10 == 0)
-                    log.info("DataSeeder: Đã tạo {}/100 tài khoản...", i);
+                    log.info("DataSeeder: Đã tạo {}/{} tài khoản...", i, totalUsersToSeed);
 
             } catch (Exception e) {
                 log.warn("DataSeeder: Lỗi khi tạo user{}: {}", i, e.getMessage());
             }
         }
-        log.info("DataSeeder: Hoàn thành! Đã tạo 100 tài khoản test.");
-        seedCommunityPostsIfNeeded();
+        log.info("DataSeeder: Hoàn thành! Đã tạo {} tài khoản test.", totalUsersToSeed);
+        if (communityPostsEnabled) {
+            seedCommunityPostsIfNeeded();
+        }
     }
 
     private void seedCommunityPostsIfNeeded() {
+        if (!communityPostsEnabled) {
+            return;
+        }
+
         if (postRepo.count() > 0) {
             return;
         }
@@ -254,16 +292,12 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     private String uploadRandomPhoto(String species, int seed) {
-        try {
-            String safeSpecies = species == null ? "" : species;
-            String imageUrl = switch (safeSpecies) {
-                case "Chó" -> "https://loremflickr.com/400/500/dog?lock=" + (seed % 50);
-                case "Mèo" -> "https://loremflickr.com/400/500/cat?lock=" + seed;
-                case "Thỏ" -> "https://picsum.photos/seed/rabbit" + seed + "/400/500";
-                case "Hamster" -> "https://picsum.photos/seed/hamster" + seed + "/400/500";
-                default -> "https://picsum.photos/seed/pet" + seed + "/400/500";
-            };
+        String imageUrl = randomImageUrl(species, seed);
+        if (!uploadPhotos) {
+            return imageUrl;
+        }
 
+        try {
             // Download ảnh
             byte[] imageBytes;
             try (InputStream is = java.net.URI.create(imageUrl).toURL().openStream()) {
@@ -280,15 +314,19 @@ public class DataSeeder implements CommandLineRunner {
         } catch (IOException e) {
             log.warn("DataSeeder: Không thể upload ảnh: {}", e.getMessage());
             // Fallback: trả về URL trực tiếp không qua Cloudinary
-            String safeSpecies = species == null ? "" : species;
-            return switch (safeSpecies) {
-                case "Chó" -> "https://loremflickr.com/400/500/dog?lock=" + (seed % 50);
-                case "Mèo" -> "https://loremflickr.com/400/500/cat?lock=" + seed;
-                case "Thỏ" -> "https://picsum.photos/seed/rabbit" + seed + "/400/500";
-                case "Hamster" -> "https://picsum.photos/seed/hamster" + seed + "/400/500";
-                default -> "https://picsum.photos/seed/pet" + seed + "/400/500";
-            };
+            return imageUrl;
         }
+    }
+
+    private String randomImageUrl(String species, int seed) {
+        String safeSpecies = species == null ? "" : species;
+        return switch (safeSpecies) {
+            case "Chó" -> "https://loremflickr.com/400/500/dog?lock=" + (seed % 50);
+            case "Mèo" -> "https://loremflickr.com/400/500/cat?lock=" + seed;
+            case "Thỏ" -> "https://picsum.photos/seed/rabbit" + seed + "/400/500";
+            case "Hamster" -> "https://picsum.photos/seed/hamster" + seed + "/400/500";
+            default -> "https://picsum.photos/seed/pet" + seed + "/400/500";
+        };
     }
 
     private String randomPetName(Gender gender, int seed) {
