@@ -147,3 +147,41 @@ interface ChatbotApi {
     suspend fun sendMessage(@Body req: ChatbotRequest): Response<ChatbotResponse>
 }
 
+interface CommunityApi {
+
+    @GET("api/community/feed")
+    suspend fun getFeed(): Response<List<CommunityPostResponse>>
+
+    @GET("api/community/my-posts")
+    suspend fun getMyPosts(): Response<List<CommunityPostResponse>>
+
+    @POST("api/community/posts")
+    suspend fun createPost(@Body req: CommunityCreatePostRequest): Response<CommunityPostResponse>
+
+    @Multipart
+    @POST("api/community/posts/upload")
+    suspend fun createPostWithUpload(
+        @Part("content") content: RequestBody,
+        @Part("location") location: RequestBody?,
+        @Part image: MultipartBody.Part?
+    ): Response<CommunityPostResponse>
+
+    @PUT("api/community/posts/{id}")
+    suspend fun updatePost(
+        @Path("id") id: Long,
+        @Body req: CommunityUpdatePostRequest
+    ): Response<CommunityPostResponse>
+
+    @DELETE("api/community/posts/{id}")
+    suspend fun deletePost(@Path("id") id: Long): Response<Unit>
+
+    @POST("api/community/posts/{id}/like")
+    suspend fun toggleLike(@Path("id") id: Long): Response<Map<String, Any>>
+
+    @DELETE("api/community/posts/{id}/like")
+    suspend fun unlikePost(@Path("id") id: Long): Response<Unit>
+
+    @POST("api/community/reports")
+    suspend fun submitReport(@Body req: CommunityReportRequest): Response<Any>
+}
+

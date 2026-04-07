@@ -1,14 +1,8 @@
 package com.petmatch.backend.service;
 
-import com.petmatch.backend.dto.request.GroupChatCreateRequest;
-import com.petmatch.backend.dto.request.GroupMessageRequest;
-import com.petmatch.backend.dto.response.GroupChatResponse;
-import com.petmatch.backend.dto.response.GroupMessageResponse;
-import com.petmatch.backend.entity.*;
-import com.petmatch.backend.enums.GroupMemberRole;
-import com.petmatch.backend.exception.AppException;
-import com.petmatch.backend.repository.*;
-import lombok.RequiredArgsConstructor;
+import java.util.List;
+import java.util.stream.Collectors;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -16,9 +10,22 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.stream.Collectors;
+import com.petmatch.backend.dto.request.GroupChatCreateRequest;
+import com.petmatch.backend.dto.request.GroupMessageRequest;
+import com.petmatch.backend.dto.response.GroupChatResponse;
+import com.petmatch.backend.dto.response.GroupMessageResponse;
+import com.petmatch.backend.entity.ChatGroup;
+import com.petmatch.backend.entity.ChatGroupMember;
+import com.petmatch.backend.entity.GroupMessage;
+import com.petmatch.backend.entity.User;
+import com.petmatch.backend.enums.GroupMemberRole;
+import com.petmatch.backend.exception.AppException;
+import com.petmatch.backend.repository.ChatGroupMemberRepository;
+import com.petmatch.backend.repository.ChatGroupRepository;
+import com.petmatch.backend.repository.GroupMessageRepository;
+import com.petmatch.backend.repository.UserRepository;
+
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor

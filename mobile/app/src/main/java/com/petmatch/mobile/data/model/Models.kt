@@ -165,3 +165,35 @@ data class ChatbotResponse(
     val isReadyToSuggest: Boolean,
     val suggestions: List<PetProfileResponse> = emptyList()
 )
+
+data class CommunityPostResponse(
+    val id: Long,
+    val content: String,
+    val imageUrl: String?,
+    val location: String?,
+    val ownerName: String,
+    val ownerAvatar: String?,
+    val ownerId: Long,
+    val createdAt: String?,
+    val likesCount: Long,
+    val commentsCount: Long,
+    val isLiked: Boolean
+)
+
+data class CommunityCreatePostRequest(
+    val content: String,
+    val imageUrl: String?,
+    val location: String?
+)
+
+data class CommunityUpdatePostRequest(
+    val content: String,
+    val imageUrl: String?,
+    val location: String?
+)
+
+data class CommunityReportRequest(
+    val targetId: Long,
+    val targetType: String,
+    val reason: String
+)
