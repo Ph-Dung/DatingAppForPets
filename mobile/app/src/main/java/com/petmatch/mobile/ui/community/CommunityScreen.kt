@@ -64,7 +64,9 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
     var replyToCommentId by remember { mutableStateOf<Long?>(null) }
     var replyToUserName by remember { mutableStateOf<String?>(null) }
     var showReportDialogForPostId by remember { mutableStateOf<Long?>(null) }
-    var reportReason by remember { mutableStateOf("") }
+    var selectedReportReason by remember { mutableStateOf<String?>(null) }
+    var customReportReason by remember { mutableStateOf("") }
+    var showReportConfirmDialog by remember { mutableStateOf(false) }
     var commentInput by remember { mutableStateOf("") }
     val commentInputFocusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -175,7 +177,9 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
                     },
                     onReportPost = {
                         showReportDialogForPostId = post.id
-                        reportReason = ""
+                        selectedReportReason = null
+                        customReportReason = ""
+                        showReportConfirmDialog = false
                     }
                 )
             }
@@ -355,33 +359,55 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
         }
     }
 
-    if (showReportDialogForPostId != null) {
+    if (showReportDialogForPostId != null && !showReportConfirmDialog) {
+        val reportReasons = listOf(
+            "Không phải bài đăng liên quan đến thú cưng hoặc động vật",
+            "Có hình ảnh nhạy cảm, bạo lực, gây hại đến thú cưng và động vật",
+            "Liên quan đến các hành vi trái pháp luật và đạo đức",
+            "Tôi không thích bài đăng này vì lý do xuất phát từ cá nhân"
+        )
+        val finalReason = selectedReportReason?.ifBlank { null }
+            ?: customReportReason.trim().ifBlank { null }
+
         AlertDialog(
             onDismissRequest = { showReportDialogForPostId = null },
             title = { Text("Báo cáo bài viết") },
             text = {
-                OutlinedTextField(
-                    value = reportReason,
-                    onValueChange = { reportReason = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Lý do") },
-                    minLines = 2
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    reportReasons.forEach { reason ->
+                        val selected = selectedReportReason == reason
+                        Button(
+                            onClick = { selectedReportReason = reason },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(20.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (selected) Color(0xFFEE3F5A) else Color(0xFFE89AA8)
+                            )
+                        ) {
+                            Text(reason, color = Color.White)
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = customReportReason,
+                        onValueChange = {
+                            customReportReason = it
+                            if (it.isNotBlank()) selectedReportReason = null
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Lý do khác") },
+                        minLines = 2
+                    )
+                }
             },
             confirmButton = {
                 TextButton(
-                    enabled = reportReason.isNotBlank() && !actionLoading,
+                    enabled = finalReason != null,
                     onClick = {
-                        val postId = showReportDialogForPostId
-                        if (postId != null) {
-                            vm.submitReport(ctx, postId, reportReason) {
-                                showReportDialogForPostId = null
-                                reportReason = ""
-                            }
-                        }
+                        showReportConfirmDialog = true
                     }
                 ) {
-                    Text(if (actionLoading) "Đang gửi..." else "Gửi báo cáo")
+                    Text("Tiếp tục")
                 }
             },
             dismissButton = {
@@ -390,6 +416,77 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
                 }
             }
         )
+    }
+
+    if (showReportDialogForPostId != null && showReportConfirmDialog) {
+        val finalReason = selectedReportReason?.ifBlank { null }
+            ?: customReportReason.trim().ifBlank { null }
+        val postId = showReportDialogForPostId
+
+        Dialog(onDismissRequest = { showReportConfirmDialog = false }) {
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = Color.White,
+                tonalElevation = 4.dp,
+                shadowElevation = 8.dp,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text("Xác nhận báo cáo", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+                    Text(
+                        text = "Bạn muốn gửi báo cáo này theo cách nào?\n\nLý do: ${finalReason ?: "(trống)"}",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+
+                    Button(
+                        onClick = { showReportConfirmDialog = false },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF3F4F6))
+                    ) {
+                        Text("Hủy", color = Color(0xFF374151))
+                    }
+
+                    Button(
+                        enabled = postId != null && finalReason != null && !actionLoading,
+                        onClick = {
+                            if (postId != null && finalReason != null) {
+                                vm.submitReport(ctx, postId, finalReason, hidePost = false) {
+                                    showReportConfirmDialog = false
+                                    showReportDialogForPostId = null
+                                    selectedReportReason = null
+                                    customReportReason = ""
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEE3F5A))
+                    ) {
+                        Text(if (actionLoading) "Đang gửi..." else "Báo cáo", color = Color.White)
+                    }
+
+                    Button(
+                        enabled = postId != null && finalReason != null && !actionLoading,
+                        onClick = {
+                            if (postId != null && finalReason != null) {
+                                vm.submitReport(ctx, postId, finalReason, hidePost = true) {
+                                    showReportConfirmDialog = false
+                                    showReportDialogForPostId = null
+                                    selectedReportReason = null
+                                    customReportReason = ""
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD12F49))
+                    ) {
+                        Text(if (actionLoading) "Đang gửi..." else "Báo cáo và không hiển thị lại bài viết này", color = Color.White)
+                    }
+                }
+            }
+        }
     }
 }
 

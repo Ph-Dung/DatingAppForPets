@@ -16,6 +16,7 @@ import com.petmatch.backend.dto.PostResponse;
 import com.petmatch.backend.dto.request.CommunityReportRequest;
 import com.petmatch.backend.dto.response.CommentResponse;
 import com.petmatch.backend.entity.Comment;
+import com.petmatch.backend.entity.HiddenPost;
 import com.petmatch.backend.entity.Like;
 import com.petmatch.backend.entity.PetPhoto;
 import com.petmatch.backend.entity.PetProfile;
@@ -27,6 +28,7 @@ import com.petmatch.backend.enums.ReportTargetType;
 import com.petmatch.backend.enums.Role;
 import com.petmatch.backend.exception.AppException;
 import com.petmatch.backend.repository.CommentRepository;
+import com.petmatch.backend.repository.HiddenPostRepository;
 import com.petmatch.backend.repository.LikeRepository;
 import com.petmatch.backend.repository.PetPhotoRepository;
 import com.petmatch.backend.repository.PetProfileRepository;
@@ -43,6 +45,7 @@ public class CommunityService {
     private final LikeRepository likeRepository;
     private final CommentRepository commentRepository;
     private final ReportRepository reportRepository;
+    private final HiddenPostRepository hiddenPostRepository;
     private final UserRepository userRepository;
     private final PetProfileRepository petProfileRepository;
     private final PetPhotoRepository petPhotoRepository;
@@ -108,7 +111,14 @@ public class CommunityService {
     @Transactional(readOnly = true)
     public List<PostResponse> getFeed() {
         User actor = currentUser();
-        return toPostResponses(postRepository.findAllByOrderByCreatedAtDesc(), actor);
+        List<Long> hiddenPostIds = hiddenPostRepository.findPostIdsByUserId(actor.getId());
+        List<Post> posts = postRepository.findAllByOrderByCreatedAtDesc();
+        if (hiddenPostIds != null && !hiddenPostIds.isEmpty()) {
+            posts = posts.stream()
+                    .filter(post -> !hiddenPostIds.contains(post.getId()))
+                    .collect(Collectors.toList());
+        }
+        return toPostResponses(posts, actor);
     }
 
     @Transactional(readOnly = true)
@@ -328,7 +338,18 @@ public class CommunityService {
                 .status(ReportStatus.PENDING)
                 .build();
 
-        return reportRepository.save(report);
+        Report saved = reportRepository.save(report);
+
+        if (Boolean.TRUE.equals(request.getHidePost()) && request.getTargetType() == ReportTargetType.POST) {
+            Post post = requirePost(request.getTargetId());
+            hiddenPostRepository.findByUserAndPost(currentUser, post)
+                .orElseGet(() -> hiddenPostRepository.save(HiddenPost.builder()
+                    .user(currentUser)
+                    .post(post)
+                    .build()));
+        }
+
+        return saved;
     }
 
     @Transactional(readOnly = true)

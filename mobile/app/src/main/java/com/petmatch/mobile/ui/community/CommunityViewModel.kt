@@ -350,17 +350,25 @@ class CommunityViewModel : ViewModel() {
         _actionLoading.value = false
     }
 
-    fun submitReport(ctx: Context, postId: Long, reason: String, onDone: (() -> Unit)? = null) = viewModelScope.launch {
+    fun submitReport(
+        ctx: Context,
+        postId: Long,
+        reason: String,
+        hidePost: Boolean,
+        onDone: (() -> Unit)? = null
+    ) = viewModelScope.launch {
         _actionLoading.value = true
         _error.value = null
         try {
             val req = CommunityReportRequest(
                 targetId = postId,
                 targetType = "POST",
-                reason = reason.trim()
+                reason = reason.trim(),
+                hidePost = hidePost
             )
             val res = RetrofitClient.communityApi(ctx).submitReport(req)
             if (res.isSuccessful) {
+                loadFeed(ctx)
                 onDone?.invoke()
             } else {
                 _error.value = "Không gửi được báo cáo"

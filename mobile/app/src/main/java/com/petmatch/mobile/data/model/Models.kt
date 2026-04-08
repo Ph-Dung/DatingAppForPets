@@ -224,7 +224,8 @@ data class CommunityCommentResponse(
 data class CommunityReportRequest(
     val targetId: Long,
     val targetType: String,
-    val reason: String
+    val reason: String,
+    val hidePost: Boolean = false
 )
 
 data class AdminDashboardResponse(
