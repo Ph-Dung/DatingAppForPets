@@ -22,9 +22,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.navigation.NavController
@@ -59,9 +62,19 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
 
     var commentPostId by remember { mutableStateOf<Long?>(null) }
     var replyToCommentId by remember { mutableStateOf<Long?>(null) }
+    var replyToUserName by remember { mutableStateOf<String?>(null) }
     var showReportDialogForPostId by remember { mutableStateOf<Long?>(null) }
     var reportReason by remember { mutableStateOf("") }
     var commentInput by remember { mutableStateOf("") }
+    val commentInputFocusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    LaunchedEffect(replyToCommentId) {
+        if (replyToCommentId != null) {
+            commentInputFocusRequester.requestFocus()
+            keyboardController?.show()
+        }
+    }
 
     LaunchedEffect(Unit) {
         vm.loadFeed(ctx)
@@ -153,6 +166,7 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
                     onOpenComments = {
                         commentPostId = post.id
                         replyToCommentId = null
+                        replyToUserName = null
                         commentInput = ""
                         vm.loadComments(ctx, post.id)
                     },
@@ -169,140 +183,170 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
     }
 
     if (commentPostId != null) {
+        val commentsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         ModalBottomSheet(
+            sheetState = commentsSheetState,
             onDismissRequest = {
                 commentPostId = null
                 replyToCommentId = null
+                replyToUserName = null
             }
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight(0.88f)
+                    .fillMaxHeight(0.96f)
                     .padding(horizontal = 14.dp, vertical = 8.dp)
             ) {
-                Text(
-                    text = "Bình luận",
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-                )
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Text(
+                        text = "Bình luận",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                    )
+                }
                 Spacer(modifier = Modifier.height(8.dp))
 
-                Box(
+                if (commentsLoading) {
+                    Box(modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                    }
+                }
+
+                LazyColumn(
                     modifier = Modifier
                         .weight(1f)
-                        .fillMaxWidth()
+                        .fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(bottom = 10.dp)
                 ) {
-                    if (commentsLoading) {
-                        Box(modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                        }
-                    } else if (comments.isEmpty()) {
-                        Text("Chưa có bình luận nào", color = Color.Gray)
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            contentPadding = PaddingValues(bottom = 190.dp)
-                        ) {
-                            items(comments, key = { it.id }) { c ->
-                                CommentItem(
-                                    name = c.userName,
-                                    avatarUrl = c.userAvatar,
-                                    content = c.content,
-                                    createdAt = c.createdAt,
-                                    depth = 0,
-                                    canReply = true,
-                                    onReply = { replyToCommentId = c.id }
-                                )
-                                c.replies.forEach { r ->
-                                    CommentItem(
-                                        name = r.userName,
-                                        avatarUrl = r.userAvatar,
-                                        content = r.content,
-                                        createdAt = r.createdAt,
-                                        depth = 1,
-                                        canReply = false,
-                                        onReply = null
-                                    )
-                                }
-                            }
+                    if (!commentsLoading && comments.isEmpty()) {
+                        item {
+                            Text("Chưa có bình luận nào", color = Color.Gray)
                         }
                     }
-
-                    Surface(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
-                            .imePadding()
-                            .navigationBarsPadding(),
-                        color = MaterialTheme.colorScheme.surface,
-                        tonalElevation = 6.dp,
-                        shadowElevation = 4.dp
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 8.dp, bottom = 4.dp)
-                        ) {
-                            if (replyToCommentId != null) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "Đang trả lời bình luận #$replyToCommentId",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = PrimaryPink
-                                    )
-                                    TextButton(onClick = { replyToCommentId = null }) {
-                                        Text("Hủy")
-                                    }
+                    items(comments, key = { it.id }) { c ->
+                        CommentItem(
+                            name = c.userName,
+                            avatarUrl = c.userAvatar,
+                            content = c.content,
+                            createdAt = c.createdAt,
+                            depth = 0,
+                            canReply = true,
+                            onReply = {
+                                replyToCommentId = c.id
+                                replyToUserName = c.userName
+                                if (commentInput.isBlank()) {
+                                    commentInput = "@${c.userName} "
                                 }
                             }
-
-                            OutlinedTextField(
-                                value = commentInput,
-                                onValueChange = { commentInput = it },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .heightIn(min = 90.dp),
-                                label = { Text(if (replyToCommentId != null) "Viết phản hồi" else "Viết bình luận") },
-                                minLines = 2,
-                                maxLines = 5
+                        )
+                        c.replies.forEach { r ->
+                            CommentItem(
+                                name = r.userName,
+                                avatarUrl = r.userAvatar,
+                                content = r.content,
+                                createdAt = r.createdAt,
+                                depth = 1,
+                                canReply = false,
+                                onReply = null
                             )
+                        }
+                    }
+                }
 
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .imePadding()
+                        .navigationBarsPadding()
+                        .padding(horizontal = 2.dp, vertical = 6.dp),
+                    color = Color.White,
+                    shape = RoundedCornerShape(14.dp),
+                    tonalElevation = 2.dp,
+                    shadowElevation = 10.dp
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 10.dp, end = 10.dp, top = 10.dp, bottom = 8.dp)
+                    ) {
+                        if (replyToCommentId != null) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.End
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
+                                Text(
+                                    text = "Đang trả lời @${replyToUserName ?: "user"}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color(0xFF6B7280)
+                                )
                                 TextButton(onClick = {
-                                    commentPostId = null
                                     replyToCommentId = null
+                                    replyToUserName = null
                                 }) {
-                                    Text("Đóng")
+                                    Text("Hủy")
                                 }
-                                TextButton(
-                                    enabled = commentInput.isNotBlank() && !actionLoading,
-                                    onClick = {
-                                        val postId = commentPostId
-                                        if (postId != null) {
-                                            val replyingId = replyToCommentId
-                                            if (replyingId != null) {
-                                                vm.replyComment(ctx, postId, replyingId, commentInput) {
-                                                    commentInput = ""
-                                                    replyToCommentId = null
-                                                }
+                            }
+                        }
+
+                        OutlinedTextField(
+                            value = commentInput,
+                            onValueChange = { commentInput = it },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .focusRequester(commentInputFocusRequester)
+                                .heightIn(min = 90.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = Color.White,
+                                unfocusedContainerColor = Color.White,
+                                focusedBorderColor = Color(0xFFD1D5DB),
+                                unfocusedBorderColor = Color(0xFFE5E7EB)
+                            ),
+                            label = { Text(if (replyToCommentId != null) "Viết phản hồi" else "Viết bình luận") },
+                            minLines = 2,
+                            maxLines = 5
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            TextButton(onClick = {
+                                commentPostId = null
+                                replyToCommentId = null
+                                replyToUserName = null
+                            }) {
+                                Text("Đóng")
+                            }
+                            TextButton(
+                                enabled = commentInput.isNotBlank() && !actionLoading,
+                                onClick = {
+                                    val postId = commentPostId
+                                    if (postId != null) {
+                                        val payload = commentInput.trim()
+                                        val replyingId = replyToCommentId
+                                        if (replyingId != null) {
+                                            val replyTag = replyToUserName?.let { "@$it" }
+                                            val replyContent = if (!replyTag.isNullOrBlank() && !payload.startsWith(replyTag)) {
+                                                "$replyTag $payload"
                                             } else {
-                                                vm.addComment(ctx, postId, commentInput) {
-                                                    commentInput = ""
-                                                }
+                                                payload
+                                            }
+                                            vm.replyComment(ctx, postId, replyingId, replyContent) {
+                                                commentInput = ""
+                                                replyToCommentId = null
+                                                replyToUserName = null
+                                            }
+                                        } else {
+                                            vm.addComment(ctx, postId, payload) {
+                                                commentInput = ""
                                             }
                                         }
                                     }
-                                ) {
-                                    Text(if (actionLoading) "Đang gửi..." else "Gửi")
                                 }
+                            ) {
+                                Text(if (actionLoading) "Đang gửi..." else "Gửi")
                             }
                         }
                     }
@@ -738,15 +782,24 @@ private fun CommentItem(
                     Text(name, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
                     Text(content, fontSize = 13.sp)
                     val timeTag = getRelativeTimeString(createdAt)
-                    if (timeTag.isNotBlank()) {
+                    if (timeTag.isNotBlank() || canReply) {
                         Spacer(modifier = Modifier.height(2.dp))
-                        Text(timeTag, fontSize = 11.sp, color = Color.Gray)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (timeTag.isNotBlank()) {
+                                Text(timeTag, fontSize = 11.sp, color = Color.Gray)
+                            }
+                            if (canReply && onReply != null) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Trả lời",
+                                    color = Color(0xFF2563EB),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    modifier = Modifier.clickable { onReply() }
+                                )
+                            }
+                        }
                     }
-                }
-            }
-            if (canReply && onReply != null) {
-                TextButton(onClick = onReply, modifier = Modifier.height(28.dp)) {
-                    Text("Trả lời", fontSize = 12.sp)
                 }
             }
         }
