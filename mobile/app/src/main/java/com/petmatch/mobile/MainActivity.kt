@@ -44,7 +44,7 @@ class MainActivity : ComponentActivity() {
                     Box(modifier = Modifier.padding(innerPadding)) {
                         PetMatchNavGraph(
                             navController = navController,
-                            startDestination = Routes.COMMUNITY
+                            startDestination = Routes.LOGIN
                         )
                     }
                 }
