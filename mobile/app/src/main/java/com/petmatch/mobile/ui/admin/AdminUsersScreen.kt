@@ -15,8 +15,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 
-private val userActionButtonColor = Color(0xFF1D3557)
+private val userActionButtonColor = Color(0xFFD64550)
 
 @Composable
 fun AdminUsersScreen(vm: AdminViewModel) {
@@ -24,6 +26,7 @@ fun AdminUsersScreen(vm: AdminViewModel) {
     val state by vm.uiState.collectAsState()
 
     var query by remember { mutableStateOf("") }
+    var activeFilter by remember { mutableStateOf("all") } // "all", "locked", "warned"
     val listState = rememberLazyListState()
 
     LaunchedEffect(Unit) {
@@ -48,20 +51,61 @@ fun AdminUsersScreen(vm: AdminViewModel) {
 
         Spacer(Modifier.height(10.dp))
 
-        OutlinedTextField(
-            value = query,
-            onValueChange = { query = it },
-            label = { Text("Tìm theo tên/email") },
+        // Search bar with search button
+        Row(
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true
-        )
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                label = { Text("Tìm theo tên/email") },
+                modifier = Modifier.weight(1f),
+                singleLine = true
+            )
+            Button(
+                onClick = { vm.loadUsers(ctx, query = query) },
+                modifier = Modifier.height(56.dp)
+            ) {
+                Text("Tìm")
+            }
+        }
 
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(12.dp))
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            Button(onClick = { vm.loadUsers(ctx, query = query) }, modifier = Modifier.weight(1f)) { Text("Tìm") }
-            OutlinedButton(onClick = { vm.loadUsers(ctx, locked = true) }, modifier = Modifier.weight(1f)) { Text("Đang khóa") }
-            OutlinedButton(onClick = { vm.loadUsers(ctx, warned = true) }, modifier = Modifier.weight(1f)) { Text("Bị cảnh cáo") }
+        // Filter buttons
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            FilterButton(
+                text = "Tất cả",
+                isActive = activeFilter == "all",
+                onClick = {
+                    activeFilter = "all"
+                    vm.loadUsers(ctx)
+                },
+                modifier = Modifier.weight(1f)
+            )
+            FilterButton(
+                text = "Đang khóa",
+                isActive = activeFilter == "locked",
+                onClick = {
+                    activeFilter = "locked"
+                    vm.loadUsers(ctx, locked = true)
+                },
+                modifier = Modifier.weight(1f)
+            )
+            FilterButton(
+                text = "Bị cảnh cáo",
+                isActive = activeFilter == "warned",
+                onClick = {
+                    activeFilter = "warned"
+                    vm.loadUsers(ctx, warned = true)
+                },
+                modifier = Modifier.weight(1f)
+            )
         }
 
         if (state.loading) {
@@ -118,6 +162,12 @@ fun AdminUsersScreen(vm: AdminViewModel) {
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             UserActionButton(
+                                text = "Chi tiết",
+                                onClick = { vm.loadUserDetail(ctx, user.id) },
+                                modifier = Modifier.weight(1f)
+                            )
+
+                            UserActionButton(
                                 text = "Cảnh cáo",
                                 onClick = { vm.warnUser(ctx, user.id, "Cảnh cáo mức nhẹ bởi admin") },
                                 modifier = Modifier.weight(1f)
@@ -142,6 +192,57 @@ fun AdminUsersScreen(vm: AdminViewModel) {
             }
         }
     }
+
+    state.userDetail?.let { detail ->
+        AlertDialog(
+            onDismissRequest = { vm.clearUserDetail() },
+            confirmButton = {
+                TextButton(onClick = { vm.clearUserDetail() }) {
+                    Text("Đóng")
+                }
+            },
+            title = { Text("Chi tiết user") },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 460.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val user = detail.user
+                    Text("Họ tên: ${user.fullName}")
+                    Text("Email: ${user.email}")
+                    Text("SĐT: ${user.phone ?: "-"}")
+                    Text("Trạng thái: ${if (user.locked) "Đang bị khóa" else "Đang hoạt động"}")
+                    Text("Cảnh cáo: ${user.warningCount}")
+                    Text("Lần cảnh cáo gần nhất: ${user.lastWarnedAt ?: "-"}")
+                    Text("Ngày tạo: ${user.createdAt ?: "-"}")
+
+                    Spacer(Modifier.height(6.dp))
+                    Text("Lịch sử vi phạm", fontWeight = FontWeight.Bold)
+                    if (detail.violations.isEmpty()) {
+                        Text("Chưa có vi phạm nào.")
+                    } else {
+                        detail.violations.forEach { violation ->
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = Color(0xFFF5F8FF),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text("#${violation.id} • ${violation.targetType}(${violation.targetId})", fontWeight = FontWeight.SemiBold)
+                                    Text(violation.reason)
+                                    Text("Trạng thái: ${violation.status}")
+                                    Text("Thời gian: ${violation.createdAt ?: "-"}")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -154,6 +255,29 @@ private fun UserActionButton(
         onClick = onClick,
         modifier = modifier,
         colors = ButtonDefaults.buttonColors(containerColor = userActionButtonColor, contentColor = Color.White),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Text(text)
+    }
+}
+
+@Composable
+private fun FilterButton(
+    text: String,
+    isActive: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val backgroundColor = if (isActive) Color(0xFF1D3557) else Color(0xFF1D3557).copy(alpha = 0.2f)
+    val contentColor = if (isActive) Color.White else Color(0xFF1D3557)
+    
+    Button(
+        onClick = onClick,
+        modifier = modifier,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = backgroundColor,
+            contentColor = contentColor
+        ),
         shape = RoundedCornerShape(12.dp)
     ) {
         Text(text)

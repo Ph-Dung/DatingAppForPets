@@ -2,8 +2,10 @@ package com.petmatch.backend.controller;
 
 import com.petmatch.backend.dto.request.AdminHandleReportRequest;
 import com.petmatch.backend.dto.response.AdminDashboardResponse;
+import com.petmatch.backend.dto.response.AdminPetDetailResponse;
 import com.petmatch.backend.dto.response.AdminPetItemResponse;
 import com.petmatch.backend.dto.response.AdminReportItemResponse;
+import com.petmatch.backend.dto.response.AdminUserDetailResponse;
 import com.petmatch.backend.dto.response.AdminUserItemResponse;
 import com.petmatch.backend.enums.ReportStatus;
 import com.petmatch.backend.service.AdminService;
@@ -49,6 +51,11 @@ public class AdminController {
         return ResponseEntity.ok(adminService.warnUser(userId, note));
     }
 
+    @GetMapping("/users/{userId}")
+    public ResponseEntity<AdminUserDetailResponse> userDetail(@PathVariable Long userId) {
+        return ResponseEntity.ok(adminService.getUserDetail(userId));
+    }
+
     @GetMapping("/pets")
     public ResponseEntity<Page<AdminPetItemResponse>> pets(
             @RequestParam(required = false) String query,
@@ -63,6 +70,17 @@ public class AdminController {
             @PathVariable Long petId,
             @RequestParam boolean hidden) {
         return ResponseEntity.ok(adminService.setPetHidden(petId, hidden));
+    }
+
+    @GetMapping("/pets/{petId}")
+    public ResponseEntity<AdminPetDetailResponse> petDetail(@PathVariable Long petId) {
+        return ResponseEntity.ok(adminService.getPetDetail(petId));
+    }
+
+    @DeleteMapping("/pets/{petId}")
+    public ResponseEntity<Void> deletePet(@PathVariable Long petId) {
+        adminService.deletePet(petId);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/reports")

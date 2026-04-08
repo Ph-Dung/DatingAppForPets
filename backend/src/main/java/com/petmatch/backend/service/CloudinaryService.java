@@ -1,16 +1,18 @@
 package com.petmatch.backend.service;
 
-import com.cloudinary.Cloudinary;
-import com.cloudinary.Transformation;
-import com.cloudinary.utils.ObjectUtils;
-import com.petmatch.backend.exception.AppException;
-import lombok.RequiredArgsConstructor;
+import java.io.IOException;
+import java.util.Map;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
-import java.util.Map;
+import com.cloudinary.Cloudinary;
+import com.cloudinary.Transformation;
+import com.cloudinary.utils.ObjectUtils;
+import com.petmatch.backend.exception.AppException;
+
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
@@ -44,7 +46,7 @@ public class CloudinaryService {
                             "folder",          folder,
                             "resource_type",   "image",
                             // Tự resize về tối đa 800x800 để tiết kiệm dung lượng
-                            "transformation",  new Transformation()
+                            "transformation",  new Transformation<>()
                                     .width(800).height(800)
                                     .crop("limit")
                                     .quality("auto")

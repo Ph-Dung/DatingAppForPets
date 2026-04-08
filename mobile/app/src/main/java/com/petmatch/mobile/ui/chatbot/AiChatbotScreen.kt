@@ -308,6 +308,7 @@ private fun ChatBubble(message: ChatMessage) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SuggestedPetCard(
     pet: PetProfileResponse,
@@ -315,9 +316,11 @@ private fun SuggestedPetCard(
     onViewDetail: () -> Unit
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(4.dp)
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        shape = RoundedCornerShape(20.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     ) {
         Column {
             // Pet image header
@@ -346,49 +349,70 @@ private fun SuggestedPetCard(
                 }
             }
 
-            // Info row
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            // Info padding
+            FlowRow(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 pet.gender?.let { g ->
-                    AssistChip(
+                    SuggestionChip(
                         onClick = {},
-                        label = { Text(Constants.GENDER_LABELS[g] ?: g, style = MaterialTheme.typography.labelSmall) }
+                        label = { Text(Constants.GENDER_LABELS[g] ?: g, style = MaterialTheme.typography.labelMedium) },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = SuggestionChipDefaults.suggestionChipColors(containerColor = PrimaryPink.copy(0.05f))
+                    )
+                }
+                pet.distanceKm?.let { d ->
+                    SuggestionChip(
+                        onClick = {},
+                        label = { Text("📍 $d km", style = MaterialTheme.typography.labelMedium) },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = SuggestionChipDefaults.suggestionChipColors(containerColor = AccentPurple.copy(0.05f))
                     )
                 }
                 pet.weightKg?.let { w ->
-                    AssistChip(onClick = {}, label = { Text("${w}kg", style = MaterialTheme.typography.labelSmall) })
+                    SuggestionChip(
+                        onClick = {}, 
+                        label = { Text("${w}kg", style = MaterialTheme.typography.labelMedium) },
+                        shape = RoundedCornerShape(12.dp)
+                    )
                 }
                 val healthLabel = Constants.HEALTH_STATUS_LABELS[pet.healthStatus]
                 if (healthLabel != null) {
-                    AssistChip(onClick = {}, label = { Text(healthLabel, style = MaterialTheme.typography.labelSmall) })
+                    SuggestionChip(
+                        onClick = {}, 
+                        label = { Text(healthLabel, style = MaterialTheme.typography.labelMedium) },
+                        shape = RoundedCornerShape(12.dp)
+                    )
                 }
             }
 
             // Action buttons row
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 OutlinedButton(
                     onClick = onViewDetail,
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(20.dp)
+                    modifier = Modifier.weight(1f).height(48.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    border = BorderStroke(1.dp, PrimaryPink),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = PrimaryPink)
                 ) {
-                    Icon(Icons.Default.RemoveRedEye, null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Xem chi tiết")
+                    Icon(Icons.Default.RemoveRedEye, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Chi tiết", fontWeight = FontWeight.Bold)
                 }
                 Button(
                     onClick = onLike,
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(20.dp),
+                    modifier = Modifier.weight(1f).height(48.dp),
+                    shape = RoundedCornerShape(24.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = LikeGreen)
                 ) {
-                    Icon(Icons.Default.Favorite, null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Thích ❤️")
+                    Icon(Icons.Default.Favorite, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Thích", fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -402,7 +426,8 @@ private fun QuickReplies(onSelect: (String) -> Unit) {
         "Tôi muốn tìm bạn đôi cho mèo",
         "Tìm Poodle giới tính cái",
         "Thú cưng khỏe mạnh, 1-3 tuổi",
-        "Mục đích phối giống"
+        "Mục đích phối giống",
+        "Tìm thú cưng gần đây (dưới 50km)"
     )
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(

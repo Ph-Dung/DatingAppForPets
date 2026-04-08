@@ -3,6 +3,7 @@ package com.petmatch.backend.controller;
 import com.petmatch.backend.dto.request.ChatbotMessageRequest;
 import com.petmatch.backend.dto.response.ChatbotResponse;
 import com.petmatch.backend.service.ChatbotService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -20,7 +21,7 @@ public class ChatbotController {
      */
     @PostMapping("/message")
     public ResponseEntity<ChatbotResponse> sendMessage(
-            @RequestBody ChatbotMessageRequest req) {
+            @Valid @RequestBody ChatbotMessageRequest req) {
         return ResponseEntity.ok(chatbotService.processMessage(req.getMessages()));
     }
 }

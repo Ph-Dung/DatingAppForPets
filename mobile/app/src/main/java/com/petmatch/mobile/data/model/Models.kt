@@ -25,7 +25,17 @@ data class PetProfileResponse(
     val isHidden: Boolean,
     val avatarUrl: String?,
     val photoUrls: List<String>,
-    val createdAt: String?
+    val photos: List<PetPhotoDto> = emptyList(),
+    val createdAt: String?,
+    
+    // Geolocation
+    val distanceKm: Double? = null,
+    val ownerAddress: String? = null
+)
+
+data class PetPhotoDto(
+    val id: Long,
+    val url: String
 )
 
 data class PetProfileRequest(
@@ -166,6 +176,38 @@ data class ChatbotResponse(
     val suggestions: List<PetProfileResponse> = emptyList()
 )
 
+data class CommunityPostResponse(
+    val id: Long,
+    val content: String,
+    val imageUrl: String?,
+    val location: String?,
+    val ownerName: String,
+    val ownerAvatar: String?,
+    val ownerId: Long,
+    val createdAt: String?,
+    val likesCount: Long,
+    val commentsCount: Long,
+    val isLiked: Boolean
+)
+
+data class CommunityCreatePostRequest(
+    val content: String,
+    val imageUrl: String?,
+    val location: String?
+)
+
+data class CommunityUpdatePostRequest(
+    val content: String,
+    val imageUrl: String?,
+    val location: String?
+)
+
+data class CommunityReportRequest(
+    val targetId: Long,
+    val targetType: String,
+    val reason: String
+)
+
 data class AdminDashboardResponse(
     val totalUsers: Long,
     val lockedUsers: Long,
@@ -187,6 +229,11 @@ data class AdminUserItemResponse(
     val createdAt: String?
 )
 
+data class AdminUserDetailResponse(
+    val user: AdminUserItemResponse,
+    val violations: List<AdminReportItemResponse>
+)
+
 data class AdminPetItemResponse(
     val id: Long,
     val ownerId: Long,
@@ -196,6 +243,11 @@ data class AdminPetItemResponse(
     val avatarUrl: String?,
     val hidden: Boolean,
     val createdAt: String?
+)
+
+data class AdminPetDetailResponse(
+    val pet: PetProfileResponse,
+    val violations: List<AdminReportItemResponse>
 )
 
 data class AdminReportItemResponse(
@@ -217,4 +269,9 @@ data class AdminReportItemResponse(
 data class AdminHandleReportRequest(
     val action: String,
     val note: String?
+)
+
+data class UpdateLocationRequest(
+    val latitude: Double,
+    val longitude: Double
 )

@@ -158,6 +158,13 @@ fun AccountScreen(
                 onClick = { navController.navigate(Routes.CHANGE_PASSWORD) }
             )
 
+            Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                com.petmatch.mobile.ui.common.LocationUpdateButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    onLocationObtained = { lat, lon -> userVm.updateLocation(ctx, lat, lon) }
+                )
+            }
+
             // ── Pet Profile Section ───────────────────────────────
             Spacer(Modifier.height(8.dp))
             SectionHeader("Hồ sơ thú cưng")

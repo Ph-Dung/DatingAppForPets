@@ -4,11 +4,14 @@ import com.petmatch.backend.dto.request.GroupChatCreateRequest;
 import com.petmatch.backend.dto.request.GroupMessageRequest;
 import com.petmatch.backend.dto.response.GroupChatResponse;
 import com.petmatch.backend.dto.response.GroupMessageResponse;
+import com.petmatch.backend.exception.AppException;
 import com.petmatch.backend.repository.UserRepository;
 import com.petmatch.backend.service.GroupChatService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -26,9 +29,10 @@ public class GroupChatController {
     @PostMapping
     public ResponseEntity<GroupChatResponse> createGroup(
             Authentication auth,
-            @RequestBody GroupChatCreateRequest request) {
+            @Valid @RequestBody GroupChatCreateRequest request) {
         Long creatorId = getUserId(auth);
-        return ResponseEntity.ok(groupChatService.createGroup(creatorId, request));
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(groupChatService.createGroup(creatorId, request));
     }
 
     @GetMapping
@@ -41,9 +45,10 @@ public class GroupChatController {
     public ResponseEntity<GroupMessageResponse> sendMessage(
             Authentication auth,
             @PathVariable Long groupId,
-            @RequestBody GroupMessageRequest request) {
+            @Valid @RequestBody GroupMessageRequest request) {
         Long userId = getUserId(auth);
-        return ResponseEntity.ok(groupChatService.sendMessage(userId, groupId, request));
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(groupChatService.sendMessage(userId, groupId, request));
     }
 
     @GetMapping("/{groupId}/history")
@@ -69,7 +74,7 @@ public class GroupChatController {
 
     private Long getUserId(Authentication auth) {
         return userRepository.findByEmail(auth.getName())
-                .orElseThrow(() -> new RuntimeException("User not found"))
+                .orElseThrow(() -> new AppException("User not found", HttpStatus.NOT_FOUND))
                 .getId();
     }
 }

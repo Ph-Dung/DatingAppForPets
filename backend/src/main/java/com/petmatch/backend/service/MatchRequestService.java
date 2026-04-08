@@ -46,6 +46,11 @@ public class MatchRequestService {
                 .orElseThrow(() -> new AppException("User không tồn tại", NOT_FOUND));
     }
 
+    private PetProfile requirePet(Long petId) {
+        return petProfileRepo.findById(petId)
+                .orElseThrow(() -> new AppException("Không tìm thấy hồ sơ", NOT_FOUND));
+    }
+
     private PetProfile myPet() {
         return petProfileRepo.findByOwnerId(currentUser().getId())
                 .orElseThrow(() -> new AppException("Bạn chưa có hồ sơ thú cưng", NOT_FOUND));
@@ -74,14 +79,13 @@ public class MatchRequestService {
     // ── Send Match Request (Like / Super Like / Discard) ──
     public MatchRequestResponse sendRequest(Long receiverPetId, boolean isSuperLike) {
         PetProfile sender   = myPet();
-        PetProfile receiver = petProfileRepo.findById(receiverPetId)
-                .orElseThrow(() -> new AppException("Không tìm thấy hồ sơ", NOT_FOUND));
+        PetProfile receiver = requirePet(receiverPetId);
 
         if (sender.getId().equals(receiverPetId))
             throw new AppException("Không thể gửi cho chính mình", BAD_REQUEST);
 
-        if (blockRepo.existsByBlockerIdAndBlockedId(
-                currentUser().getId(), receiver.getOwner().getId()))
+        User actor = currentUser();
+        if (blockRepo.existsByBlockerIdAndBlockedId(actor.getId(), receiver.getOwner().getId()))
             throw new AppException("Bạn đã chặn người này", BAD_REQUEST);
 
         if (matchRepo.existsBySenderPetIdAndReceiverPetId(sender.getId(), receiverPetId))
@@ -175,7 +179,9 @@ public class MatchRequestService {
     @Transactional(readOnly = true)
     public List<MatchRequestResponse> getWhoLikedMe() {
         return matchRepo.findByReceiverPetIdOrderByIsSuperLikeDescCreatedAtDesc(myPet().getId())
-                .stream().map(this::toResponse).toList();
+                .stream()
+                .filter(m -> m.getStatus() == MatchStatus.PENDING)
+                .map(this::toResponse).toList();
     }
 
     @Transactional(readOnly = true)

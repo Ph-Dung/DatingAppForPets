@@ -30,7 +30,8 @@ interface PetApi {
     suspend fun getSuggestions(
         @Query("page")  page: Int = 0,
         @Query("size")  size: Int = 10,
-        @Query("smart") smart: Boolean = false
+        @Query("smart") smart: Boolean = false,
+        @Query("maxDistanceKm") maxDistanceKm: Double? = null
     ): Response<PageResponse<PetProfileResponse>>
 
     @GET("api/pets/search")
@@ -44,6 +45,7 @@ interface PetApi {
         @Query("maxWeight") maxWeight: Double? = null,
         @Query("minAge") minAge: Int? = null,
         @Query("maxAge") maxAge: Int? = null,
+        @Query("maxDistanceKm") maxDistanceKm: Double? = null,
         @Query("page") page: Int = 0,
         @Query("size") size: Int = 10
     ): Response<PageResponse<PetProfileResponse>>
@@ -156,6 +158,11 @@ interface AdminApi {
         @Query("note") note: String? = null
     ): Response<AdminUserItemResponse>
 
+    @GET("api/admin/users/{userId}")
+    suspend fun getUserDetail(
+        @Path("userId") userId: Long
+    ): Response<AdminUserDetailResponse>
+
     @GET("api/admin/pets")
     suspend fun getPets(
         @Query("query") query: String? = null,
@@ -169,6 +176,16 @@ interface AdminApi {
         @Path("petId") petId: Long,
         @Query("hidden") hidden: Boolean
     ): Response<AdminPetItemResponse>
+
+    @GET("api/admin/pets/{petId}")
+    suspend fun getPetDetail(
+        @Path("petId") petId: Long
+    ): Response<AdminPetDetailResponse>
+
+    @DELETE("api/admin/pets/{petId}")
+    suspend fun deletePet(
+        @Path("petId") petId: Long
+    ): Response<Unit>
 
     @GET("api/admin/reports")
     suspend fun getReports(
@@ -200,11 +217,52 @@ interface UserApi {
     suspend fun updateAvatar(
         @Part file: MultipartBody.Part
     ): Response<UserResponse>
+
+    @PATCH("api/users/me/location")
+    suspend fun updateLocation(@Body req: UpdateLocationRequest): Response<Unit>
 }
 
 interface ChatbotApi {
 
     @POST("api/chatbot/message")
     suspend fun sendMessage(@Body req: ChatbotRequest): Response<ChatbotResponse>
+}
+
+interface CommunityApi {
+
+    @GET("api/community/feed")
+    suspend fun getFeed(): Response<List<CommunityPostResponse>>
+
+    @GET("api/community/my-posts")
+    suspend fun getMyPosts(): Response<List<CommunityPostResponse>>
+
+    @POST("api/community/posts")
+    suspend fun createPost(@Body req: CommunityCreatePostRequest): Response<CommunityPostResponse>
+
+    @Multipart
+    @POST("api/community/posts/upload")
+    suspend fun createPostWithUpload(
+        @Part("content") content: RequestBody,
+        @Part("location") location: RequestBody?,
+        @Part image: MultipartBody.Part?
+    ): Response<CommunityPostResponse>
+
+    @PUT("api/community/posts/{id}")
+    suspend fun updatePost(
+        @Path("id") id: Long,
+        @Body req: CommunityUpdatePostRequest
+    ): Response<CommunityPostResponse>
+
+    @DELETE("api/community/posts/{id}")
+    suspend fun deletePost(@Path("id") id: Long): Response<Unit>
+
+    @POST("api/community/posts/{id}/like")
+    suspend fun toggleLike(@Path("id") id: Long): Response<Map<String, Any>>
+
+    @DELETE("api/community/posts/{id}/like")
+    suspend fun unlikePost(@Path("id") id: Long): Response<Unit>
+
+    @POST("api/community/reports")
+    suspend fun submitReport(@Body req: CommunityReportRequest): Response<Any>
 }
 

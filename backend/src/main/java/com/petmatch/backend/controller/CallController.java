@@ -4,9 +4,12 @@ import com.petmatch.backend.dto.CallRequest;
 import com.petmatch.backend.dto.SignalingMessage;
 import com.petmatch.backend.entity.CallHistory;
 import com.petmatch.backend.entity.CallStatus;
+import com.petmatch.backend.exception.AppException;
 import com.petmatch.backend.repository.UserRepository;
 import com.petmatch.backend.service.CallService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.Authentication;
@@ -30,11 +33,11 @@ public class CallController {
     @PostMapping("/start")
     public ResponseEntity<CallHistory> startCall(
             Authentication auth,
-            @RequestBody CallRequest request) {
+            @Valid @RequestBody CallRequest request) {
 
         // Lấy callerId từ JWT
         Long callerId = userRepository.findByEmail(auth.getName())
-                .orElseThrow(() -> new RuntimeException("User not found"))
+                .orElseThrow(() -> new AppException("User not found", HttpStatus.NOT_FOUND))
                 .getId();
 
         CallHistory callHistory = callService.initiateCall(callerId, request);
@@ -65,7 +68,7 @@ public class CallController {
             @RequestParam(required = false) Integer durationSeconds) {
             
         Long userId = userRepository.findByEmail(auth.getName())
-                .orElseThrow(() -> new RuntimeException("User not found"))
+                .orElseThrow(() -> new AppException("User not found", HttpStatus.NOT_FOUND))
                 .getId();
                 
         return ResponseEntity.ok(callService.endCall(callId, userId, status, durationSeconds));

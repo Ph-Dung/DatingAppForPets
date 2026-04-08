@@ -11,8 +11,10 @@ import com.petmatch.backend.enums.ReportStatus;
 import com.petmatch.backend.enums.ReportTargetType;
 import com.petmatch.backend.enums.Role;
 import com.petmatch.backend.exception.AppException;
+import com.petmatch.backend.repository.MatchRequestRepository;
 import com.petmatch.backend.repository.PetPhotoRepository;
 import com.petmatch.backend.repository.PetProfileRepository;
+import com.petmatch.backend.repository.PetVaccinationRepository;
 import com.petmatch.backend.repository.ReportRepository;
 import com.petmatch.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -23,7 +25,11 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Period;
+import java.util.ArrayList;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -32,6 +38,8 @@ public class AdminService {
 
     private final UserRepository userRepository;
     private final PetProfileRepository petProfileRepository;
+    private final PetVaccinationRepository vaccinationRepository;
+    private final MatchRequestRepository matchRequestRepository;
     private final ReportRepository reportRepository;
     private final PetPhotoRepository petPhotoRepository;
 
@@ -57,6 +65,47 @@ public class AdminService {
         return petProfileRepository.searchPetsForAdmin(query, hidden, PageRequest.of(page, size))
                 .map(this::toPetItem);
     }
+
+        @Transactional(readOnly = true)
+        public AdminUserDetailResponse getUserDetail(Long userId) {
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new AppException("Không tìm thấy user", HttpStatus.NOT_FOUND));
+
+        List<AdminReportItemResponse> violations = new ArrayList<>(reportRepository
+            .findByTargetTypeAndTargetIdOrderByCreatedAtDesc(ReportTargetType.USER, userId)
+            .stream()
+            .map(this::toReportItem)
+            .toList());
+
+        petProfileRepository.findByOwnerId(userId).ifPresent(pet -> violations.addAll(
+            reportRepository.findByTargetTypeAndTargetIdOrderByCreatedAtDesc(ReportTargetType.PET_PROFILE, pet.getId())
+                .stream()
+                .map(this::toReportItem)
+                .toList()
+        ));
+
+        return AdminUserDetailResponse.builder()
+            .user(toUserItem(user))
+            .violations(violations)
+            .build();
+        }
+
+        @Transactional(readOnly = true)
+        public AdminPetDetailResponse getPetDetail(Long petId) {
+        PetProfile pet = petProfileRepository.findById(petId)
+            .orElseThrow(() -> new AppException("Không tìm thấy hồ sơ thú cưng", HttpStatus.NOT_FOUND));
+
+        List<AdminReportItemResponse> violations = reportRepository
+            .findByTargetTypeAndTargetIdOrderByCreatedAtDesc(ReportTargetType.PET_PROFILE, petId)
+            .stream()
+            .map(this::toReportItem)
+            .toList();
+
+        return AdminPetDetailResponse.builder()
+            .pet(toPetProfileResponse(pet))
+            .violations(violations)
+            .build();
+        }
 
     @Transactional(readOnly = true)
     public Page<AdminReportItemResponse> getReports(ReportStatus status, int page, int size) {
@@ -107,29 +156,17 @@ public class AdminService {
             lockUserInternal(targetUser, true);
             report.setStatus(ReportStatus.RESOLVED);
         } else if (action == AdminReportAction.AUTO_DELETE_PHOTO) {
-            // Tự động xoá ảnh phản cảm
             if (report.getTargetType() == ReportTargetType.PET_PROFILE) {
                 PetProfile pet = petProfileRepository.findById(report.getTargetId())
                         .orElseThrow(() -> new AppException("Không tìm thấy hồ sơ thú cưng", HttpStatus.NOT_FOUND));
-                // Xoá tất cả photos của pet
                 petPhotoRepository.deleteAll(petPhotoRepository.findByPetId(pet.getId()));
             }
             report.setStatus(ReportStatus.RESOLVED);
-        } else if (action == AdminReportAction.AUTO_HIDE_PROFILE) {
-            // Tự động ẩn hồ sơ thú cưng nếu thông tin sai
-            if (report.getTargetType() == ReportTargetType.PET_PROFILE) {
-                PetProfile pet = petProfileRepository.findById(report.getTargetId())
-                        .orElseThrow(() -> new AppException("Không tìm thấy hồ sơ thú cưng", HttpStatus.NOT_FOUND));
-                pet.setIsHidden(true);
-                petProfileRepository.save(pet);
-            } else if (report.getTargetType() == ReportTargetType.USER) {
-                User targetUser = userRepository.findById(report.getTargetId())
-                        .orElseThrow(() -> new AppException("Không tìm thấy user", HttpStatus.NOT_FOUND));
-                targetUser.setIsWarned(true);
-                targetUser.setWarningCount((targetUser.getWarningCount() == null ? 0 : targetUser.getWarningCount()) + 1);
-                targetUser.setLastWarnedAt(LocalDateTime.now());
-                userRepository.save(targetUser);
+        } else if (action == AdminReportAction.AUTO_DELETE_PET) {
+            if (report.getTargetType() != ReportTargetType.PET_PROFILE) {
+                throw new AppException("Chỉ áp dụng xoá hồ sơ thú cưng", HttpStatus.BAD_REQUEST);
             }
+            deletePet(report.getTargetId());
             report.setStatus(ReportStatus.RESOLVED);
         } else if (action == AdminReportAction.DISMISS) {
             report.setStatus(ReportStatus.DISMISSED);
@@ -148,6 +185,16 @@ public class AdminService {
         report.setHandledAt(LocalDateTime.now());
 
         return toReportItem(reportRepository.save(report));
+    }
+
+    public void deletePet(Long petId) {
+        PetProfile pet = petProfileRepository.findById(petId)
+                .orElseThrow(() -> new AppException("Không tìm thấy hồ sơ thú cưng", HttpStatus.NOT_FOUND));
+
+        petPhotoRepository.deleteAll(petPhotoRepository.findByPetId(petId));
+        vaccinationRepository.deleteAllByPetId(petId);
+        matchRequestRepository.deleteBySenderPetIdOrReceiverPetId(petId, petId);
+        petProfileRepository.delete(pet);
     }
 
     private User resolveTargetUser(Report report) {
@@ -221,6 +268,49 @@ public class AdminService {
                 .createdAt(pet.getCreatedAt())
                 .build();
     }
+
+            private PetProfileResponse toPetProfileResponse(PetProfile pet) {
+            String avatarUrl = petPhotoRepository.findByPetIdAndIsAvatarTrue(pet.getId())
+                .map(PetPhoto::getPhotoUrl)
+                .orElse(null);
+            List<String> photoUrls = petPhotoRepository.findByPetId(pet.getId())
+                .stream()
+                .map(PetPhoto::getPhotoUrl)
+                .toList();
+
+            Integer age = null;
+            if (pet.getDateOfBirth() != null) {
+                age = Period.between(pet.getDateOfBirth(), LocalDate.now()).getYears();
+            }
+
+            return PetProfileResponse.builder()
+                .id(pet.getId())
+                .ownerId(pet.getOwner().getId())
+                .ownerName(pet.getOwner().getFullName())
+                .name(pet.getName())
+                .species(pet.getSpecies())
+                .breed(pet.getBreed())
+                .gender(pet.getGender() != null ? pet.getGender().name() : null)
+                .dateOfBirth(pet.getDateOfBirth())
+                .age(age)
+                .weightKg(pet.getWeightKg())
+                .color(pet.getColor())
+                .size(pet.getSize())
+                .reproductiveStatus(pet.getReproductiveStatus() != null ? pet.getReproductiveStatus().name() : null)
+                .isVaccinated(pet.getIsVaccinated())
+                .lastVaccineDate(pet.getLastVaccineDate())
+                .vaccinationCount((int) vaccinationRepository.countByPetId(pet.getId()))
+                .healthStatus(pet.getHealthStatus() != null ? pet.getHealthStatus().name() : null)
+                .healthNotes(pet.getHealthNotes())
+                .personalityTags(pet.getPersonalityTags())
+                .lookingFor(pet.getLookingFor() != null ? pet.getLookingFor().name() : null)
+                .notes(pet.getNotes())
+                .isHidden(pet.getIsHidden())
+                .avatarUrl(avatarUrl)
+                .photoUrls(photoUrls)
+                .createdAt(pet.getCreatedAt())
+                .build();
+            }
 
     private AdminReportItemResponse toReportItem(Report report) {
         return AdminReportItemResponse.builder()

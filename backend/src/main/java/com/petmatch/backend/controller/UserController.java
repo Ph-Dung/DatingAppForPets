@@ -1,6 +1,7 @@
 package com.petmatch.backend.controller;
 
 import com.petmatch.backend.dto.request.ChangePasswordRequest;
+import com.petmatch.backend.dto.request.UpdateLocationRequest;
 import com.petmatch.backend.dto.request.UpdateUserRequest;
 import com.petmatch.backend.dto.response.UserResponse;
 import com.petmatch.backend.service.UserService;
@@ -43,5 +44,13 @@ public class UserController {
     public ResponseEntity<UserResponse> updateAvatar(
             @RequestParam("file") MultipartFile file) {
         return ResponseEntity.ok(userService.updateAvatar(file));
+    }
+
+    /** Cập nhật vị trí GPS của user */
+    @PatchMapping("/me/location")
+    public ResponseEntity<Void> updateLocation(
+            @RequestBody UpdateLocationRequest req) {
+        userService.updateLocation(req.getLatitude(), req.getLongitude());
+        return ResponseEntity.noContent().build();
     }
 }

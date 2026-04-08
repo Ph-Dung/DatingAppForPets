@@ -1,14 +1,8 @@
 package com.petmatch.backend.service;
 
-import com.petmatch.backend.dto.request.GroupChatCreateRequest;
-import com.petmatch.backend.dto.request.GroupMessageRequest;
-import com.petmatch.backend.dto.response.GroupChatResponse;
-import com.petmatch.backend.dto.response.GroupMessageResponse;
-import com.petmatch.backend.entity.*;
-import com.petmatch.backend.enums.GroupMemberRole;
-import com.petmatch.backend.exception.AppException;
-import com.petmatch.backend.repository.*;
-import lombok.RequiredArgsConstructor;
+import java.util.List;
+import java.util.stream.Collectors;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -16,9 +10,22 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.stream.Collectors;
+import com.petmatch.backend.dto.request.GroupChatCreateRequest;
+import com.petmatch.backend.dto.request.GroupMessageRequest;
+import com.petmatch.backend.dto.response.GroupChatResponse;
+import com.petmatch.backend.dto.response.GroupMessageResponse;
+import com.petmatch.backend.entity.ChatGroup;
+import com.petmatch.backend.entity.ChatGroupMember;
+import com.petmatch.backend.entity.GroupMessage;
+import com.petmatch.backend.entity.User;
+import com.petmatch.backend.enums.GroupMemberRole;
+import com.petmatch.backend.exception.AppException;
+import com.petmatch.backend.repository.ChatGroupMemberRepository;
+import com.petmatch.backend.repository.ChatGroupRepository;
+import com.petmatch.backend.repository.GroupMessageRepository;
+import com.petmatch.backend.repository.UserRepository;
+
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
@@ -30,10 +37,30 @@ public class GroupChatService {
     private final UserRepository userRepository;
     private final SimpMessagingTemplate messagingTemplate;
 
+        private User requireUser(Long userId, String label) {
+                return userRepository.findById(userId)
+                                .orElseThrow(() -> new AppException(label + " not found", HttpStatus.NOT_FOUND));
+        }
+
+        private ChatGroup requireGroup(Long groupId) {
+                return chatGroupRepository.findById(groupId)
+                                .orElseThrow(() -> new AppException("Group not found", HttpStatus.NOT_FOUND));
+        }
+
+        private void ensureMember(ChatGroup group, User user, String message) {
+                if (!chatGroupMemberRepository.existsByGroupAndUser(group, user)) {
+                        throw new AppException(message, HttpStatus.FORBIDDEN);
+                }
+        }
+
+        private ChatGroupMember requireMember(ChatGroup group, User user, String message) {
+                return chatGroupMemberRepository.findByGroupAndUser(group, user)
+                                .orElseThrow(() -> new AppException(message, HttpStatus.FORBIDDEN));
+        }
+
     @Transactional
     public GroupChatResponse createGroup(Long creatorId, GroupChatCreateRequest request) {
-        User creator = userRepository.findById(creatorId)
-                .orElseThrow(() -> new AppException("Creator not found", HttpStatus.NOT_FOUND));
+                User creator = requireUser(creatorId, "Creator");
 
         ChatGroup group = ChatGroup.builder()
                 .name(request.getName())
@@ -52,10 +79,10 @@ public class GroupChatService {
         chatGroupMemberRepository.save(creatorMember);
 
         // Add other members as MEMBER
-        for (Long memberId : request.getMemberIds()) {
+                List<Long> memberIds = request.getMemberIds() == null ? List.of() : request.getMemberIds();
+                for (Long memberId : memberIds) {
             if (memberId.equals(creatorId)) continue;
-            User user = userRepository.findById(memberId)
-                    .orElseThrow(() -> new AppException("Member not found: " + memberId, HttpStatus.NOT_FOUND));
+                        User user = requireUser(memberId, "Member");
 
             ChatGroupMember member = ChatGroupMember.builder()
                     .group(savedGroup)
@@ -72,16 +99,9 @@ public class GroupChatService {
 
     @Transactional
     public GroupMessageResponse sendMessage(Long senderId, Long groupId, GroupMessageRequest request) {
-        ChatGroup group = chatGroupRepository.findById(groupId)
-                .orElseThrow(() -> new AppException("Group not found", HttpStatus.NOT_FOUND));
-
-        User sender = userRepository.findById(senderId)
-                .orElseThrow(() -> new AppException("Sender not found", HttpStatus.NOT_FOUND));
-
-        // Check if sender is a member
-        if (!chatGroupMemberRepository.existsByGroupAndUser(group, sender)) {
-            throw new AppException("You are not a member of this group", HttpStatus.FORBIDDEN);
-        }
+        ChatGroup group = requireGroup(groupId);
+        User sender = requireUser(senderId, "Sender");
+        ensureMember(group, sender, "You are not a member of this group");
 
         GroupMessage message = GroupMessage.builder()
                 .group(group)
@@ -100,8 +120,7 @@ public class GroupChatService {
 
     @Transactional(readOnly = true)
     public List<GroupChatResponse> getUserGroups(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new AppException("User not found", HttpStatus.NOT_FOUND));
+        User user = requireUser(userId, "User");
         return chatGroupRepository.findGroupsByUser(user).stream()
                 .map(this::toGroupResponse)
                 .collect(Collectors.toList());
@@ -109,15 +128,9 @@ public class GroupChatService {
 
     @Transactional(readOnly = true)
     public List<GroupMessageResponse> getGroupHistory(Long groupId, Long userId, Pageable pageable) {
-        ChatGroup group = chatGroupRepository.findById(groupId)
-                .orElseThrow(() -> new AppException("Group not found", HttpStatus.NOT_FOUND));
-
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new AppException("User not found", HttpStatus.NOT_FOUND));
-
-        if (!chatGroupMemberRepository.existsByGroupAndUser(group, user)) {
-            throw new AppException("Access denied", HttpStatus.FORBIDDEN);
-        }
+        ChatGroup group = requireGroup(groupId);
+        User user = requireUser(userId, "User");
+        ensureMember(group, user, "Access denied");
 
         Page<GroupMessage> messages = groupMessageRepository.findByGroupOrderBySentAtDesc(group, pageable);
         return messages.stream()
@@ -127,21 +140,15 @@ public class GroupChatService {
 
     @Transactional
     public void addMember(Long adminId, Long groupId, Long newMemberId) {
-        ChatGroup group = chatGroupRepository.findById(groupId)
-                .orElseThrow(() -> new AppException("Group not found", HttpStatus.NOT_FOUND));
-
-        User admin = userRepository.findById(adminId)
-                .orElseThrow(() -> new AppException("Admin not found", HttpStatus.NOT_FOUND));
-
-        ChatGroupMember adminMember = chatGroupMemberRepository.findByGroupAndUser(group, admin)
-                .orElseThrow(() -> new AppException("Not a member", HttpStatus.FORBIDDEN));
+        ChatGroup group = requireGroup(groupId);
+        User admin = requireUser(adminId, "Admin");
+        ChatGroupMember adminMember = requireMember(group, admin, "Not a member");
 
         if (adminMember.getRole() != GroupMemberRole.ADMIN) {
             throw new AppException("Only admins can add members", HttpStatus.FORBIDDEN);
         }
 
-        User newMemberUser = userRepository.findById(newMemberId)
-                .orElseThrow(() -> new AppException("User not found", HttpStatus.NOT_FOUND));
+        User newMemberUser = requireUser(newMemberId, "User");
 
         if (chatGroupMemberRepository.existsByGroupAndUser(group, newMemberUser)) {
             throw new AppException("User already in group", HttpStatus.CONFLICT);

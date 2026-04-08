@@ -1,26 +1,42 @@
 package com.petmatch.backend.config;
 
-import com.cloudinary.Cloudinary;
-import com.cloudinary.utils.ObjectUtils;
-import com.petmatch.backend.entity.PetPhoto;
-import com.petmatch.backend.entity.PetProfile;
-import com.petmatch.backend.entity.User;
-import com.petmatch.backend.enums.*;
-import com.petmatch.backend.repository.PetPhotoRepository;
-import com.petmatch.backend.repository.PetProfileRepository;
-import com.petmatch.backend.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.CommandLineRunner;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
-
+import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.cloudinary.Cloudinary;
+import com.cloudinary.utils.ObjectUtils;
+import com.petmatch.backend.entity.PetPhoto;
+import com.petmatch.backend.entity.PetProfile;
+import com.petmatch.backend.entity.Post;
+import com.petmatch.backend.entity.User;
+import com.petmatch.backend.enums.Gender;
+import com.petmatch.backend.enums.HealthStatus;
+import com.petmatch.backend.enums.LookingFor;
+import com.petmatch.backend.enums.ReproductiveStatus;
+import com.petmatch.backend.enums.Role;
+import com.petmatch.backend.repository.PetPhotoRepository;
+import com.petmatch.backend.repository.PetProfileRepository;
+import com.petmatch.backend.repository.PostRepository;
+import com.petmatch.backend.repository.UserRepository;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Component
 @RequiredArgsConstructor
@@ -30,8 +46,24 @@ public class DataSeeder implements CommandLineRunner {
     private final UserRepository userRepo;
     private final PetProfileRepository petProfileRepo;
     private final PetPhotoRepository petPhotoRepo;
+    private final PostRepository postRepo;
     private final PasswordEncoder passwordEncoder;
     private final Cloudinary cloudinary;
+
+    @Value("${app.seed.enabled:true}")
+    private boolean seedEnabled;
+
+    @Value("${app.seed.users-count:30}")
+    private int usersSeedCount;
+
+    @Value("${app.seed.skip-when-users-gte:5}")
+    private long skipWhenUsersGte;
+
+    @Value("${app.seed.upload-photos:false}")
+    private boolean uploadPhotos;
+
+    @Value("${app.seed.community-posts.enabled:true}")
+    private boolean communityPostsEnabled;
 
     private static final Random RNG = new Random(42);
 
@@ -70,22 +102,68 @@ public class DataSeeder implements CommandLineRunner {
             "Nemo", "Mochi", "Peach", "Pearl", "Ruby"
     };
 
+    record ProvinceInfo(String name, double lat, double lon) {}
+    private static final List<ProvinceInfo> NORTHERN_PROVINCES = List.of(
+            new ProvinceInfo("Hà Nội", 21.0285, 105.8542),
+            new ProvinceInfo("Hải Phòng", 20.8449, 106.6881),
+            new ProvinceInfo("Quảng Ninh", 21.0069, 107.2925),
+            new ProvinceInfo("Hải Dương", 20.9409, 106.3330),
+            new ProvinceInfo("Hưng Yên", 20.6535, 106.0504),
+            new ProvinceInfo("Hà Nam", 20.5453, 105.9122),
+            new ProvinceInfo("Nam Định", 20.4357, 106.1824),
+            new ProvinceInfo("Thái Bình", 20.4463, 106.3366),
+            new ProvinceInfo("Ninh Bình", 20.2539, 105.9750),
+            new ProvinceInfo("Vĩnh Phúc", 21.3089, 105.6039),
+            new ProvinceInfo("Bắc Ninh", 21.1861, 106.0763),
+            new ProvinceInfo("Bắc Giang", 21.2731, 106.1946),
+            new ProvinceInfo("Thái Nguyên", 21.5942, 105.8482),
+            new ProvinceInfo("Phú Thọ", 21.3168, 105.2173),
+            new ProvinceInfo("Hòa Bình", 20.8133, 105.3384)
+    );
+
     @Override
     @Transactional
     public void run(String... args) {
+        if (!seedEnabled) {
+            log.info("DataSeeder: app.seed.enabled=false, bỏ qua toàn bộ seeding.");
+            return;
+        }
+
+        if (communityPostsEnabled) {
+            seedCommunityPostsIfNeeded();
+        }
         ensureDefaultAdmin();
 
         long count = userRepo.count();
-        if (count >= 5) {
+        if (count >= skipWhenUsersGte) {
             log.info("DataSeeder: DB đã có {} users, bỏ qua seeding.", count);
             return;
         }
 
-        log.info("DataSeeder: Đang tạo 100 tài khoản test...");
+        int totalUsersToSeed = Math.max(0, usersSeedCount);
+        if (totalUsersToSeed == 0) {
+            log.info("DataSeeder: app.seed.users-count=0, bỏ qua seeding user.");
+            if (communityPostsEnabled) {
+                seedCommunityPostsIfNeeded();
+            }
+            return;
+        }
+
+        log.info("DataSeeder: Đang tạo {} tài khoản test...", totalUsersToSeed);
         String encodedPass = passwordEncoder.encode("12345678");
 
         for (int i = 1; i <= 100; i++) {
             try {
+                ProvinceInfo prov;
+                double maxRadius = 15.0; // 15km quanh tâm
+                if (i <= 50) {
+                    prov = NORTHERN_PROVINCES.get(0); // Hà Nội
+                } else {
+                    prov = NORTHERN_PROVINCES.get(1 + RNG.nextInt(NORTHERN_PROVINCES.size() - 1));
+                    maxRadius = 25.0; // Các tỉnh khác cho rộng hơn tí
+                }
+                double[] coords = generateRandomCoordinate(prov.lat(), prov.lon(), maxRadius);
+
                 // 1. Tạo User
                 User user = userRepo.save(User.builder()
                         .fullName(randomFullName())
@@ -94,6 +172,9 @@ public class DataSeeder implements CommandLineRunner {
                         .phone("09" + String.format("%08d", RNG.nextInt(100000000)))
                         .role(Role.USER)
                         .isLocked(false)
+                        .latitude(coords[0])
+                        .longitude(coords[1])
+                        .address(prov.name())
                         .build());
 
                 // 2. Chọn species theo tỷ lệ: Chó 50%, Mèo 30%, Thỏ 10%, Hamster 10%
@@ -194,22 +275,71 @@ public class DataSeeder implements CommandLineRunner {
             }
         }
         log.info("DataSeeder: Hoàn thành! Đã tạo 100 tài khoản test.");
+        if (communityPostsEnabled) {
+            seedCommunityPostsIfNeeded();
+        }
+    }
+
+    private void seedCommunityPostsIfNeeded() {
+        if (!communityPostsEnabled) {
+            return;
+        }
+
+        if (postRepo.count() > 0) {
+            return;
+        }
+
+        List<User> users = userRepo.findAll();
+        if (users.isEmpty()) {
+            log.info("DataSeeder: Chưa có user để seed community posts.");
+            return;
+        }
+
+        List<String> seedContents = List.of(
+                "Mới dắt boss đi dạo công viên, bạn nào quanh khu Hà Đông muốn giao lưu không?",
+                "Hôm nay mèo nhà mình ăn ngoan lắm, chia sẻ chút năng lượng tích cực cho mọi người.",
+                "Cuối tuần này có ai cho pet đi cafe không, cùng hẹn một buổi nhé!"
+        );
+
+        List<String> seedImages = List.of(
+                "https://images.unsplash.com/photo-1537151608828-ea2b11777ee8",
+                "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba",
+                "https://images.unsplash.com/photo-1495360010541-f48722b34f7d"
+        );
+
+        List<String> seedLocations = List.of("Hà Đông, Hà Nội", "Cầu Giấy, Hà Nội", "Đống Đa, Hà Nội");
+
+        users.sort(Comparator.comparing(User::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())).reversed());
+
+        for (int i = 0; i < 3; i++) {
+            User owner = users.get(i % users.size());
+            postRepo.save(Post.builder()
+                    .user(owner)
+                    .content(seedContents.get(i))
+                    .imageUrl(seedImages.get(i))
+                    .location(seedLocations.get(i))
+                    .build());
+        }
+
+        log.info("DataSeeder: Đã seed 3 community posts mẫu.");
     }
 
     private String uploadRandomPhoto(String species, int seed) {
-        try {
-            String imageUrl;
-            if ("Chó".equals(species)) {
-                imageUrl = "https://loremflickr.com/400/500/dog?lock=" + (seed % 50);
-            } else if ("Mèo".equals(species)) {
-                imageUrl = "https://loremflickr.com/400/500/cat?lock=" + seed;
-            } else {
-                // Thỏ / Hamster → dùng picsum với seed cố định (không dùng tiếng Việt có dấu
-                // trong URL)
-                String safeSeed = "Thỏ".equals(species) ? "rabbit" : "hamster";
-                imageUrl = "https://picsum.photos/seed/" + safeSeed + seed + "/400/500";
-            }
+        String imageUrl;
+        if ("Chó".equals(species)) {
+            imageUrl = "https://loremflickr.com/400/500/dog?lock=" + seed;
+        } else if ("Mèo".equals(species)) {
+            imageUrl = "https://loremflickr.com/400/500/cat?lock=" + seed;
+        } else {
+            String safeSeed = "Thỏ".equals(species) ? "rabbit" : "hamster";
+            imageUrl = "https://picsum.photos/seed/" + safeSeed + seed + "/400/500";
+        }
 
+        if (!uploadPhotos) {
+            return imageUrl;
+        }
+
+        try {
             // Download ảnh
             byte[] imageBytes;
             try (InputStream is = java.net.URI.create(imageUrl).toURL().openStream()) {
@@ -226,14 +356,10 @@ public class DataSeeder implements CommandLineRunner {
         } catch (Exception e) {
             log.warn("DataSeeder: Không thể upload ảnh: {}", e.getMessage());
             // Fallback: trả về URL trực tiếp không qua Cloudinary
-            if ("Chó".equals(species))
-                return "https://loremflickr.com/400/500/dog?lock=" + (seed % 50);
-            if ("Mèo".equals(species))
-                return "https://loremflickr.com/400/500/cat?lock=" + seed;
-            String safeSeed = "Thỏ".equals(species) ? "rabbit" : "hamster";
-            return "https://picsum.photos/seed/" + safeSeed + seed + "/400/500";
+            return imageUrl;
         }
     }
+
 
     private BigDecimal randomWeight(String species) {
         double w = switch (species) {
@@ -266,6 +392,24 @@ public class DataSeeder implements CommandLineRunner {
                 + firstNames[RNG.nextInt(firstNames.length)];
     }
 
+    /**
+     * Tạo tọa độ ngẫu nhiên xung quanh tâm
+     * @param radiusKm bán kính phân bố (vd 20.0 km)
+     */
+    private double[] generateRandomCoordinate(double centerLat, double centerLon, double radiusKm) {
+        double radiusInDegrees = radiusKm / 111.0;
+        double u = RNG.nextDouble();
+        double v = RNG.nextDouble();
+        // Không skip đoạn tâm nữa:
+        double r = radiusInDegrees * Math.sqrt(u);
+        double theta = 2 * Math.PI * v;
+        double dx = r * Math.cos(theta);
+        double dy = r * Math.sin(theta);
+        double newLon = centerLon + dx / Math.cos(Math.toRadians(centerLat));
+        double newLat = centerLat + dy;
+        return new double[]{newLat, newLon};
+    }
+
     private List<String> pickRandom(String[] arr, int count) {
         List<String> list = new ArrayList<>(Arrays.asList(arr));
         Collections.shuffle(list, RNG);
@@ -273,7 +417,7 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     private void ensureDefaultAdmin() {
-        final String adminEmail = "admin@petmatch.com";
+        final String adminEmail = "admin@gmail.com";
         if (userRepo.existsByEmail(adminEmail)) {
             return;
         }
@@ -281,7 +425,7 @@ public class DataSeeder implements CommandLineRunner {
         userRepo.save(User.builder()
                 .fullName("System Admin")
                 .email(adminEmail)
-                .passwordHash(passwordEncoder.encode("Admin@123"))
+                .passwordHash(passwordEncoder.encode("12345678"))
                 .role(Role.ADMIN)
                 .isLocked(false)
                 .build());
