@@ -45,6 +45,27 @@ fun AccountScreen(
         userVm.loadMyInfo(ctx)
     }
 
+    val updateState by userVm.updateState.collectAsState()
+    LaunchedEffect(updateState) {
+        if (updateState != null) {
+            if (updateState == "avatar_success") {
+                android.widget.Toast.makeText(ctx, "Cập nhật ảnh đại diện thành công", android.widget.Toast.LENGTH_SHORT).show()
+                userVm.resetUpdateState()
+            } else if (updateState?.startsWith("success") == false) {
+                android.widget.Toast.makeText(ctx, updateState, android.widget.Toast.LENGTH_SHORT).show()
+                userVm.resetUpdateState()
+            }
+        }
+    }
+
+    val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
+    ) { uri: android.net.Uri? ->
+        if (uri != null) {
+            userVm.updateAvatar(ctx, uri)
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -81,35 +102,52 @@ fun AccountScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     // Avatar chủ
-                    Box(
-                        modifier = Modifier
-                            .size(90.dp)
-                            .clip(CircleShape)
-                            .background(Color.White.copy(0.2f))
-                            .border(3.dp, Color.White, CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (!user?.avatarUrl.isNullOrEmpty()) {
-                            AsyncImage(
-                                model = user.avatarUrl,
-                                contentDescription = null,
-                                modifier = Modifier.fillMaxSize().clip(CircleShape)
-                            )
-                        } else {
-                            // Ava default kiểu chuyên nghiệp
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(Color(0xFFE4E6EB)), // Màu xám nhạt FB
-                                contentAlignment = Alignment.BottomCenter
-                            ) {
-                                Icon(
-                                    Icons.Default.Person,
-                                    null,
-                                    tint = Color(0xFF8A8D91), // Màu xám đậm icon
-                                    modifier = Modifier.size(70.dp).offset(y = 10.dp)
+                    Box(contentAlignment = Alignment.BottomEnd) {
+                        Box(
+                            modifier = Modifier
+                                .size(90.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(0.2f))
+                                .border(3.dp, Color.White, CircleShape)
+                                .clickable { launcher.launch("image/*") },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (!user?.avatarUrl.isNullOrEmpty()) {
+                                AsyncImage(
+                                    model = user.avatarUrl,
+                                    contentDescription = null,
+                                    modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
                                 )
+                            } else {
+                                // Ava default kiểu chuyên nghiệp
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(Color(0xFFE4E6EB)), // Màu xám nhạt FB
+                                    contentAlignment = Alignment.BottomCenter
+                                ) {
+                                    Icon(
+                                        Icons.Default.Person,
+                                        null,
+                                        tint = Color(0xFF8A8D91), // Màu xám đậm icon
+                                        modifier = Modifier.size(70.dp).offset(y = 10.dp)
+                                    )
+                                }
                             }
+                        }
+                        Surface(
+                            color = PrimaryPink,
+                            shape = CircleShape,
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clickable { launcher.launch("image/*") }
+                        ) {
+                            Icon(
+                                Icons.Default.Edit, null,
+                                tint = Color.White,
+                                modifier = Modifier.padding(6.dp)
+                            )
                         }
                     }
 
