@@ -187,92 +187,124 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
                 )
                 Spacer(modifier = Modifier.height(8.dp))
 
-                if (commentsLoading) {
-                    Box(modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                    }
-                } else if (comments.isEmpty()) {
-                    Text("Chưa có bình luận nào", color = Color.Gray)
-                } else {
-                    LazyColumn(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(comments, key = { it.id }) { c ->
-                            CommentItem(
-                                name = c.userName,
-                                avatarUrl = c.userAvatar,
-                                content = c.content,
-                                depth = 0,
-                                onReply = { replyToCommentId = c.id }
-                            )
-                            c.replies.forEach { r ->
-                                CommentItem(
-                                    name = r.userName,
-                                    avatarUrl = r.userAvatar,
-                                    content = r.content,
-                                    depth = 1,
-                                    onReply = { replyToCommentId = r.id }
-                                )
-                            }
-                        }
-                    }
-                }
-
-                if (replyToCommentId != null) {
-                    Text(
-                        text = "Đang trả lời bình luận #$replyToCommentId",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = PrimaryPink
-                    )
-                    TextButton(onClick = { replyToCommentId = null }) {
-                        Text("Hủy trả lời")
-                    }
-                }
-
-                OutlinedTextField(
-                    value = commentInput,
-                    onValueChange = { commentInput = it },
+                Box(
                     modifier = Modifier
+                        .weight(1f)
                         .fillMaxWidth()
-                        .heightIn(min = 90.dp),
-                    label = { Text(if (replyToCommentId != null) "Viết phản hồi" else "Viết bình luận") },
-                    minLines = 2,
-                    maxLines = 5
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
                 ) {
-                    TextButton(onClick = {
-                        commentPostId = null
-                        replyToCommentId = null
-                    }) {
-                        Text("Đóng")
-                    }
-                    TextButton(
-                        enabled = commentInput.isNotBlank() && !actionLoading,
-                        onClick = {
-                            val postId = commentPostId
-                            if (postId != null) {
-                                val replyingId = replyToCommentId
-                                if (replyingId != null) {
-                                    vm.replyComment(ctx, postId, replyingId, commentInput) {
-                                        commentInput = ""
-                                        replyToCommentId = null
-                                    }
-                                } else {
-                                    vm.addComment(ctx, postId, commentInput) {
-                                        commentInput = ""
-                                    }
+                    if (commentsLoading) {
+                        Box(modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                        }
+                    } else if (comments.isEmpty()) {
+                        Text("Chưa có bình luận nào", color = Color.Gray)
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            contentPadding = PaddingValues(bottom = 190.dp)
+                        ) {
+                            items(comments, key = { it.id }) { c ->
+                                CommentItem(
+                                    name = c.userName,
+                                    avatarUrl = c.userAvatar,
+                                    content = c.content,
+                                    createdAt = c.createdAt,
+                                    depth = 0,
+                                    canReply = true,
+                                    onReply = { replyToCommentId = c.id }
+                                )
+                                c.replies.forEach { r ->
+                                    CommentItem(
+                                        name = r.userName,
+                                        avatarUrl = r.userAvatar,
+                                        content = r.content,
+                                        createdAt = r.createdAt,
+                                        depth = 1,
+                                        canReply = false,
+                                        onReply = null
+                                    )
                                 }
                             }
                         }
+                    }
+
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .imePadding()
+                            .navigationBarsPadding(),
+                        color = MaterialTheme.colorScheme.surface,
+                        tonalElevation = 6.dp,
+                        shadowElevation = 4.dp
                     ) {
-                        Text(if (actionLoading) "Đang gửi..." else "Gửi")
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp, bottom = 4.dp)
+                        ) {
+                            if (replyToCommentId != null) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Đang trả lời bình luận #$replyToCommentId",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = PrimaryPink
+                                    )
+                                    TextButton(onClick = { replyToCommentId = null }) {
+                                        Text("Hủy")
+                                    }
+                                }
+                            }
+
+                            OutlinedTextField(
+                                value = commentInput,
+                                onValueChange = { commentInput = it },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 90.dp),
+                                label = { Text(if (replyToCommentId != null) "Viết phản hồi" else "Viết bình luận") },
+                                minLines = 2,
+                                maxLines = 5
+                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End
+                            ) {
+                                TextButton(onClick = {
+                                    commentPostId = null
+                                    replyToCommentId = null
+                                }) {
+                                    Text("Đóng")
+                                }
+                                TextButton(
+                                    enabled = commentInput.isNotBlank() && !actionLoading,
+                                    onClick = {
+                                        val postId = commentPostId
+                                        if (postId != null) {
+                                            val replyingId = replyToCommentId
+                                            if (replyingId != null) {
+                                                vm.replyComment(ctx, postId, replyingId, commentInput) {
+                                                    commentInput = ""
+                                                    replyToCommentId = null
+                                                }
+                                            } else {
+                                                vm.addComment(ctx, postId, commentInput) {
+                                                    commentInput = ""
+                                                }
+                                            }
+                                        }
+                                    }
+                                ) {
+                                    Text(if (actionLoading) "Đang gửi..." else "Gửi")
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -677,8 +709,10 @@ private fun CommentItem(
     name: String,
     avatarUrl: String?,
     content: String,
+    createdAt: String?,
     depth: Int,
-    onReply: () -> Unit
+    canReply: Boolean,
+    onReply: (() -> Unit)?
 ) {
     Row(
         modifier = Modifier
@@ -703,10 +737,17 @@ private fun CommentItem(
                 Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
                     Text(name, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
                     Text(content, fontSize = 13.sp)
+                    val timeTag = getRelativeTimeString(createdAt)
+                    if (timeTag.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(timeTag, fontSize = 11.sp, color = Color.Gray)
+                    }
                 }
             }
-            TextButton(onClick = onReply, modifier = Modifier.height(28.dp)) {
-                Text("Trả lời", fontSize = 12.sp)
+            if (canReply && onReply != null) {
+                TextButton(onClick = onReply, modifier = Modifier.height(28.dp)) {
+                    Text("Trả lời", fontSize = 12.sp)
+                }
             }
         }
     }
