@@ -232,20 +232,6 @@ data class CommunityReportRequest(
     val hidePost: Boolean = false
 )
 
-data class CommunityNotificationResponse(
-    val id: Long,
-    val type: String,
-    val message: String,
-    val postId: Long,
-    val commentId: Long?,
-    val actorId: Long,
-    val actorName: String,
-    val actorAvatar: String?,
-    @SerializedName(value = "isRead", alternate = ["read"])
-    val isRead: Boolean,
-    val createdAt: String?
-)
-
 data class AdminDashboardResponse(
     val totalUsers: Long,
     val lockedUsers: Long,

@@ -291,16 +291,5 @@ interface CommunityApi {
 
     @POST("api/community/reports")
     suspend fun submitReport(@Body req: CommunityReportRequest): Response<Any>
-
-    @GET("api/community/notifications/unread-count")
-    suspend fun getUnreadNotificationCount(): Response<Map<String, Long>>
-
-    @GET("api/community/notifications")
-    suspend fun getNotifications(
-        @Query("markRead") markRead: Boolean = true
-    ): Response<List<CommunityNotificationResponse>>
-
-    @POST("api/community/notifications/read-all")
-    suspend fun markAllNotificationsAsRead(): Response<Unit>
 }
 
