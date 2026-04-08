@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.petmatch.mobile.data.api.RetrofitClient
 import com.petmatch.mobile.data.model.CommunityCommentResponse
 import com.petmatch.mobile.data.model.CommunityCreateCommentRequest
+import com.petmatch.mobile.data.model.CommunityNotificationResponse
 import com.petmatch.mobile.data.model.CommunityCreatePostRequest
 import com.petmatch.mobile.data.model.CommunityPostResponse
 import com.petmatch.mobile.data.model.CommunityReportRequest
@@ -40,6 +41,12 @@ class CommunityViewModel : ViewModel() {
 
     private val _commentsLoading = MutableStateFlow(false)
     val commentsLoading: StateFlow<Boolean> = _commentsLoading
+
+    private val _notifications = MutableStateFlow<List<CommunityNotificationResponse>>(emptyList())
+    val notifications: StateFlow<List<CommunityNotificationResponse>> = _notifications
+
+    private val _unreadNotificationCount = MutableStateFlow(0)
+    val unreadNotificationCount: StateFlow<Int> = _unreadNotificationCount
 
     private val _actionDone = MutableStateFlow(false)
     val actionDone: StateFlow<Boolean> = _actionDone
@@ -377,6 +384,44 @@ class CommunityViewModel : ViewModel() {
             _error.value = "Không thể kết nối máy chủ"
         }
         _actionLoading.value = false
+    }
+
+    fun loadUnreadNotificationCount(ctx: Context) = viewModelScope.launch {
+        try {
+            val res = RetrofitClient.communityApi(ctx).getUnreadNotificationCount()
+            if (res.isSuccessful) {
+                val count = res.body()?.get("count")?.toInt() ?: 0
+                _unreadNotificationCount.value = count.coerceAtLeast(0)
+            }
+        } catch (_: Exception) {
+            // Keep previous value; badge will refresh on next successful call.
+        }
+    }
+
+    fun loadNotifications(ctx: Context, markRead: Boolean = true) = viewModelScope.launch {
+        try {
+            val res = RetrofitClient.communityApi(ctx).getNotifications(markRead = markRead)
+            if (res.isSuccessful) {
+                _notifications.value = res.body() ?: emptyList()
+                if (markRead) {
+                    _unreadNotificationCount.value = 0
+                } else {
+                    loadUnreadNotificationCount(ctx)
+                }
+            }
+        } catch (_: Exception) {
+            _error.value = "Không tải được thông báo"
+        }
+    }
+
+    fun markAllNotificationsAsRead(ctx: Context) = viewModelScope.launch {
+        try {
+            RetrofitClient.communityApi(ctx).markAllNotificationsAsRead()
+            _notifications.value = _notifications.value.map { it.copy(isRead = true) }
+            _unreadNotificationCount.value = 0
+        } catch (_: Exception) {
+            // ignore
+        }
     }
 
     fun clearError() {

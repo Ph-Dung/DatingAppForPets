@@ -47,7 +47,7 @@ import com.petmatch.mobile.ui.common.PetMatchTopBar
 import com.petmatch.mobile.ui.navigation.Routes
 import com.petmatch.mobile.ui.petprofile.PetProfileViewModel
 import com.petmatch.mobile.ui.theme.PrimaryPink
-import android.util.Log
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -94,14 +94,7 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
 
     Scaffold(
         topBar = {
-            PetMatchTopBar(
-                title = "Cộng đồng",
-                actions = {
-                    IconButton(onClick = { Log.d("CommunityScreen", "Notification tapped - TODO") }) {
-                        Icon(Icons.Default.NotificationsNone, null, tint = Color.Black)
-                    }
-                }
-            )
+            PetMatchTopBar(title = "Cộng đồng")
         }
     ) { padding ->
         LazyColumn(

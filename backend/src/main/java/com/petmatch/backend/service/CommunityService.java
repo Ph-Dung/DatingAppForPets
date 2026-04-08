@@ -1,8 +1,8 @@
 package com.petmatch.backend.service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.ArrayList;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -15,7 +15,9 @@ import org.springframework.web.multipart.MultipartFile;
 import com.petmatch.backend.dto.PostResponse;
 import com.petmatch.backend.dto.request.CommunityReportRequest;
 import com.petmatch.backend.dto.response.CommentResponse;
+import com.petmatch.backend.dto.response.CommunityNotificationResponse;
 import com.petmatch.backend.entity.Comment;
+import com.petmatch.backend.entity.CommunityNotification;
 import com.petmatch.backend.entity.HiddenPost;
 import com.petmatch.backend.entity.Like;
 import com.petmatch.backend.entity.PetPhoto;
@@ -23,11 +25,13 @@ import com.petmatch.backend.entity.PetProfile;
 import com.petmatch.backend.entity.Post;
 import com.petmatch.backend.entity.Report;
 import com.petmatch.backend.entity.User;
+import com.petmatch.backend.enums.CommunityNotificationType;
 import com.petmatch.backend.enums.ReportStatus;
 import com.petmatch.backend.enums.ReportTargetType;
 import com.petmatch.backend.enums.Role;
 import com.petmatch.backend.exception.AppException;
 import com.petmatch.backend.repository.CommentRepository;
+import com.petmatch.backend.repository.CommunityNotificationRepository;
 import com.petmatch.backend.repository.HiddenPostRepository;
 import com.petmatch.backend.repository.LikeRepository;
 import com.petmatch.backend.repository.PetPhotoRepository;
@@ -44,6 +48,7 @@ public class CommunityService {
     private final PostRepository postRepository;
     private final LikeRepository likeRepository;
     private final CommentRepository commentRepository;
+    private final CommunityNotificationRepository communityNotificationRepository;
     private final ReportRepository reportRepository;
     private final HiddenPostRepository hiddenPostRepository;
     private final UserRepository userRepository;
@@ -251,6 +256,7 @@ public class CommunityService {
                 })
                 .orElseGet(() -> {
                     likeRepository.save(Like.builder().user(actor).post(post).build());
+                    createPostLikeNotification(actor, post);
                     return true;
                 });
     }
@@ -276,7 +282,9 @@ public class CommunityService {
                 .post(post)
                 .build();
 
-        return mapToCommentResponse(commentRepository.save(comment));
+        Comment saved = commentRepository.save(comment);
+        createPostCommentNotification(actor, post, saved);
+        return mapToCommentResponse(saved);
     }
 
     @Transactional
@@ -292,7 +300,36 @@ public class CommunityService {
                 .parentComment(parentComment)
                 .build();
 
-        return mapToCommentResponse(commentRepository.save(reply));
+        Comment saved = commentRepository.save(reply);
+        createCommentReplyNotification(actor, parentComment, saved);
+        return mapToCommentResponse(saved);
+    }
+
+    @Transactional(readOnly = true)
+    public List<CommunityNotificationResponse> getMyNotifications(boolean markAsRead) {
+        User currentUser = currentUser();
+        List<CommunityNotification> notifications = communityNotificationRepository
+                .findAllByRecipientOrderByCreatedAtDesc(currentUser);
+
+        if (markAsRead) {
+            communityNotificationRepository.markAllAsReadByRecipient(currentUser);
+        }
+
+        return notifications.stream()
+                .map(this::mapToCommunityNotificationResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public long getUnreadNotificationCount() {
+        User currentUser = currentUser();
+        return communityNotificationRepository.countByRecipientAndIsReadFalse(currentUser);
+    }
+
+    @Transactional
+    public void markAllNotificationsAsRead() {
+        User currentUser = currentUser();
+        communityNotificationRepository.markAllAsReadByRecipient(currentUser);
     }
 
     @Transactional
@@ -416,6 +453,86 @@ public class CommunityService {
                 .likesCount(likeRepository.countByPost(post))
                 .commentsCount(post.getComments().size())
                 .isLiked(currentUser != null && likeRepository.existsByUserAndPost(currentUser, post))
+                .build();
+    }
+
+    private void createPostLikeNotification(User actor, Post post) {
+        User recipient = post.getUser();
+        if (recipient.getId().equals(actor.getId())) {
+            return;
+        }
+
+        boolean exists = communityNotificationRepository.existsByRecipientAndActorAndPostAndType(
+                recipient,
+                actor,
+                post,
+                CommunityNotificationType.POST_LIKE
+        );
+        if (exists) {
+            return;
+        }
+
+        communityNotificationRepository.save(CommunityNotification.builder()
+                .recipient(recipient)
+                .actor(actor)
+                .post(post)
+                .type(CommunityNotificationType.POST_LIKE)
+                .isRead(false)
+                .build());
+    }
+
+    private void createPostCommentNotification(User actor, Post post, Comment comment) {
+        User recipient = post.getUser();
+        if (recipient.getId().equals(actor.getId())) {
+            return;
+        }
+
+        communityNotificationRepository.save(CommunityNotification.builder()
+                .recipient(recipient)
+                .actor(actor)
+                .post(post)
+                .comment(comment)
+                .type(CommunityNotificationType.POST_COMMENT)
+                .isRead(false)
+                .build());
+    }
+
+    private void createCommentReplyNotification(User actor, Comment parentComment, Comment reply) {
+        User recipient = parentComment.getUser();
+        if (recipient.getId().equals(actor.getId())) {
+            return;
+        }
+
+        communityNotificationRepository.save(CommunityNotification.builder()
+                .recipient(recipient)
+                .actor(actor)
+                .post(parentComment.getPost())
+                .comment(reply)
+                .type(CommunityNotificationType.COMMENT_REPLY)
+                .isRead(false)
+                .build());
+    }
+
+    private CommunityNotificationResponse mapToCommunityNotificationResponse(CommunityNotification notification) {
+        User actor = notification.getActor();
+        String actorName = actor != null ? actor.getFullName() : "Ai đó";
+        String message = switch (notification.getType()) {
+            case POST_LIKE -> actorName + " đã thả tim bài viết của bạn";
+            case POST_COMMENT -> actorName + " đã bình luận bài viết của bạn";
+            case COMMENT_REPLY -> actorName + " đã trả lời bình luận của bạn";
+        };
+
+        return CommunityNotificationResponse.builder()
+                .id(notification.getId())
+                .type(notification.getType())
+                .message(message)
+                .postId(notification.getPost() != null ? notification.getPost().getId() : null)
+                .commentId(notification.getComment() != null ? notification.getComment().getId() : null)
+                .actorId(actor != null ? actor.getId() : null)
+                .actorName(actorName)
+                .actorAvatar(actor != null ? actor.getAvatarUrl() : null)
+                .isRead(notification.getIsRead())
+                .createdAt(notification.getCreatedAt())
                 .build();
     }
 }

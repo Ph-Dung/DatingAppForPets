@@ -2,9 +2,9 @@ spring:
   profiles:
     include: secret
   datasource:
-    url: jdbc:postgresql://localhost:5433/petmatch_db
+    url: jdbc:postgresql://localhost:5432/petmatch_db
     username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:123456}
+    password: ${DB_PASSWORD:duymac}
 
   jpa:
     hibernate:
@@ -28,9 +28,6 @@ app:
     enabled: ${APP_SEED_ENABLED:true}
     users-count: ${APP_SEED_USERS_COUNT:30}
     skip-when-users-gte: ${APP_SEED_SKIP_USERS_GTE:5}
-    community-posts:
-      enabled: ${APP_SEED_COMMUNITY_POSTS_ENABLED:false}
-      cleanup-profile-ids: ${APP_SEED_COMMUNITY_CLEANUP_PROFILE_IDS:98,99,100}
 jwt:
   secret: qwertyuiopasdfghjklzxcvbnmqwertyuiop
   expiration: 86400000

@@ -34,8 +34,6 @@ app:
     users-count: ${APP_SEED_USERS_COUNT:30}
     skip-when-users-gte: ${APP_SEED_SKIP_USERS_GTE:5}
     upload-photos: ${APP_SEED_UPLOAD_PHOTOS:false}
-    community-posts:
-      enabled: ${APP_SEED_COMMUNITY_POSTS_ENABLED:true}
 
 cloudinary:
   cloud-name: ${CLOUDINARY_CLOUD_NAME:}
