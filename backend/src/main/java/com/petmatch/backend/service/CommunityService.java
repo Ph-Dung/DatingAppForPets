@@ -1,8 +1,12 @@
 package com.petmatch.backend.service;
 
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -41,6 +45,14 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class CommunityService {
+    private static final double DISTANCE_WEIGHT = 35.0;
+    private static final double SPECIES_WEIGHT = 20.0;
+    private static final double RECENCY_WEIGHT = 25.0;
+    private static final double ENGAGEMENT_WEIGHT = 20.0;
+    private static final int RECENCY_FULL_SCORE_HOURS = 72;
+    private static final int RANDOM_NEW_POST_HOURS = 24;
+    private static final double RANDOM_NEW_POST_RATIO = 0.20;
+
     private final PostRepository postRepository;
     private final LikeRepository likeRepository;
     private final CommentRepository commentRepository;
@@ -114,11 +126,50 @@ public class CommunityService {
         List<Long> hiddenPostIds = hiddenPostRepository.findPostIdsByUserId(actor.getId());
         List<Post> posts = postRepository.findAllByOrderByCreatedAtDesc();
         if (hiddenPostIds != null && !hiddenPostIds.isEmpty()) {
+            Set<Long> hiddenSet = new HashSet<>(hiddenPostIds);
             posts = posts.stream()
-                    .filter(post -> !hiddenPostIds.contains(post.getId()))
+                .filter(post -> !hiddenSet.contains(post.getId()))
                     .collect(Collectors.toList());
         }
-        return toPostResponses(posts, actor);
+
+        if (posts.size() <= 1) {
+            return toPostResponses(posts, actor);
+        }
+
+        String actorSpecies = petProfileRepository.findByOwnerId(actor.getId())
+            .map(PetProfile::getSpecies)
+            .orElse(null);
+
+        List<Post> freshPosts = posts.stream()
+            .filter(post -> post.getCreatedAt() != null)
+            .filter(post -> post.getCreatedAt().isAfter(java.time.LocalDateTime.now().minusHours(RANDOM_NEW_POST_HOURS)))
+            .collect(Collectors.toList());
+
+        int randomFreshCount = Math.min(
+            freshPosts.size(),
+            Math.max(0, (int) Math.round(posts.size() * RANDOM_NEW_POST_RATIO))
+        );
+
+        List<Post> randomFreshPosts = new ArrayList<>();
+        if (randomFreshCount > 0) {
+            List<Post> shuffled = new ArrayList<>(freshPosts);
+            java.util.Collections.shuffle(shuffled, ThreadLocalRandom.current());
+            randomFreshPosts = shuffled.subList(0, randomFreshCount);
+        }
+
+        Set<Long> randomFreshIds = randomFreshPosts.stream()
+            .map(Post::getId)
+            .collect(Collectors.toSet());
+
+        List<Post> rankedPosts = posts.stream()
+            .filter(post -> !randomFreshIds.contains(post.getId()))
+            .sorted(Comparator.comparingDouble((Post post) -> recommendationScore(post, actor, actorSpecies)).reversed())
+            .collect(Collectors.toList());
+
+        List<Post> finalOrder = new ArrayList<>(posts.size());
+        finalOrder.addAll(randomFreshPosts);
+        finalOrder.addAll(rankedPosts);
+        return toPostResponses(finalOrder, actor);
     }
 
     @Transactional(readOnly = true)
@@ -392,7 +443,7 @@ public class CommunityService {
 
     private PostResponse mapToPostResponse(Post post, User currentUser) {
         String ownerAvatar = post.getUser().getAvatarUrl();
-        if (ownerAvatar == null || ownerAvatar.isBlank()) {
+        if ((ownerAvatar == null || ownerAvatar.isBlank()) && petProfileRepository != null && petPhotoRepository != null) {
             PetProfile ownerPet = petProfileRepository.findByOwnerId(post.getUser().getId()).orElse(null);
             if (ownerPet != null) {
                 ownerAvatar = petPhotoRepository.findByPetIdAndIsAvatarTrue(ownerPet.getId())
@@ -417,6 +468,78 @@ public class CommunityService {
                 .commentsCount(post.getComments().size())
                 .isLiked(currentUser != null && likeRepository.existsByUserAndPost(currentUser, post))
                 .build();
+    }
+
+    private double recommendationScore(Post post, User actor, String actorSpecies) {
+        double distanceScore = distanceScore(actor, post.getUser());
+        double speciesScore = speciesScore(actorSpecies, post.getUser().getId());
+        double recencyScore = recencyScore(post);
+        double engagementScore = engagementScore(post);
+        return distanceScore + speciesScore + recencyScore + engagementScore;
+    }
+
+    private double distanceScore(User actor, User owner) {
+        if (actor.getLatitude() == null || actor.getLongitude() == null
+                || owner.getLatitude() == null || owner.getLongitude() == null) {
+            return DISTANCE_WEIGHT * 0.30;
+        }
+
+        double km = haversineKm(actor.getLatitude(), actor.getLongitude(), owner.getLatitude(), owner.getLongitude());
+        if (km <= 1) return DISTANCE_WEIGHT;
+        if (km <= 5) return DISTANCE_WEIGHT * 0.85;
+        if (km <= 15) return DISTANCE_WEIGHT * 0.60;
+        if (km <= 30) return DISTANCE_WEIGHT * 0.35;
+        return DISTANCE_WEIGHT * 0.10;
+    }
+
+    private double speciesScore(String actorSpecies, Long ownerId) {
+        if (actorSpecies == null || actorSpecies.isBlank()) {
+            return SPECIES_WEIGHT * 0.40;
+        }
+
+        String ownerSpecies = petProfileRepository.findByOwnerId(ownerId)
+                .map(PetProfile::getSpecies)
+                .orElse(null);
+
+        if (ownerSpecies == null || ownerSpecies.isBlank()) {
+            return SPECIES_WEIGHT * 0.20;
+        }
+
+        return actorSpecies.trim().equalsIgnoreCase(ownerSpecies.trim()) ? SPECIES_WEIGHT : 0.0;
+    }
+
+    private double recencyScore(Post post) {
+        if (post.getCreatedAt() == null) {
+            return 0.0;
+        }
+
+        long hours = java.time.temporal.ChronoUnit.HOURS.between(post.getCreatedAt(), java.time.LocalDateTime.now());
+        if (hours <= 0) {
+            return RECENCY_WEIGHT;
+        }
+        if (hours >= RECENCY_FULL_SCORE_HOURS) {
+            return 0.0;
+        }
+        double ratio = 1.0 - ((double) hours / RECENCY_FULL_SCORE_HOURS);
+        return RECENCY_WEIGHT * ratio;
+    }
+
+    private double engagementScore(Post post) {
+        long likes = likeRepository.countByPost(post);
+        long comments = post.getComments() == null ? 0 : post.getComments().size();
+        double raw = likes + comments * 2.0;
+        double normalized = Math.min(1.0, raw / 20.0);
+        return ENGAGEMENT_WEIGHT * normalized;
+    }
+
+    private double haversineKm(double lat1, double lon1, double lat2, double lon2) {
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return 6371.0 * c;
     }
 
 }
