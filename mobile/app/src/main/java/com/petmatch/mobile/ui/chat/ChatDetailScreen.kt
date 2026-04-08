@@ -22,21 +22,30 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.*
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.input.pointer.*
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.unit.*
 import androidx.navigation.NavController
 import com.petmatch.mobile.ui.navigation.Routes
 import coil.compose.AsyncImage
 import com.petmatch.mobile.data.model.BlockStatus
 import com.petmatch.mobile.data.model.MessageResponse
+import com.petmatch.mobile.data.model.PetProfileResponse
+import com.petmatch.mobile.data.api.RetrofitClient
 import com.petmatch.mobile.ui.common.petMatchGradient
 import com.petmatch.mobile.ui.theme.*
+import kotlinx.coroutines.launch
 import java.io.File
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -59,10 +68,18 @@ fun ChatDetailScreen(
     val blockStatus by chatVm.blockStatus.collectAsState()
     val mediaUploading by chatVm.mediaUploadLoading.collectAsState()
     val convs by chatVm.conversations.collectAsState()
-    val otherAvatarUrl = remember(convs, otherUserId) { convs.find { it.userId == otherUserId }?.userAvatar }
+    
+    // Load pet profile of other user
+    var otherPetProfile by remember { mutableStateOf<PetProfileResponse?>(null) }
+    
+    val otherAvatarUrl = otherPetProfile?.avatarUrl ?: "https://loremflickr.com/40/40/dog?lock=$otherUserId"
+    val displayName = otherPetProfile?.name ?: otherUserName
 
     var messageText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
+    val searchFocusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val scope = rememberCoroutineScope()
 
     var showAppointmentDialog by remember { mutableStateOf(false) }
     var showOptionsMenu by remember { mutableStateOf(false) }
@@ -81,6 +98,13 @@ fun ChatDetailScreen(
         }
     }
 
+    LaunchedEffect(isSearching) {
+        if (isSearching) {
+            searchFocusRequester.requestFocus()
+            keyboardController?.show()
+        }
+    }
+
     // Filter messages for search
     val displayedMessages = remember(messages, searchQuery, isSearching) {
         if (isSearching && searchQuery.isNotBlank()) {
@@ -92,9 +116,25 @@ fun ChatDetailScreen(
 
     LaunchedEffect(Unit) {
         chatVm.loadCurrentUserId(ctx)
-        chatVm.loadChatHistory(ctx, currentUserId, otherUserId)
-        chatVm.markAsRead(ctx, otherUserId, currentUserId)
-        chatVm.loadBlockStatus(ctx, otherUserId)
+    }
+
+    LaunchedEffect(currentUserId) {
+        if (currentUserId > 0) {
+            chatVm.loadConversations(ctx)
+            chatVm.loadChatHistory(ctx, currentUserId, otherUserId)
+            chatVm.markAsRead(ctx, otherUserId, currentUserId)
+            chatVm.loadBlockStatus(ctx, otherUserId)
+        }
+    }
+    
+    // Load pet profile of other user
+    LaunchedEffect(otherUserId) {
+        try {
+            val petResp = RetrofitClient.petApi(ctx).getPetByUserId(otherUserId)
+            if (petResp.isSuccessful) {
+                otherPetProfile = petResp.body()
+            }
+        } catch (_: Exception) {}
     }
 
     LaunchedEffect(currentUserId) {
@@ -129,7 +169,10 @@ fun ChatDetailScreen(
                                 focusedTextColor = Color.White,
                                 unfocusedTextColor = Color.White
                             ),
-                            modifier = Modifier.fillMaxWidth().height(50.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(50.dp)
+                                .focusRequester(searchFocusRequester),
                             singleLine = true
                         )
                     },
@@ -161,7 +204,7 @@ fun ChatDetailScreen(
                         Box {
                             AsyncImage(
                             model = otherAvatarUrl ?: "https://loremflickr.com/40/40/dog?lock=$otherUserId",
-                                contentDescription = otherUserName,
+                                contentDescription = displayName,
                                 modifier = Modifier.size(38.dp).clip(CircleShape),
                                 contentScale = ContentScale.Crop
                             )
@@ -175,7 +218,7 @@ fun ChatDetailScreen(
                         }
                         Column {
                             Text(
-                                otherUserName,
+                                displayName,
                                 style = MaterialTheme.typography.titleMedium.copy(
                                     fontWeight = FontWeight.Bold, color = Color.White
                                 )
@@ -211,13 +254,6 @@ fun ChatDetailScreen(
                             expanded = showOptionsMenu,
                             onDismissRequest = { showOptionsMenu = false }
                         ) {
-                            DropdownMenuItem(
-                                text = { Text("Tìm kiếm tin nhắn 🔍") },
-                                onClick = {
-                                    showOptionsMenu = false
-                                    isSearching = true
-                                }
-                            )
                             DropdownMenuItem(
                                 text = { Text("Đặt lịch hẹn 📅") },
                                 onClick = { showOptionsMenu = false; showAppointmentDialog = true },
@@ -322,7 +358,85 @@ fun ChatDetailScreen(
             }
         }
     ) { padding ->
-        if (loading && messages.isEmpty()) {
+        if (isSearching) {
+            // ── Search Mode: Show search results ──────────────────────────────
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .background(MaterialTheme.colorScheme.background)
+            ) {
+                if (searchQuery.isBlank()) {
+                    // Empty state - user hasn't typed anything yet
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Text("🔍", fontSize = 48.sp)
+                            Text(
+                                "Tìm kiếm tin nhắn",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = TextSecondary
+                            )
+                            Text(
+                                "Gõ từ khóa để tìm",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextHint
+                            )
+                        }
+                    }
+                } else if (displayedMessages.isEmpty()) {
+                    // No results found
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Text("📭", fontSize = 48.sp)
+                            Text(
+                                "Không tìm thấy tin nhắn",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = TextSecondary
+                            )
+                        }
+                    }
+                } else {
+                    // Show search results
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.background),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(displayedMessages, key = { it.id }) { msg ->
+                            SearchResultItem(
+                                msg = msg,
+                                searchQuery = searchQuery,
+                                isMe = msg.senderId == currentUserId,
+                                onClick = {
+                                    val index = messages.indexOfFirst { it.id == msg.id }
+                                    if (index >= 0) {
+                                        scope.launch {
+                                            listState.animateScrollToItem(index)
+                                            isSearching = false
+                                            searchQuery = ""
+                                        }
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        } else if (loading && messages.isEmpty()) {
             Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = PrimaryPink)
             }
@@ -879,6 +993,72 @@ private fun AttachBottomSheet(
                 AttachOption(icon = Icons.Default.CameraAlt, label = "Camera", bgColor = LikeGreen, onClick = onPickImage)
             }
             Spacer(Modifier.height(8.dp))
+        }
+    }
+}
+
+// ── Search Result Item ────────────────────────────────────────────────────────
+@Composable
+private fun SearchResultItem(
+    msg: MessageResponse,
+    searchQuery: String,
+    isMe: Boolean,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        colors = CardDefaults.cardColors(
+            containerColor = if (isMe) PrimaryPink else SurfaceVariant
+        ),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            // Sender info
+            Text(
+                text = if (isMe) "Bạn" else "Họ",
+                style = MaterialTheme.typography.labelSmall,
+                color = if (isMe) Color.White else TextSecondary
+            )
+
+            // Message content with highlight
+            val content = msg.content ?: ""
+            val regex = Regex(searchQuery, RegexOption.IGNORE_CASE)
+            val annotatedString = buildAnnotatedString {
+                var lastIndex = 0
+                regex.findAll(content).forEach { match ->
+                    append(content.substring(lastIndex, match.range.first))
+                    withStyle(
+                        style = SpanStyle(
+                            background = if (isMe) Color.White.copy(0.3f) else LikeGreen.copy(0.5f),
+                            fontWeight = FontWeight.Bold
+                        )
+                    ) {
+                        append(match.value)
+                    }
+                    lastIndex = match.range.last + 1
+                }
+                append(content.substring(lastIndex))
+            }
+
+            Text(
+                text = annotatedString,
+                style = MaterialTheme.typography.bodySmall,
+                color = if (isMe) Color.White else TextPrimary
+            )
+
+            // Timestamp
+            Text(
+                text = try {
+                    DateTimeFormatter.ofPattern("HH:mm").format(LocalDateTime.parse(msg.sentAt))
+                } catch (_: Exception) { msg.sentAt ?: "" },
+                style = MaterialTheme.typography.labelSmall,
+                color = if (isMe) Color.White.copy(0.7f) else TextSecondary
+            )
         }
     }
 }

@@ -6,6 +6,7 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.shape.*
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -14,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.*
 import androidx.compose.ui.draw.*
 import androidx.compose.ui.graphics.*
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -23,6 +25,8 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.petmatch.mobile.data.model.ConversationItem
 import com.petmatch.mobile.data.model.GroupChatResponse
+import com.petmatch.mobile.data.model.PetProfileResponse
+import com.petmatch.mobile.data.api.RetrofitClient
 import com.petmatch.mobile.ui.common.GradientButton
 import com.petmatch.mobile.ui.common.PetMatchLoading
 import com.petmatch.mobile.ui.common.petMatchGradient
@@ -365,6 +369,21 @@ private fun SwipeableConversationItem(
 // ── Conversation Row ──────────────────────────────────────────────────────────
 @Composable
 private fun ConversationListItem(conv: ConversationItem, onClick: () -> Unit) {
+    val ctx = LocalContext.current
+    var petProfile by remember { mutableStateOf<PetProfileResponse?>(null) }
+
+    LaunchedEffect(conv.userId) {
+        try {
+            val resp = RetrofitClient.petApi(ctx).getPetByUserId(conv.userId)
+            if (resp.isSuccessful) {
+                petProfile = resp.body()
+            }
+        } catch (_: Exception) {}
+    }
+
+    val displayName = petProfile?.name ?: conv.nickname?.takeIf { it.isNotBlank() } ?: conv.userName
+    val displayAvatar = petProfile?.avatarUrl ?: conv.userAvatar ?: "https://loremflickr.com/60/60/dog?lock=${conv.userId}"
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -376,8 +395,8 @@ private fun ConversationListItem(conv: ConversationItem, onClick: () -> Unit) {
     ) {
         Box {
             AsyncImage(
-                model = conv.userAvatar ?: "https://loremflickr.com/60/60/dog?lock=${conv.userId}",
-                contentDescription = conv.userName,
+                model = displayAvatar,
+                contentDescription = displayName,
                 modifier = Modifier.size(58.dp).clip(CircleShape),
                 contentScale = ContentScale.Crop
             )
@@ -403,7 +422,7 @@ private fun ConversationListItem(conv: ConversationItem, onClick: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = conv.userName,
+                        text = displayName,
                         style = MaterialTheme.typography.titleSmall.copy(
                             fontWeight = if (conv.unreadCount > 0) FontWeight.Bold else FontWeight.SemiBold
                         ),
@@ -591,7 +610,24 @@ private fun formatConvTime(isoTime: String?): String {
 // ── Component: New Match Item ─────────────────────────────────────────────────
 @Composable
 private fun NewMatchItem(match: ConversationItem?, onClick: () -> Unit) {
+    val ctx = LocalContext.current
     val isCurrentUser = match == null
+    var showProfileSheet by remember { mutableStateOf(false) }
+    var petProfile by remember { mutableStateOf<PetProfileResponse?>(null) }
+
+    LaunchedEffect(match?.userId) {
+        if (!isCurrentUser && match != null) {
+            try {
+                val resp = RetrofitClient.petApi(ctx).getPetByUserId(match.userId)
+                if (resp.isSuccessful) {
+                    petProfile = resp.body()
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
+    val displayName = if (isCurrentUser) "Bạn" else petProfile?.name?.split(" ")?.lastOrNull() ?: match?.userName?.split(" ")?.lastOrNull() ?: ""
+    val displayAvatar = if (isCurrentUser) null else petProfile?.avatarUrl ?: match?.userAvatar ?: "https://loremflickr.com/60/60/dog?lock=${match?.userId}"
     
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -612,6 +648,15 @@ private fun NewMatchItem(match: ConversationItem?, onClick: () -> Unit) {
                     .padding(4.dp)
                     .clip(CircleShape)
                     .background(SurfaceVariant)
+                    .let { modifier ->
+                        if (!isCurrentUser) {
+                            modifier.pointerInput(Unit) {
+                                detectTapGestures(
+                                    onLongPress = { showProfileSheet = true }
+                                )
+                            }
+                        } else modifier
+                    }
             ) {
                 if (isCurrentUser) {
                     Icon(
@@ -622,8 +667,8 @@ private fun NewMatchItem(match: ConversationItem?, onClick: () -> Unit) {
                     )
                 } else {
                     AsyncImage(
-                        model = match?.userAvatar ?: "https://loremflickr.com/60/60/dog?lock=${match?.userId}",
-                        contentDescription = match?.userName,
+                        model = displayAvatar,
+                        contentDescription = displayName,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
                     )
@@ -642,13 +687,61 @@ private fun NewMatchItem(match: ConversationItem?, onClick: () -> Unit) {
         }
         Spacer(Modifier.height(8.dp))
         Text(
-            text = if (isCurrentUser) "Bạn" else match?.userName?.split(" ")?.lastOrNull() ?: "",
+            text = displayName,
             style = MaterialTheme.typography.labelMedium.copy(
                 fontWeight = if (isCurrentUser) FontWeight.Normal else FontWeight.SemiBold
             ),
             color = if (isCurrentUser) TextSecondary else TextPrimary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
+        )
+    }
+    
+    // Profile preview tooltip
+    if (showProfileSheet && !isCurrentUser && match != null) {
+        AlertDialog(
+            onDismissRequest = { showProfileSheet = false },
+            title = { Text(petProfile?.name ?: match.nickname?.takeIf { it.isNotBlank() } ?: match.userName) },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    AsyncImage(
+                        model = petProfile?.avatarUrl ?: match.userAvatar ?: "https://loremflickr.com/400/400/dog?lock=${match.userId}",
+                        contentDescription = displayName,
+                        modifier = Modifier
+                            .size(120.dp)
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                    Text(
+                        text = petProfile?.name ?: match.nickname?.takeIf { it.isNotBlank() } ?: match.userName,
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                    )
+                    if (match.isOnline) {
+                        Text(
+                            text = "🟢 Đang hoạt động",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = LikeGreen
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { 
+                    showProfileSheet = false
+                    onClick()
+                }) {
+                    Text("Nhắn tin")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showProfileSheet = false }) {
+                    Text("Đóng")
+                }
+            }
         )
     }
 }

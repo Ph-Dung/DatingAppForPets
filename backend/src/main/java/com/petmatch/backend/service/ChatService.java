@@ -27,8 +27,8 @@ public class ChatService {
     private final UserRepository userRepository;
     private final BlockRepository blockRepository;
     private final MatchRepository matchRepository;
-    private final CloudinaryService cloudinaryService;
     private final NicknameRepository nicknameRepository;
+    private final CloudinaryService cloudinaryService;
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -84,6 +84,11 @@ public class ChatService {
             long unread = lastMsgOpt.isPresent() ? messageRepository.countUnread(other, me) : 0;
 
             String userName = other.getFullName() != null ? other.getFullName() : "Người dùng";
+            
+            // Load nickname (nếu có, trả về nickname, không thì null)
+            String nickname = nicknameRepository.findBySetterAndReceiver(me, other)
+                    .map(Nickname::getNickname)
+                    .orElse(null);
 
             return ConversationSummaryDto.builder()
                     .matchedUserId(other.getId())
@@ -94,6 +99,7 @@ public class ChatService {
                     .unreadCount(unread)
                     .isOnline(false)
                     .isMuted(false)
+                    .nickname(nickname)
                     .build();
         }).filter(Objects::nonNull).collect(Collectors.toList());
     }

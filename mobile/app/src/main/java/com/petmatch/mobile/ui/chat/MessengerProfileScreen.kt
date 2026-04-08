@@ -24,6 +24,7 @@ import coil.compose.AsyncImage
 import com.petmatch.mobile.ui.theme.*
 import androidx.compose.ui.platform.LocalContext
 import com.petmatch.mobile.data.api.RetrofitClient
+import com.petmatch.mobile.data.model.PetProfileResponse
 import com.petmatch.mobile.ui.navigation.Routes
 import kotlinx.coroutines.launch
 
@@ -42,11 +43,9 @@ fun MessengerProfileScreen(
     var currentNickname by remember { mutableStateOf<String?>(null) }
     var showNicknameDialog by remember { mutableStateOf(false) }
     var nicknameInput by remember { mutableStateOf("") }
+    var petProfile by remember { mutableStateOf<PetProfileResponse?>(null) }
     
-    val displayTitle = currentNickname?.takeIf { it.isNotBlank() } ?: userName
-
-    // Load nickname & targetPetId
-    var targetPetId by remember { mutableStateOf<Long?>(null) }
+    val displayTitle = petProfile?.name ?: (currentNickname?.takeIf { it.isNotBlank() } ?: userName)
 
     LaunchedEffect(userId) {
         try {
@@ -59,16 +58,12 @@ fun MessengerProfileScreen(
         try {
             val petResp = RetrofitClient.petApi(ctx).getPetByUserId(userId)
             if (petResp.isSuccessful) {
-                targetPetId = petResp.body()?.id
+                petProfile = petResp.body()
             }
         } catch (_: Exception) {}
     }
 
-    val convs by chatVm.conversations.collectAsState()
-    val realAvatar = remember(convs, userId) { convs.find { it.userId == userId }?.userAvatar }
-    
-    // URL ảnh tạm để UI demo nếu ko có
-    val avatarUrl = realAvatar ?: "https://loremflickr.com/400/400/dog?lock=$userId"
+    val avatarUrl = petProfile?.avatarUrl ?: "https://loremflickr.com/400/400/dog?lock=$userId"
 
     Scaffold(
         topBar = {
@@ -114,7 +109,7 @@ fun MessengerProfileScreen(
             
             if (currentNickname?.isNotBlank() == true) {
                 Text(
-                    text = "($userName)",
+                    text = "(Biệt danh: $currentNickname)",
                     style = MaterialTheme.typography.bodyMedium,
                     color = TextSecondary
                 )
@@ -127,53 +122,53 @@ fun MessengerProfileScreen(
                 horizontalArrangement = Arrangement.spacedBy(24.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                ProfileActionButton(icon = Icons.Default.Call, label = "Audio") {
+                ProfileActionButton(icon = Icons.Default.Call, label = "Gọi âm thanh") {
                     navController.navigate(Routes.call(peerId = userId, peerName = userName, callType = "AUDIO"))
                 }
-                ProfileActionButton(icon = Icons.Default.Videocam, label = "Video") {
+                ProfileActionButton(icon = Icons.Default.Videocam, label = "Gọi video") {
                     navController.navigate(Routes.call(peerId = userId, peerName = userName, callType = "VIDEO"))
                 }
-                ProfileActionButton(icon = Icons.Default.Person, label = "Profile") {
-                    if (targetPetId != null && targetPetId != 0L) {
-                        navController.navigate(Routes.petDetail(targetPetId!!))
+                ProfileActionButton(icon = Icons.Default.Person, label = "Hồ sơ thú cưng") {
+                    if (petProfile?.id != null && petProfile!!.id != 0L) {
+                        navController.navigate(Routes.petDetail(petProfile!!.id))
                     } else {
                         android.widget.Toast.makeText(ctx, "Không tìm thấy hồ sơ thú cưng!", android.widget.Toast.LENGTH_SHORT).show()
                     }
                 }
-                ProfileActionButton(icon = Icons.Default.NotificationsOff, label = "Mute") {
-                    android.widget.Toast.makeText(ctx, "Tính năng Mute đang phát triển", android.widget.Toast.LENGTH_SHORT).show()
+                ProfileActionButton(icon = Icons.Default.NotificationsOff, label = "Tắt âm") {
+                    android.widget.Toast.makeText(ctx, "Tính năng tắt âm đang phát triển", android.widget.Toast.LENGTH_SHORT).show()
                 }
             }
 
             Spacer(Modifier.height(32.dp))
 
             // Options List
-            ProfileOptionRow(label = "Color", isColorPicker = true, onClick = { 
+            ProfileOptionRow(label = "Màu chat", isColorPicker = true, onClick = { 
                 android.widget.Toast.makeText(ctx, "Đổi màu chat (Đang phát triển)", android.widget.Toast.LENGTH_SHORT).show() 
             })
-            ProfileOptionRow(label = "Nicknames", onClick = { 
+            ProfileOptionRow(label = "Biệt danh", onClick = { 
                 nicknameInput = currentNickname ?: ""
                 showNicknameDialog = true 
             })
 
             Spacer(Modifier.height(24.dp))
-            SectionHeader("MORE ACTIONS")
-            ProfileOptionRow(label = "Search in Conversation", icon = Icons.Default.Search, onClick = { 
+            SectionHeader("THÊM TÙYẾN CHỌN")
+            ProfileOptionRow(label = "Tìm kiếm cuộc trò chuyện", icon = Icons.Default.Search, onClick = { 
                 navController.previousBackStackEntry?.savedStateHandle?.set("activateSearch", true)
                 navController.popBackStack()
             })
-            ProfileOptionRow(label = "Create group", icon = Icons.Default.GroupAdd, onClick = { navController.navigate(Routes.GROUP_CHAT_CREATE) })
-            ProfileOptionRow(label = "Create an appointment", icon = Icons.Default.Event, onClick = {
+            ProfileOptionRow(label = "Tạo nhóm chat", icon = Icons.Default.GroupAdd, onClick = { navController.navigate(Routes.GROUP_CHAT_CREATE) })
+            ProfileOptionRow(label = "Đặt lịch hẹn", icon = Icons.Default.Event, onClick = {
                 navController.navigate(Routes.appointment(userId, userName))
             })
 
             Spacer(Modifier.height(24.dp))
-            SectionHeader("PRIVACY")
-            ProfileOptionRow(label = "Review", onClick = { navController.navigate(Routes.review(userId, userName)) })
-            ProfileOptionRow(label = "Block", onClick = { 
+            SectionHeader("RIÊNG TƯ")
+            ProfileOptionRow(label = "Đánh giá", onClick = { navController.navigate(Routes.review(userId, userName)) })
+            ProfileOptionRow(label = "Chặn người dùng", onClick = { 
                 android.widget.Toast.makeText(ctx, "Chặn người dùng (Vui lòng dùng nút chặn ở trong chat)", android.widget.Toast.LENGTH_SHORT).show() 
             })
-            ProfileOptionRow(label = "Something isn't working", onClick = { 
+            ProfileOptionRow(label = "Báo cáo lỗi", onClick = { 
                 android.widget.Toast.makeText(ctx, "Báo cáo lỗi (Đang phát triển)", android.widget.Toast.LENGTH_SHORT).show() 
             })
 
