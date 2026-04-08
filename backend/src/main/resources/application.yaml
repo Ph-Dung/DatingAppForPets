@@ -4,7 +4,7 @@ spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/petmatch_db
     username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:duymac}
+    password: ${DB_PASSWORD:123}
 
   jpa:
     hibernate:
@@ -33,14 +33,14 @@ jwt:
   expiration: 86400000
 
 cloudinary:
-  cloud-name: ${CLOUDINARY_CLOUD_NAME:dbvfhextb}
-  api-key: ${CLOUDINARY_API_KEY:793653198171336}
-  api-secret: ${CLOUDINARY_API_SECRET:sx_8BbbeDpxox2XFln8soKcZIeI}
+  cloud-name: ${CLOUDINARY_NAME}
+  api-key: ${CLOUDINARY_API_KEY}
+  api-secret: ${CLOUDINARY_API_SECRET}
 
 openai:
-  api-key: ${OPENAI_API_KEY:}
-  base-url: "https://api.openai.com/v1"
-  model: "gpt-4-turbo"
+  api-key: ${OPENAI_API_KEY}
+  base-url: "https://api.groq.com/openai/v1"
+  model: "llama-3.3-70b-versatile"
 
 community:
   moderation:
