@@ -146,6 +146,10 @@ data class UserResponse(
     val phone: String?,
     val address: String?,
     val avatarUrl: String?,
+    val warned: Boolean = false,
+    val warningCount: Int = 0,
+    val lastWarnedAt: String? = null,
+    val warningMessage: String? = null,
     val createdAt: String?
 )
 
