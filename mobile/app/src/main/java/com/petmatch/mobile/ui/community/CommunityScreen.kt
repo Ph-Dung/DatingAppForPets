@@ -24,9 +24,11 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -371,13 +373,22 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
 
         AlertDialog(
             onDismissRequest = { showReportDialogForPostId = null },
-            title = { Text("Báo cáo bài viết") },
+            title = {
+                Text(
+                    text = "Báo cáo bài viết",
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
+            },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     reportReasons.forEach { reason ->
                         val selected = selectedReportReason == reason
                         Button(
-                            onClick = { selectedReportReason = reason },
+                            onClick = {
+                                selectedReportReason = reason
+                                customReportReason = ""
+                            },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(20.dp),
                             colors = ButtonDefaults.buttonColors(
@@ -394,7 +405,13 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
                             customReportReason = it
                             if (it.isNotBlank()) selectedReportReason = null
                         },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onFocusChanged { focusState ->
+                                if (focusState.isFocused) {
+                                    selectedReportReason = null
+                                }
+                            },
                         label = { Text("Lý do khác") },
                         minLines = 2
                     )
@@ -435,54 +452,64 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text("Xác nhận báo cáo", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
                     Text(
-                        text = "Bạn muốn gửi báo cáo này theo cách nào?\n\nLý do: ${finalReason ?: "(trống)"}",
+                        text = "Xác nhận báo cáo",
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                    )
+                    Text(
+                        text = "Lý do báo cáo: ${finalReason ?: "(trống)"}",
                         style = MaterialTheme.typography.bodyMedium
                     )
 
-                    Button(
-                        onClick = { showReportConfirmDialog = false },
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF3F4F6))
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text("Hủy", color = Color(0xFF374151))
-                    }
+                        Button(
+                            onClick = { showReportConfirmDialog = false },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF3F4F6))
+                        ) {
+                            Text("Hủy", color = Color(0xFF374151), maxLines = 1)
+                        }
 
-                    Button(
-                        enabled = postId != null && finalReason != null && !actionLoading,
-                        onClick = {
-                            if (postId != null && finalReason != null) {
-                                vm.submitReport(ctx, postId, finalReason, hidePost = false) {
-                                    showReportConfirmDialog = false
-                                    showReportDialogForPostId = null
-                                    selectedReportReason = null
-                                    customReportReason = ""
+                        Button(
+                            enabled = postId != null && finalReason != null && !actionLoading,
+                            onClick = {
+                                if (postId != null && finalReason != null) {
+                                    vm.submitReport(ctx, postId, finalReason, hidePost = false) {
+                                        showReportConfirmDialog = false
+                                        showReportDialogForPostId = null
+                                        selectedReportReason = null
+                                        customReportReason = ""
+                                    }
                                 }
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEE3F5A))
-                    ) {
-                        Text(if (actionLoading) "Đang gửi..." else "Báo cáo", color = Color.White)
-                    }
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEE3F5A))
+                        ) {
+                            Text(if (actionLoading) "Đang gửi..." else "Báo cáo", color = Color.White, maxLines = 1)
+                        }
 
-                    Button(
-                        enabled = postId != null && finalReason != null && !actionLoading,
-                        onClick = {
-                            if (postId != null && finalReason != null) {
-                                vm.submitReport(ctx, postId, finalReason, hidePost = true) {
-                                    showReportConfirmDialog = false
-                                    showReportDialogForPostId = null
-                                    selectedReportReason = null
-                                    customReportReason = ""
+                        Button(
+                            enabled = postId != null && finalReason != null && !actionLoading,
+                            onClick = {
+                                if (postId != null && finalReason != null) {
+                                    vm.submitReport(ctx, postId, finalReason, hidePost = true) {
+                                        showReportConfirmDialog = false
+                                        showReportDialogForPostId = null
+                                        selectedReportReason = null
+                                        customReportReason = ""
+                                    }
                                 }
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD12F49))
-                    ) {
-                        Text(if (actionLoading) "Đang gửi..." else "Báo cáo và không hiển thị lại bài viết này", color = Color.White)
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD12F49))
+                        ) {
+                            Text("Báo cáo và chặn", color = Color.White, maxLines = 1)
+                        }
                     }
                 }
             }
