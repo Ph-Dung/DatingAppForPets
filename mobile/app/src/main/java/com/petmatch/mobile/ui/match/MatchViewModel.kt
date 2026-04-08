@@ -21,6 +21,15 @@ class MatchViewModel : ViewModel() {
     private val _isLoadingSuggestions = MutableStateFlow(false)
     val isLoadingSuggestions: StateFlow<Boolean> = _isLoadingSuggestions
 
+    private val _isLoadingWhoLikedMe = MutableStateFlow(false)
+    val isLoadingWhoLikedMe: StateFlow<Boolean> = _isLoadingWhoLikedMe
+
+    private val _isLoadingMatched = MutableStateFlow(false)
+    val isLoadingMatched: StateFlow<Boolean> = _isLoadingMatched
+
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error
+
     // ── AI Smart mode tracking ────────────────────────────
     /** Tổng số like đã gửi từ đầu session */
     private var totalSessionLikes = 0
@@ -62,6 +71,7 @@ class MatchViewModel : ViewModel() {
 
     fun loadSuggestions(ctx: Context, refresh: Boolean = false) = viewModelScope.launch {
         if (_isLoadingSuggestions.value) return@launch
+        _error.value = null
         if (refresh) {
             _suggestionPage.value = 0
             _hasMoreSuggestions.value = true
@@ -91,38 +101,59 @@ class MatchViewModel : ViewModel() {
                 RetrofitClient.petApi(ctx).getSuggestions(_suggestionPage.value, 5, _isSmartMode.value, _filterMaxDistance.value)
             }
             if (res.isSuccessful) {
-                val page = res.body()!!
-                _suggestions.value = _suggestions.value + page.content
-                _hasMoreSuggestions.value = !page.last
-                _suggestionPage.value++
+                val page = res.body()
+                if (page != null) {
+                    _suggestions.value = _suggestions.value + page.content
+                    _hasMoreSuggestions.value = !page.last
+                    _suggestionPage.value++
+                } else {
+                    _error.value = "Khong tai duoc du lieu goi y"
+                }
+            } else {
+                _error.value = "Khong tai duoc du lieu goi y"
             }
-        } catch (_: Exception) {}
+        } catch (_: Exception) {
+            _error.value = "Khong the ket noi may chu"
+        }
         _isLoadingSuggestions.value = false
     }
 
     fun sendLike(ctx: Context, petId: Long, isSuperLike: Boolean) = viewModelScope.launch {
+        _error.value = null
+        var shouldAdvanceCard = false
         try {
             val res = RetrofitClient.matchApi(ctx)
                 .sendMatchRequest(SendMatchRequest(petId, isSuperLike))
             if (res.isSuccessful) {
-                val resp = res.body()!!
-                // Hiện popup nếu auto-match (cả 2 like nhau)
-                if (resp.status == "ACCEPTED" && resp.canOpenConversation) {
-                    _matchPopup.value = resp
-                }
-                if (isSuperLike) loadSuperLikeStatus(ctx)
+                val resp = res.body()
+                if (resp != null) {
+                    // Hiện popup nếu auto-match (cả 2 like nhau)
+                    if (resp.status == "ACCEPTED" && resp.canOpenConversation) {
+                        _matchPopup.value = resp
+                    }
+                    if (isSuperLike) loadSuperLikeStatus(ctx)
 
-                // ── AI preference tracking ────────────────────
-                totalSessionLikes++
-                // Sau 5 likes → bật smart mode
-                if (totalSessionLikes >= 5 && !_isSmartMode.value) {
-                    _isSmartMode.value = true
+                    // ── AI preference tracking ────────────────────
+                    totalSessionLikes++
+                    // Sau 5 likes → bật smart mode
+                    if (totalSessionLikes >= 5 && !_isSmartMode.value) {
+                        _isSmartMode.value = true
+                    }
+                    shouldAdvanceCard = true
+                } else {
+                    _error.value = "Khong gui duoc luot thich"
                 }
+            } else {
+                _error.value = if (isSuperLike) "Khong the gui sieu thich" else "Khong the gui luot thich"
             }
-        } catch (_: Exception) {}
+        } catch (_: Exception) {
+            _error.value = "Khong the ket noi may chu"
+        }
 
-        _suggestions.value = _suggestions.value.drop(1)
-        if (_suggestions.value.size <= 2) loadSuggestions(ctx)
+        if (shouldAdvanceCard) {
+            _suggestions.value = _suggestions.value.drop(1)
+            if (_suggestions.value.size <= 2) loadSuggestions(ctx)
+        }
     }
 
     fun sendDislike(ctx: Context) = viewModelScope.launch {
@@ -136,21 +167,41 @@ class MatchViewModel : ViewModel() {
         try {
             val res = RetrofitClient.matchApi(ctx).getSuperLikeStatus()
             if (res.isSuccessful) _superLikeStatus.value = res.body()
-        } catch (_: Exception) {}
+        } catch (_: Exception) {
+            _error.value = "Khong tai duoc trang thai sieu thich"
+        }
     }
 
     fun loadWhoLikedMe(ctx: Context) = viewModelScope.launch {
+        _isLoadingWhoLikedMe.value = true
+        _error.value = null
         try {
             val res = RetrofitClient.matchApi(ctx).getWhoLikedMe()
-            if (res.isSuccessful) _whoLikedMe.value = res.body() ?: emptyList()
-        } catch (_: Exception) {}
+            if (res.isSuccessful) {
+                _whoLikedMe.value = res.body() ?: emptyList()
+            } else {
+                _error.value = "Khong tai duoc danh sach ai da thich"
+            }
+        } catch (_: Exception) {
+            _error.value = "Khong the ket noi may chu"
+        }
+        _isLoadingWhoLikedMe.value = false
     }
 
     fun loadMatched(ctx: Context) = viewModelScope.launch {
+        _isLoadingMatched.value = true
+        _error.value = null
         try {
             val res = RetrofitClient.matchApi(ctx).getMatchedList()
-            if (res.isSuccessful) _matched.value = res.body() ?: emptyList()
-        } catch (_: Exception) {}
+            if (res.isSuccessful) {
+                _matched.value = res.body() ?: emptyList()
+            } else {
+                _error.value = "Khong tai duoc danh sach da ghep doi"
+            }
+        } catch (_: Exception) {
+            _error.value = "Khong the ket noi may chu"
+        }
+        _isLoadingMatched.value = false
     }
 
     fun respondToMatch(ctx: Context, matchId: Long, accept: Boolean, onMatchSuccessful: (() -> Unit)? = null) = viewModelScope.launch {
@@ -190,5 +241,9 @@ class MatchViewModel : ViewModel() {
         try {
             RetrofitClient.userApi(ctx).updateLocation(UpdateLocationRequest(lat, lon))
         } catch (_: Exception) {}
+    }
+
+    fun clearError() {
+        _error.value = null
     }
 }

@@ -1,6 +1,8 @@
 package com.petmatch.backend.service;
 
 import java.util.List;
+import java.util.Objects;
+import java.util.ArrayList;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -14,7 +16,10 @@ import com.petmatch.backend.dto.PostResponse;
 import com.petmatch.backend.dto.request.CommunityReportRequest;
 import com.petmatch.backend.dto.response.CommentResponse;
 import com.petmatch.backend.entity.Comment;
+import com.petmatch.backend.entity.HiddenPost;
 import com.petmatch.backend.entity.Like;
+import com.petmatch.backend.entity.PetPhoto;
+import com.petmatch.backend.entity.PetProfile;
 import com.petmatch.backend.entity.Post;
 import com.petmatch.backend.entity.Report;
 import com.petmatch.backend.entity.User;
@@ -23,7 +28,10 @@ import com.petmatch.backend.enums.ReportTargetType;
 import com.petmatch.backend.enums.Role;
 import com.petmatch.backend.exception.AppException;
 import com.petmatch.backend.repository.CommentRepository;
+import com.petmatch.backend.repository.HiddenPostRepository;
 import com.petmatch.backend.repository.LikeRepository;
+import com.petmatch.backend.repository.PetPhotoRepository;
+import com.petmatch.backend.repository.PetProfileRepository;
 import com.petmatch.backend.repository.PostRepository;
 import com.petmatch.backend.repository.ReportRepository;
 import com.petmatch.backend.repository.UserRepository;
@@ -37,7 +45,10 @@ public class CommunityService {
     private final LikeRepository likeRepository;
     private final CommentRepository commentRepository;
     private final ReportRepository reportRepository;
+    private final HiddenPostRepository hiddenPostRepository;
     private final UserRepository userRepository;
+    private final PetProfileRepository petProfileRepository;
+    private final PetPhotoRepository petPhotoRepository;
     private final CloudinaryService cloudinaryService;
 
     @Value("${community.moderation.enabled:false}")
@@ -100,7 +111,14 @@ public class CommunityService {
     @Transactional(readOnly = true)
     public List<PostResponse> getFeed() {
         User actor = currentUser();
-        return toPostResponses(postRepository.findAllByOrderByCreatedAtDesc(), actor);
+        List<Long> hiddenPostIds = hiddenPostRepository.findPostIdsByUserId(actor.getId());
+        List<Post> posts = postRepository.findAllByOrderByCreatedAtDesc();
+        if (hiddenPostIds != null && !hiddenPostIds.isEmpty()) {
+            posts = posts.stream()
+                    .filter(post -> !hiddenPostIds.contains(post.getId()))
+                    .collect(Collectors.toList());
+        }
+        return toPostResponses(posts, actor);
     }
 
     @Transactional(readOnly = true)
@@ -137,10 +155,25 @@ public class CommunityService {
 
     @Transactional
     public PostResponse createPostWithImageUpload(String content, String location, MultipartFile imageFile) {
-        String uploadedImageUrl = imageFile == null ? null :
-                cloudinaryService.uploadImage(imageFile, "petmatch/community");
+        List<MultipartFile> files = imageFile == null ? List.of() : List.of(imageFile);
+        return createPostWithImageUploads(content, location, files);
+    }
 
-        return createPost(content, uploadedImageUrl, location);
+    @Transactional
+    public PostResponse createPostWithImageUploads(String content, String location, List<MultipartFile> imageFiles) {
+        String uploadedImageUrls = null;
+        if (imageFiles != null && !imageFiles.isEmpty()) {
+            uploadedImageUrls = imageFiles.stream()
+                    .filter(Objects::nonNull)
+                    .filter(file -> !file.isEmpty())
+                    .map(file -> cloudinaryService.uploadImage(file, "petmatch/community"))
+                    .collect(Collectors.joining(","));
+            if (uploadedImageUrls.isBlank()) {
+                uploadedImageUrls = null;
+            }
+        }
+
+        return createPost(content, uploadedImageUrls, location);
     }
 
     @Transactional
@@ -153,6 +186,46 @@ public class CommunityService {
         post.setContent(content);
         post.setImageUrl(imageUrl);
         post.setLocation(location);
+
+        return mapToPostResponse(postRepository.save(post), actor);
+    }
+
+    @Transactional
+    public PostResponse updatePostWithImageUploads(
+            Long postId,
+            String content,
+            String location,
+            String existingImageUrls,
+            List<MultipartFile> imageFiles
+    ) {
+        User actor = currentUser();
+        Post post = requirePost(postId);
+        assertCanManagePost(actor, post, "chỉnh sửa");
+
+        validateContentForModeration(content);
+
+        List<String> finalUrls = new ArrayList<>();
+        if (existingImageUrls != null && !existingImageUrls.isBlank()) {
+            String[] parts = existingImageUrls.split("[,;]");
+            for (String part : parts) {
+                String url = part == null ? "" : part.trim();
+                if (!url.isBlank()) {
+                    finalUrls.add(url);
+                }
+            }
+        }
+
+        if (imageFiles != null && !imageFiles.isEmpty()) {
+            imageFiles.stream()
+                    .filter(Objects::nonNull)
+                    .filter(file -> !file.isEmpty())
+                    .map(file -> cloudinaryService.uploadImage(file, "petmatch/community"))
+                    .forEach(finalUrls::add);
+        }
+
+        post.setContent(content);
+        post.setLocation(location);
+        post.setImageUrl(finalUrls.isEmpty() ? null : String.join(",", finalUrls));
 
         return mapToPostResponse(postRepository.save(post), actor);
     }
@@ -265,7 +338,18 @@ public class CommunityService {
                 .status(ReportStatus.PENDING)
                 .build();
 
-        return reportRepository.save(report);
+        Report saved = reportRepository.save(report);
+
+        if (Boolean.TRUE.equals(request.getHidePost()) && request.getTargetType() == ReportTargetType.POST) {
+            Post post = requirePost(request.getTargetId());
+            hiddenPostRepository.findByUserAndPost(currentUser, post)
+                .orElseGet(() -> hiddenPostRepository.save(HiddenPost.builder()
+                    .user(currentUser)
+                    .post(post)
+                    .build()));
+        }
+
+        return saved;
     }
 
     @Transactional(readOnly = true)
@@ -307,6 +391,19 @@ public class CommunityService {
     }
 
     private PostResponse mapToPostResponse(Post post, User currentUser) {
+        String ownerAvatar = post.getUser().getAvatarUrl();
+        if (ownerAvatar == null || ownerAvatar.isBlank()) {
+            PetProfile ownerPet = petProfileRepository.findByOwnerId(post.getUser().getId()).orElse(null);
+            if (ownerPet != null) {
+                ownerAvatar = petPhotoRepository.findByPetIdAndIsAvatarTrue(ownerPet.getId())
+                    .map(PetPhoto::getPhotoUrl)
+                    .orElseGet(() -> petPhotoRepository.findByPetId(ownerPet.getId()).stream()
+                        .findFirst()
+                        .map(PetPhoto::getPhotoUrl)
+                        .orElse(null));
+            }
+        }
+
         return PostResponse.builder()
                 .id(post.getId())
                 .content(post.getContent())
@@ -314,7 +411,7 @@ public class CommunityService {
                 .location(post.getLocation())
                 .ownerId(post.getUser().getId())
                 .ownerName(post.getUser().getFullName())
-                .ownerAvatar(post.getUser().getAvatarUrl())
+                .ownerAvatar(ownerAvatar)
                 .createdAt(post.getCreatedAt())
                 .likesCount(likeRepository.countByPost(post))
                 .commentsCount(post.getComments().size())

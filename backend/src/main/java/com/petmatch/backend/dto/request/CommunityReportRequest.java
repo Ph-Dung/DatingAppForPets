@@ -16,4 +16,7 @@ public class CommunityReportRequest {
 
     @NotBlank(message = "Lý do báo cáo không được để trống")
     private String reason;
+
+    // Frontend option: report and hide post from current user's feed
+    private Boolean hidePost;
 }

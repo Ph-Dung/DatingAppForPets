@@ -39,6 +39,8 @@ fun MatchedListScreen(
 ) {
     val ctx = LocalContext.current
     val matched by matchVm.matched.collectAsState()
+    val loading by matchVm.isLoadingMatched.collectAsState()
+    val error by matchVm.error.collectAsState()
     val myPetState by petVm.myPet.collectAsState()
 
     LaunchedEffect(Unit) {
@@ -60,6 +62,13 @@ fun MatchedListScreen(
             )
         }
     ) { padding ->
+        if (loading && matched.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+            return@Scaffold
+        }
+
         if (matched.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 Column(
@@ -74,11 +83,21 @@ fun MatchedListScreen(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    if (!error.isNullOrBlank()) {
+                        Text(
+                            text = error ?: "",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
                     GradientButton(
                         text = "Khám phá ngay",
                         onClick = { navController.navigate(Routes.MATCH_SWIPE) { popUpTo(Routes.MATCHED_LIST) { inclusive = true } } },
                         modifier = Modifier.fillMaxWidth(0.65f)
                     )
+                    TextButton(onClick = { matchVm.loadMatched(ctx) }) {
+                        Text("Tai lai")
+                    }
                 }
             }
             return@Scaffold
@@ -181,7 +200,7 @@ private fun MatchedCard(
             // Chat button (if canOpenConversation)
             if (req.canOpenConversation) {
                 IconButton(
-                    onClick = { /* TODO: navigate to chat */ },
+                    onClick = { navController.navigate(Routes.petDetail(otherPetId)) },
                     modifier = Modifier
                         .size(44.dp)
                         .background(PrimaryPink.copy(0.1f), CircleShape)

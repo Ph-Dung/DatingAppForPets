@@ -29,20 +29,21 @@ app:
     users-count: ${APP_SEED_USERS_COUNT:30}
     skip-when-users-gte: ${APP_SEED_SKIP_USERS_GTE:5}
     community-posts:
-      enabled: ${APP_SEED_COMMUNITY_POSTS_ENABLED:true}
+      enabled: ${APP_SEED_COMMUNITY_POSTS_ENABLED:false}
+      cleanup-profile-ids: ${APP_SEED_COMMUNITY_CLEANUP_PROFILE_IDS:98,99,100}
 jwt:
   secret: qwertyuiopasdfghjklzxcvbnmqwertyuiop
   expiration: 86400000
 
 cloudinary:
-  cloud-name: ${CLOUDINARY_NAME}
-  api-key: ${CLOUDINARY_API_KEY}
-  api-secret: ${CLOUDINARY_API_SECRET}
+  cloud-name: ${CLOUDINARY_CLOUD_NAME:dbvfhextb}
+  api-key: ${CLOUDINARY_API_KEY:793653198171336}
+  api-secret: ${CLOUDINARY_API_SECRET:sx_8BbbeDpxox2XFln8soKcZIeI}
 
 openai:
-  api-key: ${OPENAI_API_KEY}
-  base-url: "https://api.groq.com/openai/v1"
-  model: "llama-3.3-70b-versatile"
+  api-key: ${OPENAI_API_KEY:}
+  base-url: "https://api.openai.com/v1"
+  model: "gpt-4-turbo"
 
 community:
   moderation:

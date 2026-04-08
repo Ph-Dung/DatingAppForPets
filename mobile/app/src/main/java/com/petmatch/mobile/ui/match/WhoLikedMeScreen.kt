@@ -38,6 +38,8 @@ fun WhoLikedMeScreen(
 ) {
     val ctx = LocalContext.current
     val whoLikedMe by matchVm.whoLikedMe.collectAsState()
+    val loading by matchVm.isLoadingWhoLikedMe.collectAsState()
+    val error by matchVm.error.collectAsState()
 
     LaunchedEffect(Unit) { matchVm.loadWhoLikedMe(ctx) }
 
@@ -49,6 +51,13 @@ fun WhoLikedMeScreen(
             PetMatchTopBar(title = "Ai đã thích tôi")
         }
     ) { padding ->
+        if (loading && whoLikedMe.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+            return@Scaffold
+        }
+
         if (whoLikedMe.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -59,11 +68,21 @@ fun WhoLikedMeScreen(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    if (!error.isNullOrBlank()) {
+                        Text(
+                            text = error ?: "",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
                     GradientButton(
                         text = "Đi khám phá",
                         onClick = { navController.navigate(Routes.MATCH_SWIPE) { popUpTo(Routes.WHO_LIKED_ME) { inclusive = true } } },
                         modifier = Modifier.fillMaxWidth(0.6f)
                     )
+                    TextButton(onClick = { matchVm.loadWhoLikedMe(ctx) }) {
+                        Text("Tai lai")
+                    }
                 }
             }
             return@Scaffold

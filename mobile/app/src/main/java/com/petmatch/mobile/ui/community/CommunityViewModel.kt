@@ -5,8 +5,11 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.petmatch.mobile.data.api.RetrofitClient
+import com.petmatch.mobile.data.model.CommunityCommentResponse
+import com.petmatch.mobile.data.model.CommunityCreateCommentRequest
 import com.petmatch.mobile.data.model.CommunityCreatePostRequest
 import com.petmatch.mobile.data.model.CommunityPostResponse
+import com.petmatch.mobile.data.model.CommunityReportRequest
 import com.petmatch.mobile.data.model.CommunityUpdatePostRequest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,6 +34,12 @@ class CommunityViewModel : ViewModel() {
 
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
+
+    private val _comments = MutableStateFlow<List<CommunityCommentResponse>>(emptyList())
+    val comments: StateFlow<List<CommunityCommentResponse>> = _comments
+
+    private val _commentsLoading = MutableStateFlow(false)
+    val commentsLoading: StateFlow<Boolean> = _commentsLoading
 
     private val _actionDone = MutableStateFlow(false)
     val actionDone: StateFlow<Boolean> = _actionDone
@@ -94,11 +103,11 @@ class CommunityViewModel : ViewModel() {
         _actionLoading.value = false
     }
 
-    fun createPostWithDeviceImage(
+    fun createPostWithDeviceImages(
         ctx: Context,
         content: String,
         location: String?,
-        imageUri: Uri?,
+        imageUris: List<Uri>,
         onDone: () -> Unit
     ) = viewModelScope.launch {
         _actionLoading.value = true
@@ -106,22 +115,29 @@ class CommunityViewModel : ViewModel() {
         _actionDone.value = false
         try {
             val api = RetrofitClient.communityApi(ctx)
-            val res = if (imageUri != null) {
-                val mimeType = ctx.contentResolver.getType(imageUri) ?: "image/jpeg"
-                val bytes = ctx.contentResolver.openInputStream(imageUri)?.use { it.readBytes() }
-                if (bytes == null) {
+            val res = if (imageUris.isNotEmpty()) {
+                val contentPart = content.toRequestBody("text/plain".toMediaTypeOrNull())
+                val locationPart = location?.takeIf { it.isNotBlank() }
+                    ?.toRequestBody("text/plain".toMediaTypeOrNull())
+
+                val imageParts = imageUris.mapNotNull { uri ->
+                    val mimeType = ctx.contentResolver.getType(uri) ?: "image/jpeg"
+                    val bytes = ctx.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@mapNotNull null
+                    val imageBody = bytes.toRequestBody(mimeType.toMediaTypeOrNull())
+                    MultipartBody.Part.createFormData("images", "community_upload_${System.nanoTime()}.jpg", imageBody)
+                }
+                if (imageParts.isEmpty()) {
                     _actionLoading.value = false
                     _error.value = "Không đọc được ảnh đã chọn"
                     return@launch
                 }
 
-                val contentPart = content.toRequestBody("text/plain".toMediaTypeOrNull())
-                val locationPart = location?.takeIf { it.isNotBlank() }
-                    ?.toRequestBody("text/plain".toMediaTypeOrNull())
-                val imageBody = bytes.toRequestBody(mimeType.toMediaTypeOrNull())
-                val imagePart = MultipartBody.Part.createFormData("image", "community_upload.jpg", imageBody)
-
-                api.createPostWithUpload(contentPart, locationPart, imagePart)
+                api.createPostWithUpload(
+                    content = contentPart,
+                    location = locationPart,
+                    image = null,
+                    images = imageParts
+                )
             } else {
                 val req = CommunityCreatePostRequest(
                     content,
@@ -171,6 +187,61 @@ class CommunityViewModel : ViewModel() {
         _actionLoading.value = false
     }
 
+    fun updatePostWithDeviceImages(
+        ctx: Context,
+        id: Long,
+        content: String,
+        location: String?,
+        imageUris: List<Uri>,
+        onDone: (() -> Unit)? = null
+    ) = viewModelScope.launch {
+        _actionLoading.value = true
+        _error.value = null
+        try {
+            val api = RetrofitClient.communityApi(ctx)
+
+            val localUris = imageUris.filter { uri ->
+                val s = uri.toString().lowercase()
+                s.startsWith("content://") || s.startsWith("file://")
+            }
+            val remoteUrls = imageUris.map { it.toString().trim() }
+                .filter { it.startsWith("http://") || it.startsWith("https://") }
+
+            val contentPart = content.toRequestBody("text/plain".toMediaTypeOrNull())
+            val locationPart = location?.takeIf { it.isNotBlank() }
+                ?.toRequestBody("text/plain".toMediaTypeOrNull())
+            val existingUrlsPart = remoteUrls.joinToString(",").takeIf { it.isNotBlank() }
+                ?.toRequestBody("text/plain".toMediaTypeOrNull())
+
+            val imageParts = localUris.mapNotNull { uri ->
+                val mimeType = ctx.contentResolver.getType(uri) ?: "image/jpeg"
+                val bytes = ctx.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@mapNotNull null
+                val imageBody = bytes.toRequestBody(mimeType.toMediaTypeOrNull())
+                MultipartBody.Part.createFormData("images", "community_upload_${System.nanoTime()}.jpg", imageBody)
+            }
+
+            val res = api.updatePostWithUpload(
+                id = id,
+                content = contentPart,
+                location = locationPart,
+                existingImageUrls = existingUrlsPart,
+                image = null,
+                images = imageParts
+            )
+
+            if (res.isSuccessful) {
+                loadFeed(ctx)
+                loadMyPosts(ctx)
+                onDone?.invoke()
+            } else {
+                _error.value = "Không thể cập nhật bài viết"
+            }
+        } catch (_: Exception) {
+            _error.value = "Không thể kết nối máy chủ"
+        }
+        _actionLoading.value = false
+    }
+
     fun deletePost(ctx: Context, id: Long) = viewModelScope.launch {
         _actionLoading.value = true
         _error.value = null
@@ -189,14 +260,127 @@ class CommunityViewModel : ViewModel() {
     }
 
     fun toggleLike(ctx: Context, id: Long) = viewModelScope.launch {
+        _error.value = null
         try {
             val res = RetrofitClient.communityApi(ctx).toggleLike(id)
             if (res.isSuccessful) {
-                loadFeed(ctx)
-                loadMyPosts(ctx)
+                val likedRaw = res.body()?.get("liked")
+                val liked = when (likedRaw) {
+                    is Boolean -> likedRaw
+                    is String -> likedRaw.equals("true", ignoreCase = true)
+                    else -> false
+                }
+                _feed.value = _feed.value.map { post ->
+                    if (post.id == id) {
+                        post.copy(
+                            isLiked = liked,
+                            likesCount = if (liked) post.likesCount + 1 else (post.likesCount - 1).coerceAtLeast(0)
+                        )
+                    } else post
+                }
+                _myPosts.value = _myPosts.value.map { post ->
+                    if (post.id == id) {
+                        post.copy(
+                            isLiked = liked,
+                            likesCount = if (liked) post.likesCount + 1 else (post.likesCount - 1).coerceAtLeast(0)
+                        )
+                    } else post
+                }
+            } else {
+                _error.value = "Không thể cập nhật lượt thích"
             }
         } catch (_: Exception) {
+            _error.value = "Không thể kết nối máy chủ"
         }
+    }
+
+    fun replyComment(ctx: Context, postId: Long, parentCommentId: Long, content: String, onDone: (() -> Unit)? = null) = viewModelScope.launch {
+        _actionLoading.value = true
+        _error.value = null
+        try {
+            val res = RetrofitClient.communityApi(ctx)
+                .replyComment(parentCommentId, CommunityCreateCommentRequest(content.trim()))
+            if (res.isSuccessful) {
+                loadComments(ctx, postId)
+                loadFeed(ctx)
+                loadMyPosts(ctx)
+                onDone?.invoke()
+            } else {
+                _error.value = "Không gửi được phản hồi"
+            }
+        } catch (_: Exception) {
+            _error.value = "Không thể kết nối máy chủ"
+        }
+        _actionLoading.value = false
+    }
+
+    fun loadComments(ctx: Context, postId: Long) = viewModelScope.launch {
+        _commentsLoading.value = true
+        _error.value = null
+        try {
+            val res = RetrofitClient.communityApi(ctx).getComments(postId)
+            if (res.isSuccessful) {
+                _comments.value = res.body() ?: emptyList()
+            } else {
+                _error.value = "Không tải được bình luận"
+            }
+        } catch (_: Exception) {
+            _error.value = "Không thể kết nối máy chủ"
+        }
+        _commentsLoading.value = false
+    }
+
+    fun addComment(ctx: Context, postId: Long, content: String, onDone: (() -> Unit)? = null) = viewModelScope.launch {
+        _actionLoading.value = true
+        _error.value = null
+        try {
+            val res = RetrofitClient.communityApi(ctx)
+                .addComment(postId, CommunityCreateCommentRequest(content.trim()))
+            if (res.isSuccessful) {
+                loadComments(ctx, postId)
+                loadFeed(ctx)
+                loadMyPosts(ctx)
+                onDone?.invoke()
+            } else {
+                _error.value = "Không gửi được bình luận"
+            }
+        } catch (_: Exception) {
+            _error.value = "Không thể kết nối máy chủ"
+        }
+        _actionLoading.value = false
+    }
+
+    fun submitReport(
+        ctx: Context,
+        postId: Long,
+        reason: String,
+        hidePost: Boolean,
+        onDone: (() -> Unit)? = null
+    ) = viewModelScope.launch {
+        _actionLoading.value = true
+        _error.value = null
+        try {
+            val req = CommunityReportRequest(
+                targetId = postId,
+                targetType = "POST",
+                reason = reason.trim(),
+                hidePost = hidePost
+            )
+            val res = RetrofitClient.communityApi(ctx).submitReport(req)
+            if (res.isSuccessful) {
+                loadFeed(ctx)
+                onDone?.invoke()
+            } else {
+                _error.value = "Không gửi được báo cáo"
+            }
+        } catch (_: Exception) {
+            _error.value = "Không thể kết nối máy chủ"
+        }
+        _actionLoading.value = false
+    }
+
+    fun clearError() {
+        _error.value = null
     }
 
     fun clearActionState() {

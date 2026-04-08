@@ -60,9 +60,19 @@ public class CommunityController {
     public ResponseEntity<PostResponse> createPostWithUpload(
             @RequestPart("content") String content,
             @RequestPart(value = "location", required = false) String location,
-            @RequestPart(value = "image", required = false) MultipartFile image) {
+            @RequestPart(value = "image", required = false) MultipartFile image,
+            @RequestPart(value = "images", required = false) List<MultipartFile> images) {
+        List<MultipartFile> uploadImages;
+        if (images != null && !images.isEmpty()) {
+            uploadImages = images;
+        } else if (image != null) {
+            uploadImages = List.of(image);
+        } else {
+            uploadImages = List.of();
+        }
+
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(communityService.createPostWithImageUpload(content, location, image));
+                .body(communityService.createPostWithImageUploads(content, location, uploadImages));
     }
 
     @PutMapping("/posts/{id}")
@@ -75,6 +85,28 @@ public class CommunityController {
                 request.getImageUrl(),
                 request.getLocation()
         ));
+    }
+
+    @PutMapping(value = "/posts/{id}/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<PostResponse> updatePostWithUpload(
+            @PathVariable Long id,
+            @RequestPart("content") String content,
+            @RequestPart(value = "location", required = false) String location,
+            @RequestPart(value = "existingImageUrls", required = false) String existingImageUrls,
+            @RequestPart(value = "image", required = false) MultipartFile image,
+            @RequestPart(value = "images", required = false) List<MultipartFile> images) {
+        List<MultipartFile> uploadImages;
+        if (images != null && !images.isEmpty()) {
+            uploadImages = images;
+        } else if (image != null) {
+            uploadImages = List.of(image);
+        } else {
+            uploadImages = List.of();
+        }
+
+        return ResponseEntity.ok(
+                communityService.updatePostWithImageUploads(id, content, location, existingImageUrls, uploadImages)
+        );
     }
 
     @DeleteMapping("/posts/{id}")
