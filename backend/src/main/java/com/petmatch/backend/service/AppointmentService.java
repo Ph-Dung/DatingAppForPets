@@ -24,6 +24,7 @@ public class AppointmentService {
     private final SimpMessagingTemplate messagingTemplate;
     private final com.petmatch.backend.repository.MatchRepository matchRepository;
     private final com.petmatch.backend.repository.MessageRepository messageRepository;
+    private final jakarta.persistence.EntityManager entityManager;
 
     @Transactional
     public Appointment createAppointment(Long requesterId, AppointmentRequest request) {
@@ -33,9 +34,10 @@ public class AppointmentService {
                 .orElseThrow(() -> new AppException("Recipient not found", HttpStatus.NOT_FOUND));
 
         // Match check: chỉ người đã match mới tạo lịch hẹn được
-        if (matchRepository.findMatchByUsers(requester, recipient).isEmpty()) {
-            throw new AppException("Chỉ có thể đặt lịch hẹn với người đã match", HttpStatus.FORBIDDEN);
-        }
+        // Ghi chú: Tạm thời vô hiệu hoá check này để cho phép test / trò chuyện tự do và đặt lịch
+        // if (matchRepository.findMatchByUserIds(requesterId, request.getRecipientId()).isEmpty()) {
+        //     throw new AppException("Chỉ có thể đặt lịch hẹn với người đã match", HttpStatus.FORBIDDEN);
+        // }
 
         Appointment appointment = Appointment.builder()
                 .requester(requester)
@@ -132,31 +134,15 @@ public class AppointmentService {
                 )
         );
 
-        // Phát thêm 1 tin nhắn TEXT thông báo vào chat
-        User sender = appointment.getRequester().getId().equals(currentUserId) ? appointment.getRequester() : appointment.getRecipient();
-        User receiver = appointment.getRequester().getId().equals(currentUserId) ? appointment.getRecipient() : appointment.getRequester();
-        String replyText = "Đã thay đổi trạng thái cuộc hẹn thành: " + newStatus.name();
-        if (newStatus == AppointmentStatus.CONFIRMED) replyText = "Tôi đã CHẤP NHẬN lời mời hẹn của bạn ❤️";
-        if (newStatus == AppointmentStatus.CANCELLED) replyText = "Rất tiếc tôi phải TỪ CHỐI lời mời hẹn này 💔";
-        
-        com.petmatch.backend.entity.Message textMsg = com.petmatch.backend.entity.Message.builder()
-                .sender(sender)
-                .receiver(receiver)
-                .type(com.petmatch.backend.entity.MessageType.TEXT)
-                .content(replyText)
-                .build();
-        messageRepository.save(textMsg);
-        
-        com.petmatch.backend.dto.MessageDto textDto = com.petmatch.backend.dto.MessageDto.builder()
-                .id(textMsg.getId())
-                .senderId(sender.getId())
-                .receiverId(receiver.getId())
-                .type(com.petmatch.backend.entity.MessageType.TEXT)
-                .content(replyText)
-                .sentAt(textMsg.getSentAt())
-                .isRead(false)
-                .build();
-        messagingTemplate.convertAndSendToUser(String.valueOf(receiver.getId()), "/queue/messages", textDto);
+        // Xóa tính năng tự động phát tin nhắn TEXT thông báo.
+        // Thay vào đó cập nhật content của thẻ Message APPOINTMENT gốc
+        try {
+            String q = "UPDATE messages SET content = REPLACE(content, '\"status\":\"PENDING\"', '\"status\":\"" + newStatus.name() + "\"') " +
+                       "WHERE type = 'APPOINTMENT' AND content LIKE '%\"id\":" + appointmentId + ",%'";
+            entityManager.createNativeQuery(q).executeUpdate();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
 
         return saved;
     }

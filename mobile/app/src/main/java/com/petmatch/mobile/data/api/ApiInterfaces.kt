@@ -20,6 +20,9 @@ interface PetApi {
     @GET("api/pets/{petId}")
     suspend fun getPetById(@Path("petId") petId: Long): Response<PetProfileResponse>
 
+    @GET("api/pets/user/{userId}")
+    suspend fun getPetByUserId(@Path("userId") userId: Long): Response<PetProfileResponse>
+
     @PATCH("api/pets/toggle-hidden")
     suspend fun toggleHidden(): Response<Unit>
 
@@ -155,6 +158,11 @@ interface AdminApi {
         @Query("note") note: String? = null
     ): Response<AdminUserItemResponse>
 
+    @GET("api/admin/users/{userId}")
+    suspend fun getUserDetail(
+        @Path("userId") userId: Long
+    ): Response<AdminUserDetailResponse>
+
     @GET("api/admin/pets")
     suspend fun getPets(
         @Query("query") query: String? = null,
@@ -168,6 +176,16 @@ interface AdminApi {
         @Path("petId") petId: Long,
         @Query("hidden") hidden: Boolean
     ): Response<AdminPetItemResponse>
+
+    @GET("api/admin/pets/{petId}")
+    suspend fun getPetDetail(
+        @Path("petId") petId: Long
+    ): Response<AdminPetDetailResponse>
+
+    @DELETE("api/admin/pets/{petId}")
+    suspend fun deletePet(
+        @Path("petId") petId: Long
+    ): Response<Unit>
 
     @GET("api/admin/reports")
     suspend fun getReports(

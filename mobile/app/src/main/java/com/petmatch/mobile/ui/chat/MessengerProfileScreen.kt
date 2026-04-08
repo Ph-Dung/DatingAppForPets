@@ -32,7 +32,8 @@ import kotlinx.coroutines.launch
 fun MessengerProfileScreen(
     navController: NavController,
     userId: Long,
-    userName: String
+    userName: String,
+    chatVm: ChatViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
 ) {
     val scrollState = rememberScrollState()
     val ctx = LocalContext.current
@@ -44,7 +45,9 @@ fun MessengerProfileScreen(
     
     val displayTitle = currentNickname?.takeIf { it.isNotBlank() } ?: userName
 
-    // Load nickname
+    // Load nickname & targetPetId
+    var targetPetId by remember { mutableStateOf<Long?>(null) }
+
     LaunchedEffect(userId) {
         try {
             val resp = RetrofitClient.chatApi(ctx).getNickname(userId)
@@ -52,10 +55,20 @@ fun MessengerProfileScreen(
                 currentNickname = resp.body()?.get("nickname")
             }
         } catch (_: Exception) {}
+        
+        try {
+            val petResp = RetrofitClient.petApi(ctx).getPetByUserId(userId)
+            if (petResp.isSuccessful) {
+                targetPetId = petResp.body()?.id
+            }
+        } catch (_: Exception) {}
     }
 
-    // URL ảnh tạm để UI demo
-    val avatarUrl = "https://placedog.net/400/400?r=$userId"
+    val convs by chatVm.conversations.collectAsState()
+    val realAvatar = remember(convs, userId) { convs.find { it.userId == userId }?.userAvatar }
+    
+    // URL ảnh tạm để UI demo nếu ko có
+    val avatarUrl = realAvatar ?: "https://loremflickr.com/400/400/dog?lock=$userId"
 
     Scaffold(
         topBar = {
@@ -121,17 +134,23 @@ fun MessengerProfileScreen(
                     navController.navigate(Routes.call(peerId = userId, peerName = userName, callType = "VIDEO"))
                 }
                 ProfileActionButton(icon = Icons.Default.Person, label = "Profile") {
-                    // Navigate to user profile
+                    if (targetPetId != null && targetPetId != 0L) {
+                        navController.navigate(Routes.petDetail(targetPetId!!))
+                    } else {
+                        android.widget.Toast.makeText(ctx, "Không tìm thấy hồ sơ thú cưng!", android.widget.Toast.LENGTH_SHORT).show()
+                    }
                 }
                 ProfileActionButton(icon = Icons.Default.NotificationsOff, label = "Mute") {
-                    // Mute logic
+                    android.widget.Toast.makeText(ctx, "Tính năng Mute đang phát triển", android.widget.Toast.LENGTH_SHORT).show()
                 }
             }
 
             Spacer(Modifier.height(32.dp))
 
             // Options List
-            ProfileOptionRow(label = "Color", isColorPicker = true, onClick = { /* TODO: Đổi màu chat (Local state) */ })
+            ProfileOptionRow(label = "Color", isColorPicker = true, onClick = { 
+                android.widget.Toast.makeText(ctx, "Đổi màu chat (Đang phát triển)", android.widget.Toast.LENGTH_SHORT).show() 
+            })
             ProfileOptionRow(label = "Nicknames", onClick = { 
                 nicknameInput = currentNickname ?: ""
                 showNicknameDialog = true 
@@ -139,7 +158,10 @@ fun MessengerProfileScreen(
 
             Spacer(Modifier.height(24.dp))
             SectionHeader("MORE ACTIONS")
-            ProfileOptionRow(label = "Search in Conversation", icon = Icons.Default.Search, onClick = { })
+            ProfileOptionRow(label = "Search in Conversation", icon = Icons.Default.Search, onClick = { 
+                navController.previousBackStackEntry?.savedStateHandle?.set("activateSearch", true)
+                navController.popBackStack()
+            })
             ProfileOptionRow(label = "Create group", icon = Icons.Default.GroupAdd, onClick = { navController.navigate(Routes.GROUP_CHAT_CREATE) })
             ProfileOptionRow(label = "Create an appointment", icon = Icons.Default.Event, onClick = {
                 navController.navigate(Routes.appointment(userId, userName))
@@ -148,8 +170,12 @@ fun MessengerProfileScreen(
             Spacer(Modifier.height(24.dp))
             SectionHeader("PRIVACY")
             ProfileOptionRow(label = "Review", onClick = { navController.navigate(Routes.review(userId, userName)) })
-            ProfileOptionRow(label = "Block", onClick = { /* TODO: Block user via modal */ })
-            ProfileOptionRow(label = "Something isn't working", onClick = { /* Report */ })
+            ProfileOptionRow(label = "Block", onClick = { 
+                android.widget.Toast.makeText(ctx, "Chặn người dùng (Vui lòng dùng nút chặn ở trong chat)", android.widget.Toast.LENGTH_SHORT).show() 
+            })
+            ProfileOptionRow(label = "Something isn't working", onClick = { 
+                android.widget.Toast.makeText(ctx, "Báo cáo lỗi (Đang phát triển)", android.widget.Toast.LENGTH_SHORT).show() 
+            })
 
             Spacer(Modifier.height(40.dp))
         }

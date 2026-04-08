@@ -23,12 +23,15 @@ sealed class AdminAuthState {
 
 data class AdminUiState(
     val loading: Boolean = false,
+    val detailLoading: Boolean = false,
     val dashboard: AdminDashboardResponse? = null,
     val users: List<AdminUserItemResponse> = emptyList(),
     val usersHasMore: Boolean = true,
     val pets: List<AdminPetItemResponse> = emptyList(),
     val petsHasMore: Boolean = true,
     val reports: List<AdminReportItemResponse> = emptyList(),
+    val userDetail: AdminUserDetailResponse? = null,
+    val petDetail: AdminPetDetailResponse? = null,
     val adminProfile: UserResponse? = null,
     val error: String? = null
 )
@@ -175,6 +178,34 @@ class AdminViewModel : ViewModel() {
         }
     }
 
+    fun loadUserDetail(ctx: Context, userId: Long) = viewModelScope.launch {
+        _uiState.value = _uiState.value.copy(detailLoading = true, error = null, userDetail = null)
+        try {
+            val res = RetrofitClient.adminApi(ctx).getUserDetail(userId)
+            if (res.isSuccessful && res.body() != null) {
+                _uiState.value = _uiState.value.copy(detailLoading = false, userDetail = res.body())
+            } else {
+                _uiState.value = _uiState.value.copy(detailLoading = false, error = "Không tải được chi tiết user")
+            }
+        } catch (e: Exception) {
+            _uiState.value = _uiState.value.copy(detailLoading = false, error = "Lỗi: ${e.message}")
+        }
+    }
+
+    fun loadPetDetail(ctx: Context, petId: Long) = viewModelScope.launch {
+        _uiState.value = _uiState.value.copy(detailLoading = true, error = null, petDetail = null)
+        try {
+            val res = RetrofitClient.adminApi(ctx).getPetDetail(petId)
+            if (res.isSuccessful && res.body() != null) {
+                _uiState.value = _uiState.value.copy(detailLoading = false, petDetail = res.body())
+            } else {
+                _uiState.value = _uiState.value.copy(detailLoading = false, error = "Không tải được chi tiết hồ sơ thú cưng")
+            }
+        } catch (e: Exception) {
+            _uiState.value = _uiState.value.copy(detailLoading = false, error = "Lỗi: ${e.message}")
+        }
+    }
+
     fun loadMorePets(ctx: Context) = viewModelScope.launch {
         if (petLoadingMore || !_uiState.value.petsHasMore) return@launch
         petLoadingMore = true
@@ -196,17 +227,27 @@ class AdminViewModel : ViewModel() {
     }
 
     fun loadReports(ctx: Context, status: String = "PENDING") = viewModelScope.launch {
-        _uiState.value = _uiState.value.copy(loading = true, error = null)
+        _uiState.value = _uiState.value.copy(loading = true, reports = emptyList(), error = null)
         try {
             val res = RetrofitClient.adminApi(ctx).getReports(status = status)
             if (res.isSuccessful && res.body() != null) {
-                _uiState.value = _uiState.value.copy(loading = false, reports = res.body()!!.content)
+                val sortedReports = res.body()!!.content
+                    .sortedWith(
+                        compareByDescending<AdminReportItemResponse> { reportTimeKey(it) }
+                            .thenByDescending { it.id }
+                    )
+                _uiState.value = _uiState.value.copy(loading = false, reports = sortedReports)
             } else {
                 _uiState.value = _uiState.value.copy(loading = false, error = "Không tải được báo cáo")
             }
         } catch (e: Exception) {
             _uiState.value = _uiState.value.copy(loading = false, error = "Lỗi: ${e.message}")
         }
+    }
+
+    // Keep newest reports at the top. For processed reports, prefer handledAt when available.
+    private fun reportTimeKey(report: AdminReportItemResponse): String {
+        return report.handledAt ?: report.createdAt ?: ""
     }
 
     fun setUserLocked(ctx: Context, userId: Long, locked: Boolean, onDone: (() -> Unit)? = null) = viewModelScope.launch {
@@ -236,21 +277,42 @@ class AdminViewModel : ViewModel() {
         }
     }
 
+    fun deletePet(ctx: Context, petId: Long, onDone: (() -> Unit)? = null) = viewModelScope.launch {
+        try {
+            RetrofitClient.adminApi(ctx).deletePet(petId)
+            loadPets(ctx, petQuery, petHidden)
+            loadDashboard(ctx)
+            _uiState.value = _uiState.value.copy(petDetail = null)
+            onDone?.invoke()
+        } catch (_: Exception) {
+        }
+    }
+
     fun handleReport(
         ctx: Context,
         reportId: Long,
         action: String,
+        currentStatus: String = "PENDING",
         note: String? = null,
         onDone: (() -> Unit)? = null
     ) = viewModelScope.launch {
         try {
             RetrofitClient.adminApi(ctx).handleReport(reportId, AdminHandleReportRequest(action, note))
-            loadReports(ctx)
+            loadReports(ctx, currentStatus)
             loadDashboard(ctx)
+            loadPets(ctx, petQuery, petHidden)
             loadUsers(ctx, userQuery, userLocked, userWarned)
             onDone?.invoke()
         } catch (_: Exception) {
         }
+    }
+
+    fun clearUserDetail() {
+        _uiState.value = _uiState.value.copy(userDetail = null)
+    }
+
+    fun clearPetDetail() {
+        _uiState.value = _uiState.value.copy(petDetail = null)
     }
 
     fun loadAdminProfile(ctx: Context) = viewModelScope.launch {

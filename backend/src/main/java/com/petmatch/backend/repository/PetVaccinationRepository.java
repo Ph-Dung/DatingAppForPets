@@ -14,6 +14,8 @@ public interface PetVaccinationRepository extends JpaRepository<PetVaccination, 
 
     long countByPetId(Long petId);
 
+        void deleteAllByPetId(Long petId);
+
     /** Tìm theo ID và petId để tránh cross-user access */
     Optional<PetVaccination> findByIdAndPetId(Long id, Long petId);
 

@@ -25,11 +25,17 @@ data class PetProfileResponse(
     val isHidden: Boolean,
     val avatarUrl: String?,
     val photoUrls: List<String>,
+    val photos: List<PetPhotoDto> = emptyList(),
     val createdAt: String?,
     
     // Geolocation
     val distanceKm: Double? = null,
     val ownerAddress: String? = null
+)
+
+data class PetPhotoDto(
+    val id: Long,
+    val url: String
 )
 
 data class PetProfileRequest(
@@ -239,6 +245,11 @@ data class AdminUserItemResponse(
     val createdAt: String?
 )
 
+data class AdminUserDetailResponse(
+    val user: AdminUserItemResponse,
+    val violations: List<AdminReportItemResponse>
+)
+
 data class AdminPetItemResponse(
     val id: Long,
     val ownerId: Long,
@@ -248,6 +259,11 @@ data class AdminPetItemResponse(
     val avatarUrl: String?,
     val hidden: Boolean,
     val createdAt: String?
+)
+
+data class AdminPetDetailResponse(
+    val pet: PetProfileResponse,
+    val violations: List<AdminReportItemResponse>
 )
 
 data class AdminReportItemResponse(

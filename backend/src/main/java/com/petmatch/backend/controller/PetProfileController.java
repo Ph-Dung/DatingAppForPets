@@ -50,6 +50,11 @@ public class PetProfileController {
         return ResponseEntity.ok(petService.getById(petId));
     }
 
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<PetProfileResponse> getByUserId(@PathVariable Long userId) {
+        return ResponseEntity.ok(petService.getByUserId(userId));
+    }
+
     @PatchMapping("/toggle-hidden")
     public ResponseEntity<Void> toggleHidden() {
         petService.toggleHidden();

@@ -17,7 +17,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
-private val actionButtonColor = Color(0xFF1D3557)
+private val actionButtonColor = Color(0xFFD64550)
 
 private enum class ReportReasonType {
     WARN,
@@ -60,7 +60,7 @@ fun AdminReportsScreen(vm: AdminViewModel) {
             .padding(16.dp)
     ) {
         Text("Danh sách báo cáo", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
-        Text("Xử lý nhanh: cảnh báo, ẩn hồ sơ thú cưng, ban user hoặc bỏ qua.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Xử lý nhanh: cảnh báo, xoá hồ sơ thú cưng, ban user hoặc bỏ qua.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(8.dp))
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
@@ -75,6 +75,26 @@ fun AdminReportsScreen(vm: AdminViewModel) {
         }
 
         Spacer(Modifier.height(10.dp))
+
+        if (!state.loading && state.reports.isEmpty()) {
+            val emptyText = when (selectedStatus) {
+                "PENDING" -> "Hiện chưa có báo cáo nào chờ xử lý."
+                "RESOLVED" -> "Chưa có báo cáo nào đã xử lý."
+                else -> "Chưa có báo cáo nào bị bỏ qua."
+            }
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = Color(0xFFF5F8FF),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = emptyText,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 14.dp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(Modifier.height(10.dp))
+        }
 
         LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             items(state.reports) { report ->
@@ -113,7 +133,7 @@ fun AdminReportsScreen(vm: AdminViewModel) {
                         ) {
                             Icon(Icons.Default.Info, contentDescription = null)
                             Spacer(Modifier.width(6.dp))
-                            Text("Xem chi tiết báo cáo")
+                            Text("Chi tiết báo cáo")
                         }
 
                         Spacer(Modifier.height(8.dp))
@@ -126,8 +146,14 @@ fun AdminReportsScreen(vm: AdminViewModel) {
                                     reasonDialogType = ReportReasonType.WARN
                                     selectedReason = warnReasons.first()
                                 },
-                                onHideProfile = {
-                                    vm.handleReport(ctx, report.id, "AUTO_HIDE_PROFILE", "Ẩn hồ sơ thú cưng do vi phạm")
+                                onDeletePet = {
+                                    vm.handleReport(
+                                        ctx,
+                                        report.id,
+                                        "AUTO_DELETE_PET",
+                                        selectedStatus,
+                                        "Xoá hồ sơ thú cưng do vi phạm"
+                                    )
                                 },
                                 onBan = {
                                     actionReportId = report.id
@@ -135,7 +161,7 @@ fun AdminReportsScreen(vm: AdminViewModel) {
                                     selectedReason = banReasons.first()
                                 },
                                 onDismiss = {
-                                    vm.handleReport(ctx, report.id, "DISMISS", "Bỏ qua báo cáo")
+                                    vm.handleReport(ctx, report.id, "DISMISS", selectedStatus, "Bỏ qua báo cáo")
                                 }
                             )
                         } else {
@@ -184,8 +210,14 @@ fun AdminReportsScreen(vm: AdminViewModel) {
                                 reasonDialogType = ReportReasonType.WARN
                                 selectedReason = warnReasons.first()
                             },
-                            onHideProfile = {
-                                vm.handleReport(ctx, report.id, "AUTO_HIDE_PROFILE", "Ẩn hồ sơ thú cưng do vi phạm")
+                            onDeletePet = {
+                                vm.handleReport(
+                                    ctx,
+                                    report.id,
+                                    "AUTO_DELETE_PET",
+                                    selectedStatus,
+                                    "Xoá hồ sơ thú cưng do vi phạm"
+                                )
                                 selectedReport = null
                             },
                             onBan = {
@@ -194,7 +226,7 @@ fun AdminReportsScreen(vm: AdminViewModel) {
                                 selectedReason = banReasons.first()
                             },
                             onDismiss = {
-                                vm.handleReport(ctx, report.id, "DISMISS", "Bỏ qua báo cáo")
+                                vm.handleReport(ctx, report.id, "DISMISS", selectedStatus, "Bỏ qua báo cáo")
                                 selectedReport = null
                             }
                         )
@@ -235,9 +267,9 @@ fun AdminReportsScreen(vm: AdminViewModel) {
                     onClick = {
                         val reportId = actionReportId ?: return@Button
                         if (reasonDialogType == ReportReasonType.WARN) {
-                            vm.handleReport(ctx, reportId, "WARN_USER", selectedReason)
+                            vm.handleReport(ctx, reportId, "WARN_USER", selectedStatus, selectedReason)
                         } else {
-                            vm.handleReport(ctx, reportId, "BAN_USER", selectedReason)
+                            vm.handleReport(ctx, reportId, "BAN_USER", selectedStatus, selectedReason)
                         }
                         reasonDialogType = null
                         actionReportId = null
@@ -260,7 +292,7 @@ fun AdminReportsScreen(vm: AdminViewModel) {
 private fun ReportActionButtons(
     report: com.petmatch.mobile.data.model.AdminReportItemResponse,
     onWarn: () -> Unit,
-    onHideProfile: () -> Unit,
+    onDeletePet: () -> Unit,
     onBan: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -272,8 +304,8 @@ private fun ReportActionButtons(
         ) {
             UnifiedActionButton(text = "Cảnh báo", onClick = onWarn, modifier = Modifier.weight(1f))
             UnifiedActionButton(
-                text = "Ẩn hồ sơ thú cưng",
-                onClick = onHideProfile,
+                text = "Xoá hồ sơ thú cưng",
+                onClick = onDeletePet,
                 enabled = report.targetType == "PET_PROFILE",
                 modifier = Modifier.weight(1f)
             )

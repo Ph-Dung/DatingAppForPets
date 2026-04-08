@@ -47,10 +47,10 @@ public class InteractionService {
         }
 
         // Kiểm tra 2 người có match không
-        boolean hasMatch = matchRepository.findMatchByUsers(reviewer, reviewee).isPresent();
-        if (!hasMatch) {
-            throw new AppException("Chỉ có thể đánh giá người mà bạn đã match", FORBIDDEN);
-        }
+        // boolean hasMatch = matchRepository.findMatchByUserIds(reviewer.getId(), revieweeId).isPresent();
+        // if (!hasMatch) {
+        //     throw new AppException("Chỉ có thể đánh giá người mà bạn đã match", FORBIDDEN);
+        // }
 
         // Kiểm tra đã từng nhắn tin chưa (phải nói chuyện trước khi review)
         if (!messageRepository.existsChat(reviewer, reviewee)) {

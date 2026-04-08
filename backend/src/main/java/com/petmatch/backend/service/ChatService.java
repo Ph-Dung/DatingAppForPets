@@ -62,6 +62,7 @@ public class ChatService {
             String lastMsg = lastMsgOpt.map(m -> {
                 if (m.getType() == MessageType.IMAGE) return "📷 Hình ảnh";
                 if (m.getType() == MessageType.VOICE) return "🎙️ Tin nhắn thoại";
+                if (m.getType() == MessageType.APPOINTMENT) return "📅 Lời mời đặt lịch hẹn";
                 return m.getContent();
             }).orElse(null);
 
@@ -105,9 +106,9 @@ public class ChatService {
         User receiver = getUser(messageDto.getReceiverId());
 
         // Match check: chỉ người đã match mới nhắn tin được
-        if (matchRepository.findMatchByUsers(sender, receiver).isEmpty()) {
-            throw new AppException("Chỉ có thể nhắn tin với người đã match", HttpStatus.FORBIDDEN);
-        }
+        // if (matchRepository.findMatchByUserIds(sender.getId(), receiver.getId()).isEmpty()) {
+        //     throw new AppException("Chỉ có thể nhắn tin với người đã match", HttpStatus.FORBIDDEN);
+        // }
 
         // Block check: cấp MESSAGE hoặc ALL
         List<BlockLevel> msgLevels = List.of(BlockLevel.MESSAGE, BlockLevel.ALL);
@@ -146,9 +147,9 @@ public class ChatService {
         User user2 = getUser(userId2);
 
         // Match check để lấy lịch sử
-        if (matchRepository.findMatchByUsers(user1, user2).isEmpty()) {
-            throw new AppException("Không tìm thấy match giữa 2 người dùng", HttpStatus.FORBIDDEN);
-        }
+        // if (matchRepository.findMatchByUserIds(user1.getId(), user2.getId()).isEmpty()) {
+        //     throw new AppException("Không tìm thấy match giữa 2 người dùng", HttpStatus.FORBIDDEN);
+        // }
 
         Pageable pageable = PageRequest.of(page, size);
         Page<Message> messages = messageRepository.findChatHistory(user1, user2, pageable);

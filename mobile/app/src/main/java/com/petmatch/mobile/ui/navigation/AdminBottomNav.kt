@@ -21,31 +21,31 @@ data class AdminBottomNavItem(
 val adminBottomNavItems = listOf(
     AdminBottomNavItem(
         route = Routes.ADMIN_DASHBOARD,
-        labelText = "Dashboard",
+        labelText = "Tổng quan",
         iconFilled = Icons.Default.Dashboard,
         iconOutline = Icons.Default.Dashboard
     ),
     AdminBottomNavItem(
         route = Routes.ADMIN_USERS,
-        labelText = "Users",
+        labelText = "Người dùng",
         iconFilled = Icons.Default.SupervisedUserCircle,
         iconOutline = Icons.Default.SupervisedUserCircle
     ),
     AdminBottomNavItem(
         route = Routes.ADMIN_PETS,
-        labelText = "Pets",
+        labelText = "Thú cưng",
         iconFilled = Icons.Default.Pets,
         iconOutline = Icons.Default.Pets
     ),
     AdminBottomNavItem(
         route = Routes.ADMIN_REPORTS,
-        labelText = "Reports",
+        labelText = "Báo cáo",
         iconFilled = Icons.Default.Report,
         iconOutline = Icons.Default.Report
     ),
     AdminBottomNavItem(
         route = Routes.ADMIN_ACCOUNT,
-        labelText = "Account",
+        labelText = "Tài khoản",
         iconFilled = Icons.Default.AdminPanelSettings,
         iconOutline = Icons.Default.AdminPanelSettings
     )

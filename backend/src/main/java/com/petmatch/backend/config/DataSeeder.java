@@ -324,20 +324,22 @@ public class DataSeeder implements CommandLineRunner {
         log.info("DataSeeder: Đã seed 3 community posts mẫu.");
     }
 
-       private String uploadRandomPhoto(String species, int seed) {
-        try {
-            String imageUrl;
-            if ("Chó".equals(species)) {
-                imageUrl = "https://loremflickr.com/400/500/dog?lock=" + seed;
-            } else if ("Mèo".equals(species)) {
-                imageUrl = "https://loremflickr.com/400/500/cat?lock=" + seed;
-            } else {
-                // Thỏ / Hamster → dùng picsum với seed cố định (không dùng tiếng Việt có dấu
-                // trong URL)
-                String safeSeed = "Thỏ".equals(species) ? "rabbit" : "hamster";
-                imageUrl = "https://picsum.photos/seed/" + safeSeed + seed + "/400/500";
-            }
+    private String uploadRandomPhoto(String species, int seed) {
+        String imageUrl;
+        if ("Chó".equals(species)) {
+            imageUrl = "https://loremflickr.com/400/500/dog?lock=" + seed;
+        } else if ("Mèo".equals(species)) {
+            imageUrl = "https://loremflickr.com/400/500/cat?lock=" + seed;
+        } else {
+            String safeSeed = "Thỏ".equals(species) ? "rabbit" : "hamster";
+            imageUrl = "https://picsum.photos/seed/" + safeSeed + seed + "/400/500";
+        }
 
+        if (!uploadPhotos) {
+            return imageUrl;
+        }
+
+        try {
             // Download ảnh
             byte[] imageBytes;
             try (InputStream is = java.net.URI.create(imageUrl).toURL().openStream()) {
@@ -354,12 +356,7 @@ public class DataSeeder implements CommandLineRunner {
         } catch (Exception e) {
             log.warn("DataSeeder: Không thể upload ảnh: {}", e.getMessage());
             // Fallback: trả về URL trực tiếp không qua Cloudinary
-            if ("Chó".equals(species))
-                return "https://loremflickr.com/400/500/dog?lock=" + (seed % 50);
-            if ("Mèo".equals(species))
-                return "https://loremflickr.com/400/500/cat?lock=" + seed;
-            String safeSeed = "Thỏ".equals(species) ? "rabbit" : "hamster";
-            return "https://picsum.photos/seed/" + safeSeed + seed + "/400/500";
+            return imageUrl;
         }
     }
 

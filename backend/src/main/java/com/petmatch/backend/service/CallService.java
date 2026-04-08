@@ -30,9 +30,9 @@ public class CallService {
                 .orElseThrow(() -> new RuntimeException("Callee not found"));
 
         // Match check
-        if (matchRepository.findMatchByUsers(caller, callee).isEmpty()) {
-            throw new AppException("Chỉ có thể gọi cho người đã match", HttpStatus.FORBIDDEN);
-        }
+        // if (matchRepository.findMatchByUserIds(caller.getId(), callee.getId()).isEmpty()) {
+        //     throw new AppException("Chỉ có thể gọi cho người đã match", HttpStatus.FORBIDDEN);
+        // }
 
         // Block check: cấp CALL hoặc ALL
         List<BlockLevel> callLevels = List.of(BlockLevel.CALL, BlockLevel.ALL);

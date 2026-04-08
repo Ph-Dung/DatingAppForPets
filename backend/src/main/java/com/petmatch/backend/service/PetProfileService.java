@@ -2,6 +2,7 @@ package com.petmatch.backend.service;
 
 import com.petmatch.backend.dto.request.PetProfileRequest;
 import com.petmatch.backend.dto.request.PetVaccinationRequest;
+import com.petmatch.backend.dto.response.PetPhotoDto;
 import com.petmatch.backend.dto.response.PetProfileResponse;
 import com.petmatch.backend.dto.response.VaccinationResponse;
 import com.petmatch.backend.entity.PetPhoto;
@@ -124,6 +125,12 @@ public class PetProfileService {
     public PetProfileResponse getById(Long petId) {
         return toResponse(petProfileRepo.findById(petId)
                 .orElseThrow(() -> new AppException("Không tìm thấy hồ sơ", NOT_FOUND)));
+    }
+
+    @Transactional(readOnly = true)
+    public PetProfileResponse getByUserId(Long userId) {
+        return toResponse(petProfileRepo.findByOwnerId(userId)
+                .orElseThrow(() -> new AppException("Người dùng chưa có thú cưng", NOT_FOUND)));
     }
 
     // ── Suggestions & Search ─────────────────────────────
@@ -343,6 +350,8 @@ public class PetProfileService {
                 .map(PetPhoto::getPhotoUrl).orElse(null);
         List<String> photoUrls = petPhotoRepo.findByPetId(p.getId())
                 .stream().map(PetPhoto::getPhotoUrl).toList();
+        List<PetPhotoDto> photos = petPhotoRepo.findByPetId(p.getId())
+                .stream().map(ph -> PetPhotoDto.builder().id(ph.getId()).url(ph.getPhotoUrl()).build()).toList();
         int vacCount = (int) vaccinationRepo.countByPetId(p.getId());
 
         Integer age = null;
@@ -383,6 +392,7 @@ public class PetProfileService {
                 .isHidden(p.getIsHidden())
                 .avatarUrl(avatarUrl)
                 .photoUrls(photoUrls)
+                .photos(photos)
                 .createdAt(p.getCreatedAt())
                 .distanceKm(distanceKm)
                 .ownerAddress(p.getOwner().getAddress())

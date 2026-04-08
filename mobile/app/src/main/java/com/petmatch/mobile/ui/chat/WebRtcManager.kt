@@ -91,9 +91,30 @@ class WebRtcManager(
             .createPeerConnectionFactory()
 
         // 3. PeerConnection configuration
-        val iceServers = STUN_SERVERS.map {
-            PeerConnection.IceServer.builder(it).createIceServer()
+        val iceServers = mutableListOf<PeerConnection.IceServer>()
+        STUN_SERVERS.forEach {
+            iceServers.add(PeerConnection.IceServer.builder(it).createIceServer())
         }
+        // Thêm Free TURN server (Metered OpenRelay) để 2 Emulator có thể đục lỗ NAT với nhau
+        iceServers.add(
+            PeerConnection.IceServer.builder("turn:openrelay.metered.ca:80")
+                .setUsername("openrelayproject")
+                .setPassword("openrelayproject")
+                .createIceServer()
+        )
+        iceServers.add(
+            PeerConnection.IceServer.builder("turn:openrelay.metered.ca:443")
+                .setUsername("openrelayproject")
+                .setPassword("openrelayproject")
+                .createIceServer()
+        )
+        iceServers.add(
+            PeerConnection.IceServer.builder("turn:openrelay.metered.ca:443?transport=tcp")
+                .setUsername("openrelayproject")
+                .setPassword("openrelayproject")
+                .createIceServer()
+        )
+
         val rtcConfig = PeerConnection.RTCConfiguration(iceServers).apply {
             sdpSemantics = PeerConnection.SdpSemantics.UNIFIED_PLAN
             continualGatheringPolicy = PeerConnection.ContinualGatheringPolicy.GATHER_CONTINUALLY

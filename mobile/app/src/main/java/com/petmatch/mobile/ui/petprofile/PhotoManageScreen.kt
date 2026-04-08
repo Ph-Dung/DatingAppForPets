@@ -175,10 +175,10 @@ fun PhotoManageScreen(navController: NavController, vm: PetProfileViewModel) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    "Thư viện (${pet.photoUrls.size}/10)",
+                    "Thư viện (${pet.photos.size}/10)",
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold)
                 )
-                if (pet.photoUrls.size < 10) {
+                if (pet.photos.size < 10) {
                     TextButton(onClick = {
                         pendingSetAsAvatar = false
                         launcher.launch("image/*")
@@ -197,13 +197,12 @@ fun PhotoManageScreen(navController: NavController, vm: PetProfileViewModel) {
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                items(pet.photoUrls) { url ->
+                items(pet.photos) { photo ->
                     PhotoGridItem(
-                        url = url,
-                        isAvatar = url == pet.avatarUrl,
+                        url = photo.url,
+                        isAvatar = photo.url == pet.avatarUrl,
                         onDelete = {
-                            val photoId = pet.photoUrls.indexOf(url).toLong()
-                            vm.deletePhoto(ctx, photoId)
+                            vm.deletePhoto(ctx, photo.id)
                         },
                         onSetAvatar = {
                             // re-upload as avatar is not possible; user should upload new avatar
@@ -211,7 +210,7 @@ fun PhotoManageScreen(navController: NavController, vm: PetProfileViewModel) {
                     )
                 }
                 // Add placeholder
-                if (pet.photoUrls.size < 10) {
+                if (pet.photos.size < 10) {
                     item {
                         Box(
                             modifier = Modifier
