@@ -72,8 +72,12 @@ fun ChatDetailScreen(
     // Load pet profile of other user
     var otherPetProfile by remember { mutableStateOf<PetProfileResponse?>(null) }
     
+    // Get nickname from conversations
+    val otherConversation = convs.find { it.userId == otherUserId }
+    val otherNickname = otherConversation?.nickname?.takeIf { it?.isNotBlank() == true }
+    
     val otherAvatarUrl = otherPetProfile?.avatarUrl ?: "https://loremflickr.com/40/40/dog?lock=$otherUserId"
-    val displayName = otherPetProfile?.name ?: otherUserName
+    val displayName = otherNickname ?: otherPetProfile?.name ?: otherUserName
 
     var messageText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
@@ -116,6 +120,7 @@ fun ChatDetailScreen(
 
     LaunchedEffect(Unit) {
         chatVm.loadCurrentUserId(ctx)
+        chatVm.loadConversations(ctx)  // Load conversations to get nickname
     }
 
     LaunchedEffect(currentUserId) {
@@ -124,6 +129,7 @@ fun ChatDetailScreen(
             chatVm.loadChatHistory(ctx, currentUserId, otherUserId)
             chatVm.markAsRead(ctx, otherUserId, currentUserId)
             chatVm.loadBlockStatus(ctx, otherUserId)
+            chatVm.loadUserAppointments(ctx, currentUserId)
         }
     }
     
@@ -135,12 +141,8 @@ fun ChatDetailScreen(
                 otherPetProfile = petResp.body()
             }
         } catch (_: Exception) {}
-    }
-
-    LaunchedEffect(currentUserId) {
-        if (currentUserId > 0) {
-            chatVm.loadUserAppointments(ctx, currentUserId)
-        }
+        // Reload conversations to ensure we have latest nickname
+        chatVm.loadConversations(ctx)
     }
 
     LaunchedEffect(displayedMessages.size) {

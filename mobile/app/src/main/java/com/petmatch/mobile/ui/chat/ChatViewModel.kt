@@ -168,7 +168,16 @@ class ChatViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 RetrofitClient.chatApi(ctx).deleteConversation(otherId)
-                _conversations.value = _conversations.value.filter { it.userId != otherId }
+                // Update conversation: clear messages but keep conversation in list
+                _conversations.value = _conversations.value.map { conv ->
+                    if (conv.userId == otherId) {
+                        conv.copy(lastMessage = null, lastMessageTime = null, unreadCount = 0)
+                    } else {
+                        conv
+                    }
+                }
+                // Also clear local messages for this conversation
+                _messages.value = emptyList()
             } catch (_: Exception) {}
         }
     }

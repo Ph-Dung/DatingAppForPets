@@ -45,7 +45,7 @@ fun MessengerProfileScreen(
     var nicknameInput by remember { mutableStateOf("") }
     var petProfile by remember { mutableStateOf<PetProfileResponse?>(null) }
     
-    val displayTitle = petProfile?.name ?: (currentNickname?.takeIf { it.isNotBlank() } ?: userName)
+    val displayTitle = currentNickname?.takeIf { it.isNotBlank() } ?: petProfile?.name ?: userName
 
     LaunchedEffect(userId) {
         try {
@@ -106,14 +106,6 @@ fun MessengerProfileScreen(
                 style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                 color = TextPrimary
             )
-            
-            if (currentNickname?.isNotBlank() == true) {
-                Text(
-                    text = "(Biệt danh: $currentNickname)",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TextSecondary
-                )
-            }
 
             Spacer(Modifier.height(24.dp))
 
@@ -197,6 +189,8 @@ fun MessengerProfileScreen(
                             val resp = RetrofitClient.chatApi(ctx).setNickname(userId, req)
                             if (resp.isSuccessful) {
                                 currentNickname = resp.body()?.get("nickname")
+                                // Reload conversations to update nickname in chat list
+                                chatVm.loadConversations(ctx)
                             }
                         } catch (_: Exception) {}
                         showNicknameDialog = false

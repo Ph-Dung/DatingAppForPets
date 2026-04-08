@@ -12,9 +12,11 @@ import com.petmatch.backend.enums.ReportTargetType;
 import com.petmatch.backend.enums.Role;
 import com.petmatch.backend.exception.AppException;
 import com.petmatch.backend.repository.MatchRequestRepository;
+import com.petmatch.backend.repository.CommentRepository;
 import com.petmatch.backend.repository.PetPhotoRepository;
 import com.petmatch.backend.repository.PetProfileRepository;
 import com.petmatch.backend.repository.PetVaccinationRepository;
+import com.petmatch.backend.repository.PostRepository;
 import com.petmatch.backend.repository.ReportRepository;
 import com.petmatch.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -42,6 +44,8 @@ public class AdminService {
     private final MatchRequestRepository matchRequestRepository;
     private final ReportRepository reportRepository;
     private final PetPhotoRepository petPhotoRepository;
+    private final PostRepository postRepository;
+    private final CommentRepository commentRepository;
 
     @Transactional(readOnly = true)
     public AdminDashboardResponse getDashboard() {
@@ -154,6 +158,7 @@ public class AdminService {
         if (action == AdminReportAction.BAN_USER) {
             User targetUser = resolveTargetUser(report);
             lockUserInternal(targetUser, true);
+            deleteCommunityContentByUser(targetUser.getId());
             report.setStatus(ReportStatus.RESOLVED);
         } else if (action == AdminReportAction.AUTO_DELETE_PHOTO) {
             if (report.getTargetType() == ReportTargetType.PET_PROFILE) {
@@ -176,6 +181,7 @@ public class AdminService {
             targetUser.setWarningCount((targetUser.getWarningCount() == null ? 0 : targetUser.getWarningCount()) + 1);
             targetUser.setLastWarnedAt(LocalDateTime.now());
             userRepository.save(targetUser);
+            deleteReportedContent(report);
             report.setStatus(ReportStatus.RESOLVED);
         }
 
@@ -209,6 +215,18 @@ public class AdminService {
             return pet.getOwner();
         }
 
+        if (report.getTargetType() == ReportTargetType.POST) {
+            return postRepository.findById(report.getTargetId())
+                    .orElseThrow(() -> new AppException("Không tìm thấy bài viết bị báo cáo", HttpStatus.NOT_FOUND))
+                    .getUser();
+        }
+
+        if (report.getTargetType() == ReportTargetType.COMMENT) {
+            return commentRepository.findById(report.getTargetId())
+                    .orElseThrow(() -> new AppException("Không tìm thấy bình luận bị báo cáo", HttpStatus.NOT_FOUND))
+                    .getUser();
+        }
+
         throw new AppException("Loại báo cáo này chưa hỗ trợ ban user", HttpStatus.BAD_REQUEST);
     }
 
@@ -231,10 +249,27 @@ public class AdminService {
         user.setIsLocked(locked);
         User saved = userRepository.save(user);
 
-        if (locked) {
-            petProfileRepository.findByOwnerId(saved.getId()).ifPresent(petProfileRepository::delete);
-        }
+        petProfileRepository.findByOwnerId(saved.getId()).ifPresent(pet -> {
+            pet.setIsHidden(locked);
+            petProfileRepository.save(pet);
+        });
         return saved;
+    }
+
+    private void deleteReportedContent(Report report) {
+        if (report.getTargetType() == ReportTargetType.POST) {
+            postRepository.findById(report.getTargetId()).ifPresent(postRepository::delete);
+            return;
+        }
+
+        if (report.getTargetType() == ReportTargetType.COMMENT) {
+            commentRepository.findById(report.getTargetId()).ifPresent(commentRepository::delete);
+        }
+    }
+
+    private void deleteCommunityContentByUser(Long userId) {
+        commentRepository.deleteByUserId(userId);
+        postRepository.deleteByUserId(userId);
     }
 
     private AdminUserItemResponse toUserItem(User user) {
