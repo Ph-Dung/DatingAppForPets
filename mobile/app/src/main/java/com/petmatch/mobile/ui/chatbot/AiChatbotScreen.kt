@@ -326,7 +326,7 @@ private fun SuggestedPetCard(
             // Pet image header
             Box(modifier = Modifier.fillMaxWidth().height(160.dp)) {
                 AsyncImage(
-                    model = if (pet.avatarUrl.isNullOrEmpty()) "https://placedog.net/400/200?id=${pet.id}" else pet.avatarUrl,
+                    model = if (pet.avatarUrl.isNullOrEmpty()) "https://i.pinimg.com/originals/f1/0f/f7/f10ff70a715515d1662550dccdd44832.png" else pet.avatarUrl,
                     contentDescription = pet.name,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop

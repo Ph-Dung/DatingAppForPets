@@ -232,7 +232,7 @@ fun PetMatchNavGraph(
         // ── Pet Profile ──────────────────────────────────
         composable(Routes.PET_SETUP)    { PetProfileSetupScreen(navController, petVm) }
         composable(Routes.PET_EDIT)     { PetProfileEditScreen(navController, petVm) }
-        composable(Routes.PET_ME)       { AccountScreen(navController, petVm, authVm, userVm) }  // Bottom tab
+        composable(Routes.PET_ME)       { AccountScreen(navController, petVm, authVm, userVm, matchVm) }  // Bottom tab
         composable(Routes.MY_PET)       { MyProfileScreen(navController, petVm, authVm) }          // Sub-page: chi tiết pet
         composable(Routes.EDIT_USER_PROFILE) { EditUserProfileScreen(navController, userVm) }
         composable(Routes.CHANGE_PASSWORD)   { ChangePasswordScreen(navController, userVm) }

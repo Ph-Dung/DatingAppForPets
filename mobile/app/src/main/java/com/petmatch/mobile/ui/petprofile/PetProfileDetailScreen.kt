@@ -126,7 +126,7 @@ private fun PetDetailContent(
 ) {
     val photos = if (pet.avatarUrl != null)
         listOf(pet.avatarUrl) + pet.photoUrls.filter { it != pet.avatarUrl }
-    else pet.photoUrls.ifEmpty { listOf("https://placedog.net/400/600") }
+    else pet.photoUrls.ifEmpty { listOf("https://i.pinimg.com/originals/f1/0f/f7/f10ff70a715515d1662550dccdd44832.png") }
 
     val pagerState = rememberPagerState { photos.size }
 

@@ -156,7 +156,7 @@ private fun MatchedCard(
             // Avatar with match ring
             Box {
                 AsyncImage(
-                    model = otherAvatar ?: "https://placedog.net/80/80",
+                    model = otherAvatar ?: "https://i.pinimg.com/originals/f1/0f/f7/f10ff70a715515d1662550dccdd44832.png",
                     contentDescription = otherName,
                     modifier = Modifier
                         .size(70.dp)

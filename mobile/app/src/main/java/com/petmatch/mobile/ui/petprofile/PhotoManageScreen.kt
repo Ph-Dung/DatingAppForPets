@@ -117,7 +117,7 @@ fun PhotoManageScreen(navController: NavController, vm: PetProfileViewModel) {
                     )
                     Box(contentAlignment = Alignment.BottomEnd) {
                         AsyncImage(
-                            model = pet.avatarUrl ?: "https://placedog.net/140/140",
+                            model = pet.avatarUrl ?: "https://i.pinimg.com/originals/f1/0f/f7/f10ff70a715515d1662550dccdd44832.png",
                             contentDescription = "Avatar",
                             modifier = Modifier
                                 .size(120.dp)

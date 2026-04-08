@@ -91,11 +91,11 @@ class AuthViewModel : ViewModel() {
     }
 
     fun logout(ctx: Context) = viewModelScope.launch {
+        _authState.value = AuthState.Idle
         ctx.dataStore.edit {
             it.remove(stringPreferencesKey(Constants.TOKEN_KEY))
             it.remove(stringPreferencesKey("current_user_id"))
         }
-        _authState.value = AuthState.Idle
     }
 
     fun resetState() {

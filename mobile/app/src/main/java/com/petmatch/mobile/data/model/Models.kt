@@ -78,6 +78,10 @@ data class SendMatchRequest(
     val isSuperLike: Boolean = false
 )
 
+data class SendDislikeRequest(
+    val dislikedPetId: Long
+)
+
 data class SuperLikeStatusResponse(
     val canSuperLike: Boolean,
     val nextResetAt: String?,

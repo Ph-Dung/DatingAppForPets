@@ -540,13 +540,18 @@ class ChatViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 val resp = RetrofitClient.groupChatApi(ctx).getGroupHistory(groupId)
-                if (resp.isSuccessful) _groupMessages.value = resp.body() ?: emptyList()
+                if (resp.isSuccessful) {
+                    // Sort messages by sentAt in ascending order (oldest first)
+                    val messages = resp.body() ?: emptyList()
+                    _groupMessages.value = messages.sortedBy { it.sentAt }
+                }
             } catch (_: Exception) {}
         }
     }
 
     fun addLocalGroupMessage(msg: GroupMessageResponse) {
-        _groupMessages.value = _groupMessages.value + msg
+        // Add and keep sorted order (oldest first)
+        _groupMessages.value = (_groupMessages.value + msg).sortedBy { it.sentAt }
     }
 
     fun sendGroupMessage(ctx: Context, groupId: Long, currentUserId: Long, text: String) {

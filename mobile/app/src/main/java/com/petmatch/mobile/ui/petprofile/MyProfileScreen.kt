@@ -117,7 +117,7 @@ private fun MyProfileContent(
         // Hero section
         Box(modifier = Modifier.fillMaxWidth().height(280.dp)) {
             AsyncImage(
-                model = pet.avatarUrl ?: "https://placedog.net/400/280",
+                model = pet.avatarUrl ?: "https://i.pinimg.com/originals/f1/0f/f7/f10ff70a715515d1662550dccdd44832.png",
                 contentDescription = pet.name,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop

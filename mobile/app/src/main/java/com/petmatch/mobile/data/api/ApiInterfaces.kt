@@ -83,6 +83,9 @@ interface MatchApi {
     @POST("api/matches")
     suspend fun sendMatchRequest(@Body req: SendMatchRequest): Response<MatchRequestResponse>
 
+    @POST("api/matches/dislike")
+    suspend fun sendDislike(@Body req: SendDislikeRequest): Response<Unit>
+
     @GET("api/matches/super-like-status")
     suspend fun getSuperLikeStatus(): Response<SuperLikeStatusResponse>
 

@@ -2,14 +2,11 @@ package com.petmatch.backend.service;
 
 import com.petmatch.backend.dto.response.MatchRequestResponse;
 import com.petmatch.backend.dto.response.SuperLikeStatusResponse;
-import com.petmatch.backend.entity.Match;
-import com.petmatch.backend.entity.MatchRequest;
-import com.petmatch.backend.entity.PetPhoto;
-import com.petmatch.backend.entity.PetProfile;
-import com.petmatch.backend.entity.User;
+import com.petmatch.backend.entity.*;
 import com.petmatch.backend.enums.MatchStatus;
 import com.petmatch.backend.exception.AppException;
 import com.petmatch.backend.repository.BlockRepository;
+import com.petmatch.backend.repository.DislikeRepository;
 import com.petmatch.backend.repository.MatchRepository;
 import com.petmatch.backend.repository.MatchRequestRepository;
 import com.petmatch.backend.repository.PetPhotoRepository;
@@ -37,6 +34,7 @@ public class MatchRequestService {
     private final PetProfileRepository petProfileRepo;
     private final PetPhotoRepository petPhotoRepo;
     private final BlockRepository blockRepo;
+    private final DislikeRepository dislikeRepo;
     private final UserRepository userRepo;
     private final AiMatchingService aiMatchingService;
 
@@ -127,6 +125,27 @@ public class MatchRequestService {
         catch (Exception ignored) { /* không block luồng chính */ }
 
         return toResponse(saved);
+    }
+
+    // ── Record Dislike (bỏ qua) ───────────────────────────
+    public void recordDislike(Long dislikedPetId) {
+        PetProfile dislikerPet = myPet();
+        PetProfile dislikedPet = requirePet(dislikedPetId);
+
+        if (dislikerPet.getId().equals(dislikedPetId))
+            throw new AppException("Không thể bỏ qua chính mình", BAD_REQUEST);
+
+        // Kiểm tra đã bỏ qua chưa
+        if (dislikeRepo.existsByDislikerPetIdAndDislikedPetId(dislikerPet.getId(), dislikedPetId))
+            throw new AppException("Đã bỏ qua rồi", CONFLICT);
+
+        // Tạo Dislike record
+        Dislike dislike = Dislike.builder()
+                .dislikerPet(dislikerPet)
+                .dislikedPet(dislikedPet)
+                .build();
+
+        dislikeRepo.save(dislike);
     }
 
     /**

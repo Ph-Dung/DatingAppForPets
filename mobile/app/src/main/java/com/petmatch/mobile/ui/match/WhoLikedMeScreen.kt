@@ -167,7 +167,7 @@ private fun WhoLikedMeCard(
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             AsyncImage(
-                model = req.senderPetAvatarUrl ?: "https://placedog.net/200/280",
+                model = req.senderPetAvatarUrl ?: "https://i.pinimg.com/originals/f1/0f/f7/f10ff70a715515d1662550dccdd44832.png",
                 contentDescription = req.senderPetName,
                 modifier = Modifier.fillMaxSize().clickable { navController.navigate(Routes.petDetail(req.senderPetId)) },
                 contentScale = ContentScale.Crop

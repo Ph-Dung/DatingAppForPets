@@ -1,6 +1,7 @@
 package com.petmatch.backend.controller;
 
 import com.petmatch.backend.dto.request.MatchRequestDto;
+import com.petmatch.backend.dto.request.DislikeRequestDto;
 import com.petmatch.backend.dto.response.MatchRequestResponse;
 import com.petmatch.backend.dto.response.SuperLikeStatusResponse;
 import com.petmatch.backend.enums.MatchStatus;
@@ -25,6 +26,14 @@ public class MatchRequestController {
         boolean isSuperLike = Boolean.TRUE.equals(req.getIsSuperLike());
         return ResponseEntity.status(201)
                 .body(matchService.sendRequest(req.getReceiverPetId(), isSuperLike));
+    }
+
+    /** Ghi nhận bỏ qua (dislike) */
+    @PostMapping("/dislike")
+    public ResponseEntity<Void> recordDislike(
+            @Valid @RequestBody DislikeRequestDto req) {
+        matchService.recordDislike(req.getDislikedPetId());
+        return ResponseEntity.noContent().build();
     }
 
     /** Kiểm tra quota Super Like hôm nay */

@@ -32,7 +32,8 @@ fun AccountScreen(
     navController: NavController,
     petVm: PetProfileViewModel,
     authVm: AuthViewModel,
-    userVm: UserViewModel
+    userVm: UserViewModel,
+    matchVm: com.petmatch.mobile.ui.match.MatchViewModel
 ) {
     val ctx = LocalContext.current
     val petState by petVm.myPet.collectAsState()
@@ -291,7 +292,7 @@ fun AccountScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         AsyncImage(
-                            model = pet.avatarUrl ?: "https://placedog.net/60/60",
+                            model = pet.avatarUrl ?: "https://i.pinimg.com/originals/f1/0f/f7/f10ff70a715515d1662550dccdd44832.png",
                             contentDescription = null,
                             modifier = Modifier.size(60.dp).clip(RoundedCornerShape(12.dp))
                         )
@@ -349,6 +350,7 @@ fun AccountScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
                     .clickable {
+                        matchVm.clearData()
                         authVm.logout(ctx)
                         navController.navigate(Routes.LOGIN) { popUpTo(navController.graph.id) { inclusive = true } }
                     },

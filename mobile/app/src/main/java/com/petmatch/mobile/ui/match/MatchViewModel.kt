@@ -156,9 +156,21 @@ class MatchViewModel : ViewModel() {
         }
     }
 
-    fun sendDislike(ctx: Context) = viewModelScope.launch {
-        _suggestions.value = _suggestions.value.drop(1)
-        if (_suggestions.value.size <= 2) loadSuggestions(ctx)
+    fun sendDislike(ctx: Context, petId: Long) = viewModelScope.launch {
+        _error.value = null
+        try {
+            val res = RetrofitClient.matchApi(ctx)
+                .sendDislike(SendDislikeRequest(petId))
+            if (res.isSuccessful) {
+                // Successfully recorded dislike - remove from local suggestions
+                _suggestions.value = _suggestions.value.drop(1)
+                if (_suggestions.value.size <= 2) loadSuggestions(ctx)
+            } else {
+                _error.value = "Không thể ghi nhận bỏ qua"
+            }
+        } catch (_: Exception) {
+            _error.value = "Không thể kết nối máy chủ"
+        }
     }
 
     fun dismissMatchPopup() { _matchPopup.value = null }
@@ -245,5 +257,15 @@ class MatchViewModel : ViewModel() {
 
     fun clearError() {
         _error.value = null
+    }
+
+    fun clearData() {
+        _suggestions.value = emptyList()
+        _error.value = null
+        _whoLikedMe.value = emptyList()
+        _matched.value = emptyList()
+        _matchPopup.value = null
+        _isSmartMode.value = false
+        totalSessionLikes = 0
     }
 }

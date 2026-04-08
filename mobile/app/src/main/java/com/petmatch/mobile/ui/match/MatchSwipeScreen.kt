@@ -125,7 +125,7 @@ fun MatchSwipeScreen(
                                     pet = suggestions[0],
                                     superLikeStatus = superLikeStatus,
                                     onLike = { matchVm.sendLike(ctx, suggestions[0].id, false) },
-                                    onDislike = { matchVm.sendDislike(ctx) },
+                                    onDislike = { matchVm.sendDislike(ctx, suggestions[0].id) },
                                     onSuperLike = { matchVm.sendLike(ctx, suggestions[0].id, true) },
                                     onViewDetail = { navController.navigate(Routes.petDetail(suggestions[0].id)) }
                                 )
@@ -135,7 +135,7 @@ fun MatchSwipeScreen(
                         // Action buttons row
                         ActionButtonsRow(
                             superLikeStatus = superLikeStatus,
-                            onDislike = { if (suggestions.isNotEmpty()) matchVm.sendDislike(ctx) },
+                            onDislike = { if (suggestions.isNotEmpty()) matchVm.sendDislike(ctx, suggestions[0].id) },
                             onSuperLike = { if (suggestions.isNotEmpty()) matchVm.sendLike(ctx, suggestions[0].id, true) },
                             onLike = { if (suggestions.isNotEmpty()) matchVm.sendLike(ctx, suggestions[0].id, false) },
                             onLikedMe = { navController.navigate(Routes.WHO_LIKED_ME) },
@@ -172,7 +172,7 @@ fun MatchSwipeScreen(
                                 matchVm.loadSuggestions(ctx, refresh = true)
                             }
                         }) {
-                            Text("Dong")
+                            Text("Đóng")
                         }
                     }
                 }
@@ -275,7 +275,7 @@ private fun SwipeCard(
             Box(modifier = Modifier.fillMaxSize()) {
                 // Background photo
                 AsyncImage(
-                    model = pet.avatarUrl ?: "https://placedog.net/400/600",
+                    model = pet.avatarUrl ?: "https://i.pinimg.com/originals/f1/0f/f7/f10ff70a715515d1662550dccdd44832.png",
                     contentDescription = pet.name,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
@@ -625,13 +625,13 @@ private fun MatchPopupDialog(
                 // Avatars
                 Row(horizontalArrangement = Arrangement.spacedBy((-20).dp)) {
                     AsyncImage(
-                        model = matchResponse.senderPetAvatarUrl ?: "https://placedog.net/80/80",
+                        model = matchResponse.senderPetAvatarUrl ?: "https://i.pinimg.com/originals/f1/0f/f7/f10ff70a715515d1662550dccdd44832.png",
                         contentDescription = null,
                         modifier = Modifier.size(100.dp).clip(CircleShape).border(3.dp, PrimaryPink, CircleShape),
                         contentScale = ContentScale.Crop
                     )
                     AsyncImage(
-                        model = matchResponse.receiverPetAvatarUrl ?: "https://placedog.net/80/80",
+                        model = matchResponse.receiverPetAvatarUrl ?: "https://i.pinimg.com/originals/f1/0f/f7/f10ff70a715515d1662550dccdd44832.png",
                         contentDescription = null,
                         modifier = Modifier.size(100.dp).clip(CircleShape).border(3.dp, LikeGreen, CircleShape),
                         contentScale = ContentScale.Crop
