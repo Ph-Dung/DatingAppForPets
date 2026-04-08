@@ -76,6 +76,26 @@ fun AdminReportsScreen(vm: AdminViewModel) {
 
         Spacer(Modifier.height(10.dp))
 
+        if (!state.loading && state.reports.isEmpty()) {
+            val emptyText = when (selectedStatus) {
+                "PENDING" -> "Hiện chưa có báo cáo nào chờ xử lý."
+                "RESOLVED" -> "Chưa có báo cáo nào đã xử lý."
+                else -> "Chưa có báo cáo nào bị bỏ qua."
+            }
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = Color(0xFFF5F8FF),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = emptyText,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 14.dp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(Modifier.height(10.dp))
+        }
+
         LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             items(state.reports) { report ->
                 Card(
@@ -127,7 +147,13 @@ fun AdminReportsScreen(vm: AdminViewModel) {
                                     selectedReason = warnReasons.first()
                                 },
                                 onDeletePet = {
-                                    vm.handleReport(ctx, report.id, "AUTO_DELETE_PET", "Xoá hồ sơ thú cưng do vi phạm")
+                                    vm.handleReport(
+                                        ctx,
+                                        report.id,
+                                        "AUTO_DELETE_PET",
+                                        selectedStatus,
+                                        "Xoá hồ sơ thú cưng do vi phạm"
+                                    )
                                 },
                                 onBan = {
                                     actionReportId = report.id
@@ -135,7 +161,7 @@ fun AdminReportsScreen(vm: AdminViewModel) {
                                     selectedReason = banReasons.first()
                                 },
                                 onDismiss = {
-                                    vm.handleReport(ctx, report.id, "DISMISS", "Bỏ qua báo cáo")
+                                    vm.handleReport(ctx, report.id, "DISMISS", selectedStatus, "Bỏ qua báo cáo")
                                 }
                             )
                         } else {
@@ -185,7 +211,13 @@ fun AdminReportsScreen(vm: AdminViewModel) {
                                 selectedReason = warnReasons.first()
                             },
                             onDeletePet = {
-                                vm.handleReport(ctx, report.id, "AUTO_DELETE_PET", "Xoá hồ sơ thú cưng do vi phạm")
+                                vm.handleReport(
+                                    ctx,
+                                    report.id,
+                                    "AUTO_DELETE_PET",
+                                    selectedStatus,
+                                    "Xoá hồ sơ thú cưng do vi phạm"
+                                )
                                 selectedReport = null
                             },
                             onBan = {
@@ -194,7 +226,7 @@ fun AdminReportsScreen(vm: AdminViewModel) {
                                 selectedReason = banReasons.first()
                             },
                             onDismiss = {
-                                vm.handleReport(ctx, report.id, "DISMISS", "Bỏ qua báo cáo")
+                                vm.handleReport(ctx, report.id, "DISMISS", selectedStatus, "Bỏ qua báo cáo")
                                 selectedReport = null
                             }
                         )
@@ -235,9 +267,9 @@ fun AdminReportsScreen(vm: AdminViewModel) {
                     onClick = {
                         val reportId = actionReportId ?: return@Button
                         if (reasonDialogType == ReportReasonType.WARN) {
-                            vm.handleReport(ctx, reportId, "WARN_USER", selectedReason)
+                            vm.handleReport(ctx, reportId, "WARN_USER", selectedStatus, selectedReason)
                         } else {
-                            vm.handleReport(ctx, reportId, "BAN_USER", selectedReason)
+                            vm.handleReport(ctx, reportId, "BAN_USER", selectedStatus, selectedReason)
                         }
                         reasonDialogType = null
                         actionReportId = null

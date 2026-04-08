@@ -29,6 +29,15 @@ fun AdminUsersScreen(vm: AdminViewModel) {
     var activeFilter by remember { mutableStateOf("all") } // "all", "locked", "warned"
     val listState = rememberLazyListState()
 
+    val currentLockedFilter = when (activeFilter) {
+        "locked" -> true
+        else -> null
+    }
+    val currentWarnedFilter = when (activeFilter) {
+        "warned" -> true
+        else -> null
+    }
+
     LaunchedEffect(Unit) {
         vm.loadUsers(ctx)
     }
@@ -65,7 +74,14 @@ fun AdminUsersScreen(vm: AdminViewModel) {
                 singleLine = true
             )
             Button(
-                onClick = { vm.loadUsers(ctx, query = query) },
+                onClick = {
+                    vm.loadUsers(
+                        ctx,
+                        query = query,
+                        locked = currentLockedFilter,
+                        warned = currentWarnedFilter
+                    )
+                },
                 modifier = Modifier.height(56.dp)
             ) {
                 Text("Tìm")
@@ -84,7 +100,7 @@ fun AdminUsersScreen(vm: AdminViewModel) {
                 isActive = activeFilter == "all",
                 onClick = {
                     activeFilter = "all"
-                    vm.loadUsers(ctx)
+                    vm.loadUsers(ctx, query = query)
                 },
                 modifier = Modifier.weight(1f)
             )
@@ -93,7 +109,7 @@ fun AdminUsersScreen(vm: AdminViewModel) {
                 isActive = activeFilter == "locked",
                 onClick = {
                     activeFilter = "locked"
-                    vm.loadUsers(ctx, locked = true)
+                    vm.loadUsers(ctx, query = query, locked = true)
                 },
                 modifier = Modifier.weight(1f)
             )
@@ -102,7 +118,7 @@ fun AdminUsersScreen(vm: AdminViewModel) {
                 isActive = activeFilter == "warned",
                 onClick = {
                     activeFilter = "warned"
-                    vm.loadUsers(ctx, warned = true)
+                    vm.loadUsers(ctx, query = query, warned = true)
                 },
                 modifier = Modifier.weight(1f)
             )
