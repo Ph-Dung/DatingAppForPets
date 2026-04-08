@@ -1,7 +1,9 @@
 package com.petmatch.mobile.ui.community
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -17,11 +19,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.petmatch.mobile.data.model.CommunityPostResponse
@@ -33,6 +38,9 @@ import com.petmatch.mobile.ui.navigation.Routes
 import com.petmatch.mobile.ui.petprofile.PetProfileViewModel
 import com.petmatch.mobile.ui.theme.PrimaryPink
 import android.util.Log
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -140,6 +148,7 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
                 CommunityPostItem(
                     post = post,
                     isOwner = currentUser?.id == post.ownerId,
+                    currentUserAvatarUrl = currentUser?.avatarUrl,
                     onToggleLike = { vm.toggleLike(ctx, post.id) },
                     onOpenComments = {
                         commentPostId = post.id
@@ -148,7 +157,7 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
                         vm.loadComments(ctx, post.id)
                     },
                     onEditPost = {
-                        navController.navigate(Routes.postManagement(post.id))
+                        navController.navigate(Routes.postAdd(post.id))
                     },
                     onReportPost = {
                         showReportDialogForPostId = post.id
@@ -374,12 +383,17 @@ fun CreatePostBar(
 fun CommunityPostItem(
     post: CommunityPostResponse,
     isOwner: Boolean,
+    currentUserAvatarUrl: String?,
     onToggleLike: () -> Unit,
     onOpenComments: () -> Unit,
     onEditPost: () -> Unit,
-    onReportPost: () -> Unit
+    onReportPost: () -> Unit,
+    onDeletePost: (() -> Unit)? = null
 ) {
     var showMoreMenu by remember { mutableStateOf(false) }
+    val imageUrls = remember(post.imageUrl) { parsePostImageUrls(post.imageUrl) }
+    val displayAvatar = post.ownerAvatar?.takeIf { it.isNotBlank() }
+        ?: if (isOwner) currentUserAvatarUrl?.takeIf { it.isNotBlank() } else null
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -388,9 +402,9 @@ fun CommunityPostItem(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (!post.ownerAvatar.isNullOrBlank()) {
+            if (!displayAvatar.isNullOrBlank()) {
                 AsyncImage(
-                    model = post.ownerAvatar,
+                    model = displayAvatar,
                     contentDescription = null,
                     modifier = Modifier
                         .size(40.dp)
@@ -416,8 +430,12 @@ fun CommunityPostItem(
             Spacer(modifier = Modifier.width(8.dp))
             Column {
                 Text(post.ownerName, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                if (!post.location.isNullOrBlank()) {
-                    Text(post.location, color = Color.Gray, fontSize = 11.sp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (!post.location.isNullOrBlank()) {
+                        Text(post.location, color = Color.Gray, fontSize = 11.sp)
+                        Text(", ", color = Color.Gray, fontSize = 11.sp)
+                    }
+                    Text(getRelativeTimeString(post.createdAt), color = Color.Gray, fontSize = 11.sp)
                 }
             }
             Spacer(Modifier.weight(1f))
@@ -434,6 +452,15 @@ fun CommunityPostItem(
                                 onEditPost()
                             }
                         )
+                        if (onDeletePost != null) {
+                            DropdownMenuItem(
+                                text = { Text("Xóa bài viết") },
+                                onClick = {
+                                    showMoreMenu = false
+                                    onDeletePost()
+                                }
+                            )
+                        }
                     } else {
                         DropdownMenuItem(
                             text = { Text("Báo cáo bài viết") },
@@ -453,17 +480,8 @@ fun CommunityPostItem(
             fontSize = 14.sp
         )
 
-        if (!post.imageUrl.isNullOrBlank()) {
-            AsyncImage(
-                model = post.imageUrl,
-                contentDescription = null,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(300.dp)
-                    .padding(horizontal = 12.dp)
-                    .clip(RoundedCornerShape(8.dp)),
-                contentScale = ContentScale.Crop
-            )
+        if (imageUrls.isNotEmpty()) {
+            PostImageCarousel(imageUrls = imageUrls)
         }
 
         Row(
@@ -495,6 +513,162 @@ fun CommunityPostItem(
             Text("${post.commentsCount}", fontSize = 13.sp)
         }
         HorizontalDivider(color = Color(0xFFEEEEEE), thickness = 1.dp)
+    }
+}
+
+@Composable
+private fun PostImageCarousel(imageUrls: List<String>) {
+    var currentIndex by remember(imageUrls) { mutableIntStateOf(0) }
+    var showFullScreen by remember(imageUrls) { mutableStateOf(false) }
+    var dragOffsetX by remember { mutableFloatStateOf(0f) }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp)
+            .aspectRatio(1f)
+            .clip(RoundedCornerShape(10.dp))
+            .background(Color.White)
+            .border(1.dp, Color(0xFFECECEC), RoundedCornerShape(10.dp))
+            .pointerInput(currentIndex, imageUrls.size) {
+                detectHorizontalDragGestures(
+                    onDragStart = { dragOffsetX = 0f },
+                    onHorizontalDrag = { change, dragAmount ->
+                        dragOffsetX += dragAmount
+                    },
+                    onDragEnd = {
+                        if (dragOffsetX < -80f && currentIndex < imageUrls.lastIndex) {
+                            currentIndex += 1
+                        } else if (dragOffsetX > 80f && currentIndex > 0) {
+                            currentIndex -= 1
+                        }
+                        dragOffsetX = 0f
+                    }
+                )
+            }
+    ) {
+        AsyncImage(
+            model = imageUrls[currentIndex],
+            contentDescription = null,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(8.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .clickable { showFullScreen = true },
+            contentScale = ContentScale.Crop
+        )
+
+        if (currentIndex > 0) {
+            IconButton(
+                onClick = { currentIndex -= 1 },
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(start = 6.dp)
+                    .background(Color.Black.copy(alpha = 0.45f), CircleShape)
+            ) {
+                Icon(Icons.Default.ChevronLeft, contentDescription = "Ảnh trước", tint = Color.White)
+            }
+        }
+
+        if (currentIndex < imageUrls.lastIndex) {
+            IconButton(
+                onClick = { currentIndex += 1 },
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 6.dp)
+                    .background(Color.Black.copy(alpha = 0.45f), CircleShape)
+            ) {
+                Icon(Icons.Default.ChevronRight, contentDescription = "Ảnh tiếp", tint = Color.White)
+            }
+        }
+
+        if (imageUrls.size > 1) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 10.dp),
+                color = Color.Black.copy(alpha = 0.5f),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text(
+                    text = "${currentIndex + 1}/${imageUrls.size}",
+                    color = Color.White,
+                    fontSize = 11.sp,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                )
+            }
+        }
+    }
+
+    if (showFullScreen) {
+        FullScreenImageViewer(
+            imageUrls = imageUrls,
+            startIndex = currentIndex,
+            onDismiss = { showFullScreen = false }
+        )
+    }
+}
+
+@Composable
+private fun FullScreenImageViewer(
+    imageUrls: List<String>,
+    startIndex: Int,
+    onDismiss: () -> Unit
+) {
+    var currentIndex by remember(startIndex, imageUrls) { mutableIntStateOf(startIndex.coerceIn(0, imageUrls.lastIndex)) }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+        ) {
+            AsyncImage(
+                model = imageUrls[currentIndex],
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clickable { },
+                contentScale = ContentScale.Fit
+            )
+
+            if (currentIndex > 0) {
+                IconButton(
+                    onClick = { currentIndex -= 1 },
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .padding(start = 12.dp)
+                        .background(Color.Black.copy(alpha = 0.45f), CircleShape)
+                ) {
+                    Icon(Icons.Default.ChevronLeft, contentDescription = "Ảnh trước", tint = Color.White)
+                }
+            }
+
+            if (currentIndex < imageUrls.lastIndex) {
+                IconButton(
+                    onClick = { currentIndex += 1 },
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(end = 12.dp)
+                        .background(Color.Black.copy(alpha = 0.45f), CircleShape)
+                ) {
+                    Icon(Icons.Default.ChevronRight, contentDescription = "Ảnh tiếp", tint = Color.White)
+                }
+            }
+
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 24.dp, end = 12.dp)
+                    .background(Color.Black.copy(alpha = 0.45f), CircleShape)
+            ) {
+                Icon(Icons.Default.Close, contentDescription = "Đóng", tint = Color.White)
+            }
+        }
     }
 }
 
@@ -569,5 +743,53 @@ private fun CommunityEmptyState(
         TextButton(onClick = onRetry) {
             Text("Làm mới")
         }
+    }
+}
+
+private fun getRelativeTimeString(createdAtStr: String?): String {
+    if (createdAtStr.isNullOrBlank()) return ""
+    
+    return try {
+        val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale("vi", "VN"))
+        val createdTime = sdf.parse(createdAtStr) ?: return ""
+        val now = Calendar.getInstance().time
+        val diffMs = now.time - createdTime.time
+        
+        when {
+            diffMs < 5 * 60 * 1000 -> "Mới"
+            diffMs < 60 * 60 * 1000 -> {
+                val minutes = (diffMs / (60 * 1000)).toInt()
+                "$minutes phút trước"
+            }
+            diffMs < 24 * 60 * 60 * 1000 -> {
+                val hours = (diffMs / (60 * 60 * 1000)).toInt()
+                "$hours giờ trước"
+            }
+            else -> {
+                val dateSdf = SimpleDateFormat("dd/MM/yyyy", Locale("vi", "VN"))
+                dateSdf.format(createdTime)
+            }
+        }
+    } catch (e: Exception) {
+        ""
+    }
+}
+
+private fun parsePostImageUrls(imageUrl: String?): List<String> {
+    if (imageUrl.isNullOrBlank()) return emptyList()
+
+    val normalized = imageUrl.trim()
+    return if (normalized.startsWith("[") && normalized.endsWith("]")) {
+        normalized.removePrefix("[")
+            .removeSuffix("]")
+            .split(",")
+            .map { it.trim().trim('"') }
+            .filter { it.isNotBlank() }
+    } else if (normalized.contains(",") || normalized.contains(";")) {
+        normalized.split(',', ';')
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+    } else {
+        listOf(normalized)
     }
 }

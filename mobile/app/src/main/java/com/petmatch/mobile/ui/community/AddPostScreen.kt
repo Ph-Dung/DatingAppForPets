@@ -68,6 +68,10 @@ fun AddPostScreen(
     var location by rememberSaveable { mutableStateOf("") }
     val actionLoading by vm.actionLoading.collectAsState()
     val actionDone by vm.actionDone.collectAsState()
+    val myPosts by vm.myPosts.collectAsState()
+    val isEditMode = editPostId != null
+    val editingPost = remember(editPostId, myPosts) { myPosts.firstOrNull { it.id == editPostId } }
+    var prefilled by remember(editPostId) { mutableStateOf(false) }
 
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicturePreview()
@@ -101,6 +105,18 @@ fun AddPostScreen(
 
     LaunchedEffect(Unit) {
         userVm.loadMyInfo(ctx)
+        if (isEditMode) {
+            vm.loadMyPosts(ctx)
+        }
+    }
+
+    LaunchedEffect(editingPost?.id) {
+        if (isEditMode && !prefilled && editingPost != null) {
+            content = editingPost.content
+            location = editingPost.location.orEmpty()
+            selectedImageUris = parseImageUris(editingPost.imageUrl)
+            prefilled = true
+        }
     }
 
     LaunchedEffect(currentUser?.address) {
@@ -112,7 +128,7 @@ fun AddPostScreen(
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("Tạo bài viết", fontWeight = FontWeight.Bold) },
+                title = { Text(if (isEditMode) "Chỉnh sửa bài viết" else "Tạo bài viết", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
@@ -121,19 +137,33 @@ fun AddPostScreen(
                 actions = {
                     TextButton(
                         onClick = {
-                            val firstImageUri = selectedImageUris.firstOrNull()
-                            vm.createPostWithDeviceImage(
-                                ctx = ctx,
-                                content = content,
-                                location = location,
-                                imageUri = firstImageUri,
-                                onDone = { }
-                            )
+                            if (isEditMode && editPostId != null) {
+                                vm.updatePostWithDeviceImages(
+                                    ctx = ctx,
+                                    id = editPostId,
+                                    content = content,
+                                    location = location,
+                                    imageUris = selectedImageUris,
+                                    onDone = { navController.popBackStack() }
+                                )
+                            } else {
+                                vm.createPostWithDeviceImages(
+                                    ctx = ctx,
+                                    content = content,
+                                    location = location,
+                                    imageUris = selectedImageUris,
+                                    onDone = { }
+                                )
+                            }
                         },
                         enabled = content.isNotBlank() && !actionLoading
                     ) {
                         Text(
-                            if (actionLoading) "Đang đăng..." else "Đăng",
+                            if (actionLoading) {
+                                if (isEditMode) "Đang cập nhật..." else "Đang đăng..."
+                            } else {
+                                if (isEditMode) "Cập nhật" else "Đăng"
+                            },
                             color = if (content.isNotBlank() && !actionLoading) PrimaryPink else Color.Gray,
                             fontWeight = FontWeight.Bold,
                             fontSize = 16.sp
@@ -197,15 +227,19 @@ fun AddPostScreen(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            LocationUpdateButton(
-                onLocationObtained = { lat, lon ->
-                    userVm.updateLocation(ctx, lat, lon)
-                    val cityName = getReverseGeocodedAddress(ctx, lat, lon)
-                    location = cityName ?: "Vị trí: %.4f, %.4f".format(lat, lon)
-                }
-            )
+            if (!isEditMode) {
+                LocationUpdateButton(
+                    onLocationObtained = { lat, lon ->
+                        userVm.updateLocation(ctx, lat, lon)
+                        val cityName = getReverseGeocodedAddress(ctx, lat, lon)
+                        location = cityName ?: "Vị trí: %.4f, %.4f".format(lat, lon)
+                    }
+                )
 
-            Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+            } else {
+                Spacer(modifier = Modifier.height(8.dp))
+            }
 
             // Input Content
             OutlinedTextField(
@@ -359,4 +393,25 @@ private fun getReverseGeocodedAddress(ctx: android.content.Context, lat: Double,
     } catch (_: Exception) {
         null
     }
+}
+
+private fun parseImageUris(imageUrlRaw: String?): List<Uri> {
+    if (imageUrlRaw.isNullOrBlank()) return emptyList()
+
+    val normalized = imageUrlRaw.trim()
+    val urls = if (normalized.startsWith("[") && normalized.endsWith("]")) {
+        normalized.removePrefix("[")
+            .removeSuffix("]")
+            .split(",")
+            .map { it.trim().trim('"') }
+            .filter { it.isNotBlank() }
+    } else if (normalized.contains(",") || normalized.contains(";")) {
+        normalized.split(',', ';')
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+    } else {
+        listOf(normalized)
+    }
+
+    return urls.map { Uri.parse(it) }
 }

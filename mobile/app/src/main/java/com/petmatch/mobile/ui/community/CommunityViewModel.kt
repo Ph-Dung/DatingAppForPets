@@ -103,11 +103,11 @@ class CommunityViewModel : ViewModel() {
         _actionLoading.value = false
     }
 
-    fun createPostWithDeviceImage(
+    fun createPostWithDeviceImages(
         ctx: Context,
         content: String,
         location: String?,
-        imageUri: Uri?,
+        imageUris: List<Uri>,
         onDone: () -> Unit
     ) = viewModelScope.launch {
         _actionLoading.value = true
@@ -115,22 +115,29 @@ class CommunityViewModel : ViewModel() {
         _actionDone.value = false
         try {
             val api = RetrofitClient.communityApi(ctx)
-            val res = if (imageUri != null) {
-                val mimeType = ctx.contentResolver.getType(imageUri) ?: "image/jpeg"
-                val bytes = ctx.contentResolver.openInputStream(imageUri)?.use { it.readBytes() }
-                if (bytes == null) {
+            val res = if (imageUris.isNotEmpty()) {
+                val contentPart = content.toRequestBody("text/plain".toMediaTypeOrNull())
+                val locationPart = location?.takeIf { it.isNotBlank() }
+                    ?.toRequestBody("text/plain".toMediaTypeOrNull())
+
+                val imageParts = imageUris.mapNotNull { uri ->
+                    val mimeType = ctx.contentResolver.getType(uri) ?: "image/jpeg"
+                    val bytes = ctx.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@mapNotNull null
+                    val imageBody = bytes.toRequestBody(mimeType.toMediaTypeOrNull())
+                    MultipartBody.Part.createFormData("images", "community_upload_${System.nanoTime()}.jpg", imageBody)
+                }
+                if (imageParts.isEmpty()) {
                     _actionLoading.value = false
                     _error.value = "Không đọc được ảnh đã chọn"
                     return@launch
                 }
 
-                val contentPart = content.toRequestBody("text/plain".toMediaTypeOrNull())
-                val locationPart = location?.takeIf { it.isNotBlank() }
-                    ?.toRequestBody("text/plain".toMediaTypeOrNull())
-                val imageBody = bytes.toRequestBody(mimeType.toMediaTypeOrNull())
-                val imagePart = MultipartBody.Part.createFormData("image", "community_upload.jpg", imageBody)
-
-                api.createPostWithUpload(contentPart, locationPart, imagePart)
+                api.createPostWithUpload(
+                    content = contentPart,
+                    location = locationPart,
+                    image = null,
+                    images = imageParts
+                )
             } else {
                 val req = CommunityCreatePostRequest(
                     content,
@@ -175,6 +182,61 @@ class CommunityViewModel : ViewModel() {
                 _error.value = "Không thể cập nhật bài viết"
             }
         } catch (e: Exception) {
+            _error.value = "Không thể kết nối máy chủ"
+        }
+        _actionLoading.value = false
+    }
+
+    fun updatePostWithDeviceImages(
+        ctx: Context,
+        id: Long,
+        content: String,
+        location: String?,
+        imageUris: List<Uri>,
+        onDone: (() -> Unit)? = null
+    ) = viewModelScope.launch {
+        _actionLoading.value = true
+        _error.value = null
+        try {
+            val api = RetrofitClient.communityApi(ctx)
+
+            val localUris = imageUris.filter { uri ->
+                val s = uri.toString().lowercase()
+                s.startsWith("content://") || s.startsWith("file://")
+            }
+            val remoteUrls = imageUris.map { it.toString().trim() }
+                .filter { it.startsWith("http://") || it.startsWith("https://") }
+
+            val contentPart = content.toRequestBody("text/plain".toMediaTypeOrNull())
+            val locationPart = location?.takeIf { it.isNotBlank() }
+                ?.toRequestBody("text/plain".toMediaTypeOrNull())
+            val existingUrlsPart = remoteUrls.joinToString(",").takeIf { it.isNotBlank() }
+                ?.toRequestBody("text/plain".toMediaTypeOrNull())
+
+            val imageParts = localUris.mapNotNull { uri ->
+                val mimeType = ctx.contentResolver.getType(uri) ?: "image/jpeg"
+                val bytes = ctx.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@mapNotNull null
+                val imageBody = bytes.toRequestBody(mimeType.toMediaTypeOrNull())
+                MultipartBody.Part.createFormData("images", "community_upload_${System.nanoTime()}.jpg", imageBody)
+            }
+
+            val res = api.updatePostWithUpload(
+                id = id,
+                content = contentPart,
+                location = locationPart,
+                existingImageUrls = existingUrlsPart,
+                image = null,
+                images = imageParts
+            )
+
+            if (res.isSuccessful) {
+                loadFeed(ctx)
+                loadMyPosts(ctx)
+                onDone?.invoke()
+            } else {
+                _error.value = "Không thể cập nhật bài viết"
+            }
+        } catch (_: Exception) {
             _error.value = "Không thể kết nối máy chủ"
         }
         _actionLoading.value = false

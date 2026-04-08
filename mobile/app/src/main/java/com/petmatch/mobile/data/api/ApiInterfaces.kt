@@ -244,13 +244,25 @@ interface CommunityApi {
     suspend fun createPostWithUpload(
         @Part("content") content: RequestBody,
         @Part("location") location: RequestBody?,
-        @Part image: MultipartBody.Part?
+        @Part image: MultipartBody.Part?,
+        @Part images: List<MultipartBody.Part>
     ): Response<CommunityPostResponse>
 
     @PUT("api/community/posts/{id}")
     suspend fun updatePost(
         @Path("id") id: Long,
         @Body req: CommunityUpdatePostRequest
+    ): Response<CommunityPostResponse>
+
+    @Multipart
+    @PUT("api/community/posts/{id}/upload")
+    suspend fun updatePostWithUpload(
+        @Path("id") id: Long,
+        @Part("content") content: RequestBody,
+        @Part("location") location: RequestBody?,
+        @Part("existingImageUrls") existingImageUrls: RequestBody?,
+        @Part image: MultipartBody.Part?,
+        @Part images: List<MultipartBody.Part>
     ): Response<CommunityPostResponse>
 
     @DELETE("api/community/posts/{id}")

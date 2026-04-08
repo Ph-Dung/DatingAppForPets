@@ -1,6 +1,8 @@
 package com.petmatch.backend.service;
 
 import java.util.List;
+import java.util.Objects;
+import java.util.ArrayList;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -143,10 +145,25 @@ public class CommunityService {
 
     @Transactional
     public PostResponse createPostWithImageUpload(String content, String location, MultipartFile imageFile) {
-        String uploadedImageUrl = imageFile == null ? null :
-                cloudinaryService.uploadImage(imageFile, "petmatch/community");
+        List<MultipartFile> files = imageFile == null ? List.of() : List.of(imageFile);
+        return createPostWithImageUploads(content, location, files);
+    }
 
-        return createPost(content, uploadedImageUrl, location);
+    @Transactional
+    public PostResponse createPostWithImageUploads(String content, String location, List<MultipartFile> imageFiles) {
+        String uploadedImageUrls = null;
+        if (imageFiles != null && !imageFiles.isEmpty()) {
+            uploadedImageUrls = imageFiles.stream()
+                    .filter(Objects::nonNull)
+                    .filter(file -> !file.isEmpty())
+                    .map(file -> cloudinaryService.uploadImage(file, "petmatch/community"))
+                    .collect(Collectors.joining(","));
+            if (uploadedImageUrls.isBlank()) {
+                uploadedImageUrls = null;
+            }
+        }
+
+        return createPost(content, uploadedImageUrls, location);
     }
 
     @Transactional
@@ -159,6 +176,46 @@ public class CommunityService {
         post.setContent(content);
         post.setImageUrl(imageUrl);
         post.setLocation(location);
+
+        return mapToPostResponse(postRepository.save(post), actor);
+    }
+
+    @Transactional
+    public PostResponse updatePostWithImageUploads(
+            Long postId,
+            String content,
+            String location,
+            String existingImageUrls,
+            List<MultipartFile> imageFiles
+    ) {
+        User actor = currentUser();
+        Post post = requirePost(postId);
+        assertCanManagePost(actor, post, "chỉnh sửa");
+
+        validateContentForModeration(content);
+
+        List<String> finalUrls = new ArrayList<>();
+        if (existingImageUrls != null && !existingImageUrls.isBlank()) {
+            String[] parts = existingImageUrls.split("[,;]");
+            for (String part : parts) {
+                String url = part == null ? "" : part.trim();
+                if (!url.isBlank()) {
+                    finalUrls.add(url);
+                }
+            }
+        }
+
+        if (imageFiles != null && !imageFiles.isEmpty()) {
+            imageFiles.stream()
+                    .filter(Objects::nonNull)
+                    .filter(file -> !file.isEmpty())
+                    .map(file -> cloudinaryService.uploadImage(file, "petmatch/community"))
+                    .forEach(finalUrls::add);
+        }
+
+        post.setContent(content);
+        post.setLocation(location);
+        post.setImageUrl(finalUrls.isEmpty() ? null : String.join(",", finalUrls));
 
         return mapToPostResponse(postRepository.save(post), actor);
     }
@@ -313,15 +370,17 @@ public class CommunityService {
     }
 
     private PostResponse mapToPostResponse(Post post, User currentUser) {
-        PetProfile ownerPet = petProfileRepository.findByOwnerId(post.getUser().getId()).orElse(null);
-        String petAvatar = null;
-        if (ownerPet != null) {
-            petAvatar = petPhotoRepository.findByPetIdAndIsAvatarTrue(ownerPet.getId())
-                .map(PetPhoto::getPhotoUrl)
-                .orElseGet(() -> petPhotoRepository.findByPetId(ownerPet.getId()).stream()
-                    .findFirst()
+        String ownerAvatar = post.getUser().getAvatarUrl();
+        if (ownerAvatar == null || ownerAvatar.isBlank()) {
+            PetProfile ownerPet = petProfileRepository.findByOwnerId(post.getUser().getId()).orElse(null);
+            if (ownerPet != null) {
+                ownerAvatar = petPhotoRepository.findByPetIdAndIsAvatarTrue(ownerPet.getId())
                     .map(PetPhoto::getPhotoUrl)
-                    .orElse(null));
+                    .orElseGet(() -> petPhotoRepository.findByPetId(ownerPet.getId()).stream()
+                        .findFirst()
+                        .map(PetPhoto::getPhotoUrl)
+                        .orElse(null));
+            }
         }
 
         return PostResponse.builder()
@@ -331,7 +390,7 @@ public class CommunityService {
                 .location(post.getLocation())
                 .ownerId(post.getUser().getId())
                 .ownerName(post.getUser().getFullName())
-                .ownerAvatar(petAvatar)
+                .ownerAvatar(ownerAvatar)
                 .createdAt(post.getCreatedAt())
                 .likesCount(likeRepository.countByPost(post))
                 .commentsCount(post.getComments().size())
