@@ -42,6 +42,7 @@ fun ChatListScreen(
     val ctx = LocalContext.current
     var searchQuery by remember { mutableStateOf("") }
     var selectedTab by remember { mutableIntStateOf(0) }
+    var petProfiles by remember { mutableStateOf<Map<Long, com.petmatch.mobile.data.model.PetProfileResponse>>(emptyMap()) }
 
     val conversations by chatVm.conversations.collectAsState()
     val conversationsLoading by chatVm.conversationsLoading.collectAsState()
@@ -53,6 +54,22 @@ fun ChatListScreen(
         if (selectedTab == 0) {
             chatVm.loadConversations(ctx)
             chatVm.loadUserGroups(ctx)
+        }
+    }
+
+    // ── Load pet profiles for all conversations ──────────────────
+    LaunchedEffect(conversations) {
+        if (conversations.isNotEmpty()) {
+            val profileMap = mutableMapOf<Long, com.petmatch.mobile.data.model.PetProfileResponse>()
+            conversations.forEach { conv ->
+                try {
+                    val resp = RetrofitClient.petApi(ctx).getPetByUserId(conv.userId)
+                    if (resp.isSuccessful) {
+                        resp.body()?.let { profileMap[conv.userId] = it }
+                    }
+                } catch (_: Exception) {}
+            }
+            petProfiles = profileMap
         }
     }
 
@@ -149,11 +166,21 @@ fun ChatListScreen(
 
             // ── Content ─────────────────────────────────────────────────────
             if (selectedTab == 0) {
-                if (conversationsLoading) {
+                if (conversationsLoading && searchQuery.isEmpty()) {
                     PetMatchLoading()
                 } else {
                     if (searchQuery.isNotEmpty()) {
-                        val filtered = conversations.filter { it.userName.contains(searchQuery, ignoreCase = true) }
+                        // Show all conversations matching search query (by pet name, nickname, or user name)
+                        val filtered = conversations.filter { conv ->
+                            val petName = petProfiles[conv.userId]?.name ?: ""
+                            val nickname = conv.nickname ?: ""
+                            val userName = conv.userName
+                            val query = searchQuery.lowercase()
+                            
+                            petName.lowercase().contains(query) || 
+                            nickname.lowercase().contains(query) || 
+                            userName.lowercase().contains(query)
+                        }
                         if (filtered.isEmpty()) {
                             EmptyConversationsPlaceholder()
                         } else {
@@ -169,6 +196,7 @@ fun ChatListScreen(
                             }
                         }
                     } else {
+                        // Show conversations (normal view)
                         val newMatches = conversations.filter { it.lastMessage == null }
                         val activeChats = conversations.filter { it.lastMessage != null }
 
@@ -381,7 +409,7 @@ private fun ConversationListItem(conv: ConversationItem, onClick: () -> Unit) {
         } catch (_: Exception) {}
     }
 
-    val displayName = petProfile?.name ?: conv.nickname?.takeIf { it.isNotBlank() } ?: conv.userName
+    val displayName = conv.nickname?.takeIf { it.isNotBlank() } ?: petProfile?.name ?: conv.userName
     val displayAvatar = petProfile?.avatarUrl ?: conv.userAvatar ?: "https://loremflickr.com/60/60/dog?lock=${conv.userId}"
 
     Row(
@@ -626,7 +654,7 @@ private fun NewMatchItem(match: ConversationItem?, onClick: () -> Unit) {
         }
     }
 
-    val displayName = if (isCurrentUser) "Bạn" else petProfile?.name?.split(" ")?.lastOrNull() ?: match?.userName?.split(" ")?.lastOrNull() ?: ""
+    val displayName = if (isCurrentUser) "Bạn" else match?.nickname?.takeIf { it.isNotBlank() } ?: petProfile?.name ?: match?.userName ?: ""
     val displayAvatar = if (isCurrentUser) null else petProfile?.avatarUrl ?: match?.userAvatar ?: "https://loremflickr.com/60/60/dog?lock=${match?.userId}"
     
     Column(

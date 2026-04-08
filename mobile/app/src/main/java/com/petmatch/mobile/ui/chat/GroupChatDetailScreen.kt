@@ -26,6 +26,7 @@ import com.petmatch.mobile.data.model.GroupChatResponse
 import com.petmatch.mobile.data.api.RetrofitClient
 import com.petmatch.mobile.ui.common.petMatchGradient
 import com.petmatch.mobile.ui.theme.*
+import kotlinx.coroutines.launch
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
@@ -45,6 +46,15 @@ fun GroupChatDetailScreen(
     
     var messageText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    
+    // Member management state
+    var showMembersDialog by remember { mutableStateOf(false) }
+    var groupDetails by remember { mutableStateOf<com.petmatch.mobile.data.model.GroupChatResponse?>(null) }
+    var showAddMemberDialog by remember { mutableStateOf(false) }
+    var newMemberIdInput by remember { mutableStateOf("") }
+    var availableFriends by remember { mutableStateOf<List<com.petmatch.mobile.data.model.ConversationItem>>(emptyList()) }
+    var friendPetProfiles by remember { mutableStateOf<Map<Long, com.petmatch.mobile.data.model.PetProfileResponse>>(emptyMap()) }
     
     // Image picker for group chat
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
@@ -67,6 +77,45 @@ fun GroupChatDetailScreen(
         if (groupMessages.isNotEmpty()) listState.animateScrollToItem(groupMessages.lastIndex)
     }
 
+    // ── Load group details for member list ────────────────────
+    LaunchedEffect(groupId) {
+        try {
+            val resp = RetrofitClient.groupChatApi(ctx).getUserGroups()
+            if (resp.isSuccessful) {
+                groupDetails = resp.body()?.find { it.id == groupId }
+            }
+        } catch (_: Exception) {}
+    }
+
+    // ── Load available friends for adding to group ────────────────
+    LaunchedEffect(showAddMemberDialog, groupDetails) {
+        if (showAddMemberDialog && groupDetails != null) {
+            try {
+                // Load conversations (friends list)
+                val convResp = RetrofitClient.chatApi(ctx).getConversations()
+                if (convResp.isSuccessful) {
+                    val conversations = convResp.body() ?: emptyList()
+                    val currentMemberIds = groupDetails!!.members.map { it.userId }.toSet()
+                    
+                    // Filter out members already in group
+                    availableFriends = conversations.filter { !currentMemberIds.contains(it.userId) }
+                    
+                    // Load pet profiles for all available friends
+                    val profileMap = mutableMapOf<Long, com.petmatch.mobile.data.model.PetProfileResponse>()
+                    availableFriends.forEach { friend ->
+                        try {
+                            val petResp = RetrofitClient.petApi(ctx).getPetByUserId(friend.userId)
+                            if (petResp.isSuccessful) {
+                                petResp.body()?.let { profileMap[friend.userId] = it }
+                            }
+                        } catch (_: Exception) {}
+                    }
+                    friendPetProfiles = profileMap
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -76,7 +125,7 @@ fun GroupChatDetailScreen(
                     }
                 },
                 title = {
-                    Column {
+                    Column(modifier = Modifier.clickable { if (groupDetails != null) showMembersDialog = true }) {
                         Text(
                             groupName,
                             style = MaterialTheme.typography.titleMedium.copy(
@@ -85,9 +134,14 @@ fun GroupChatDetailScreen(
                             )
                         )
                         Text(
-                            "Nhóm chat",
+                            if (groupDetails != null) "${groupDetails!!.members.size} thành viên" else "Nhóm chat",
                             style = MaterialTheme.typography.labelSmall.copy(color = Color.White.copy(0.8f))
                         )
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { showMembersDialog = true }) {
+                        Icon(Icons.Default.People, null, tint = Color.White)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = PrimaryPink)
@@ -140,6 +194,133 @@ fun GroupChatDetailScreen(
                 }
             }
         }
+    }
+
+    // ── Members Dialog ────────────────────────────────────────────────────
+    if (showMembersDialog && groupDetails != null) {
+        AlertDialog(
+            onDismissRequest = { showMembersDialog = false },
+            title = { Text("Thành viên nhóm (${groupDetails!!.members.size})") },
+            text = {
+                LazyColumn {
+                    items(groupDetails!!.members, key = { it.userId }) { member ->
+                        MemberItem(member, ctx)
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddMemberDialog = true }) {
+                    Text("Thêm thành viên")
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showMembersDialog = false }) {
+                    Text("Đóng")
+                }
+            }
+        )
+    }
+
+    // ── Add Member Dialog ────────────────────────────────────────────────────
+    if (showAddMemberDialog && groupDetails != null) {
+        // Filter suggestions by pet name, nickname, or user name
+        val filteredFriends = if (newMemberIdInput.isNotBlank()) {
+            availableFriends.filter { friend ->
+                val petName = friendPetProfiles[friend.userId]?.name ?: ""
+                val nickname = friend.nickname ?: ""
+                val userName = friend.userName
+                val query = newMemberIdInput.lowercase()
+                petName.lowercase().contains(query) || 
+                nickname.lowercase().contains(query) || 
+                userName.lowercase().contains(query)
+            }
+        } else {
+            availableFriends
+        }
+        
+        AlertDialog(
+            onDismissRequest = { showAddMemberDialog = false },
+            title = { Text("Thêm thành viên vào nhóm") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        "Tìm kiếm theo tên pet, biệt danh hoặc tên người dùng",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary
+                    )
+                    OutlinedTextField(
+                        value = newMemberIdInput,
+                        onValueChange = { newMemberIdInput = it },
+                        label = { Text("Tìm kiếm...") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        placeholder = { Text("Nhập tên...") }
+                    )
+                    
+                    // Show friend suggestions
+                    if (availableFriends.isNotEmpty()) {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 200.dp)
+                        ) {
+                            items(filteredFriends, key = { it.userId }) { friend ->
+                                FriendSuggestionItem(
+                                    friend = friend,
+                                    petProfile = friendPetProfiles[friend.userId],
+                                    onSelect = {
+                                        scope.launch {
+                                            try {
+                                                val resp = RetrofitClient.groupChatApi(ctx).addMember(groupId, friend.userId)
+                                                if (resp.isSuccessful) {
+                                                    android.widget.Toast.makeText(ctx, "Đã thêm ${friendPetProfiles[friend.userId]?.name ?: friend.userName}!", android.widget.Toast.LENGTH_SHORT).show()
+                                                    showAddMemberDialog = false
+                                                    newMemberIdInput = ""
+                                                    // Reload group details
+                                                    val groupResp = RetrofitClient.groupChatApi(ctx).getUserGroups()
+                                                    if (groupResp.isSuccessful) {
+                                                        groupDetails = groupResp.body()?.find { it.id == groupId }
+                                                    }
+                                                } else {
+                                                    android.widget.Toast.makeText(ctx, "Không thể thêm thành viên", android.widget.Toast.LENGTH_SHORT).show()
+                                                }
+                                            } catch (e: Exception) {
+                                                android.widget.Toast.makeText(ctx, "Lỗi: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    } else if (newMemberIdInput.isBlank()) {
+                        Text(
+                            "Không có bạn bè khác trong danh sách hoặc tất cả đều đã là thành viên",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary
+                        )
+                    } else {
+                        Text(
+                            "Không tìm thấy kết quả",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary
+                        )
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { 
+                    showAddMemberDialog = false
+                    newMemberIdInput = ""
+                }) {
+                    Text("Hủy")
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showAddMemberDialog = false }) {
+                    Text("Đóng")
+                }
+            }
+        )
     }
 }
 
@@ -247,6 +428,102 @@ private fun GroupChatInputBar(
             enabled = text.isNotBlank() && !isUploading
         ) {
             Icon(Icons.AutoMirrored.Filled.Send, "Gửi", tint = if (text.isNotBlank() && !isUploading) PrimaryPink else TextSecondary)
+        }
+    }
+}
+
+@Composable
+private fun MemberItem(member: com.petmatch.mobile.data.model.GroupMemberResponse, ctx: android.content.Context) {
+    var petProfile by remember { mutableStateOf<com.petmatch.mobile.data.model.PetProfileResponse?>(null) }
+    
+    LaunchedEffect(member.userId) {
+        try {
+            val resp = RetrofitClient.petApi(ctx).getPetByUserId(member.userId)
+            if (resp.isSuccessful) {
+                petProfile = resp.body()
+            }
+        } catch (_: Exception) {}
+    }
+    
+    val displayName = petProfile?.name ?: member.fullName
+    val displayAvatar = petProfile?.avatarUrl ?: member.avatarUrl ?: "https://loremflickr.com/40/40/dog?lock=${member.userId}"
+    
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        AsyncImage(
+            model = displayAvatar,
+            contentDescription = displayName,
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape),
+            contentScale = ContentScale.Crop
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                displayName,
+                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold)
+            )
+            if (member.role == "ADMIN") {
+                Text(
+                    "Quản trị viên",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = PrimaryPink
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FriendSuggestionItem(
+    friend: com.petmatch.mobile.data.model.ConversationItem,
+    petProfile: com.petmatch.mobile.data.model.PetProfileResponse?,
+    onSelect: () -> Unit
+) {
+    val displayName = petProfile?.name ?: friend.userName
+    val displayAvatar = petProfile?.avatarUrl ?: friend.userAvatar ?: "https://loremflickr.com/40/40/dog?lock=${friend.userId}"
+    val subtitle = if (petProfile?.name != null && friend.nickname?.isNotBlank() == true) {
+        "Biệt danh: ${friend.nickname}"
+    } else if (petProfile?.name != null) {
+        friend.userName
+    } else {
+        ""
+    }
+    
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onSelect)
+            .padding(vertical = 8.dp, horizontal = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        AsyncImage(
+            model = displayAvatar,
+            contentDescription = displayName,
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape),
+            contentScale = ContentScale.Crop
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                displayName,
+                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold)
+            )
+            if (subtitle.isNotBlank()) {
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextSecondary
+                )
+            }
         }
     }
 }
