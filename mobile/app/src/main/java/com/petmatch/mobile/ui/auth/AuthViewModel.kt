@@ -9,7 +9,6 @@ import com.petmatch.mobile.Constants
 import com.petmatch.mobile.data.api.RetrofitClient
 import com.petmatch.mobile.data.api.dataStore
 import com.petmatch.mobile.data.model.LoginRequest
-import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -108,31 +107,5 @@ class AuthViewModel : ViewModel() {
             prefs[stringPreferencesKey(Constants.TOKEN_KEY)]
         }
         token.collect { t -> onResult(!t.isNullOrBlank()); return@collect }
-    }
-
-    fun resolveSessionDestination(ctx: Context, onResult: (Boolean?) -> Unit) = viewModelScope.launch {
-        val token = ctx.dataStore.data
-            .map { prefs -> prefs[stringPreferencesKey(Constants.TOKEN_KEY)] }
-            .firstOrNull()
-
-        if (token.isNullOrBlank()) {
-            onResult(null)
-            return@launch
-        }
-
-        try {
-            val profileRes = RetrofitClient.petApi(ctx).getMyProfile()
-            when {
-                profileRes.isSuccessful && profileRes.body() != null -> onResult(true)
-                profileRes.code() == 404 -> onResult(false)
-                profileRes.code() == 401 || profileRes.code() == 403 -> {
-                    logout(ctx)
-                    onResult(null)
-                }
-                else -> onResult(null)
-            }
-        } catch (_: Exception) {
-            onResult(null)
-        }
     }
 }

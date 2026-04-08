@@ -1,5 +1,7 @@
 package com.petmatch.mobile.data.model
 
+import com.google.gson.annotations.SerializedName
+
 data class PetProfileResponse(
     val id: Long,
     val ownerId: Long,
@@ -187,6 +189,7 @@ data class CommunityPostResponse(
     val createdAt: String?,
     val likesCount: Long,
     val commentsCount: Long,
+    @SerializedName(value = "isLiked", alternate = ["liked"])
     val isLiked: Boolean
 )
 

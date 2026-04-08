@@ -1,6 +1,5 @@
 package com.petmatch.backend.config;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -12,9 +11,10 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.stream.Collectors;
 
-import org.springframework.boot.CommandLineRunner;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -64,6 +64,9 @@ public class DataSeeder implements CommandLineRunner {
 
     @Value("${app.seed.community-posts.enabled:true}")
     private boolean communityPostsEnabled;
+
+    @Value("${app.seed.community-posts.cleanup-profile-ids:98,99,100}")
+    private String cleanupCommunityPostProfileIds;
 
     private static final Random RNG = new Random(42);
 
@@ -124,6 +127,8 @@ public class DataSeeder implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
+        cleanupSeedCommunityPosts();
+
         if (!seedEnabled) {
             log.info("DataSeeder: app.seed.enabled=false, bỏ qua toàn bộ seeding.");
             return;
@@ -277,6 +282,34 @@ public class DataSeeder implements CommandLineRunner {
         log.info("DataSeeder: Hoàn thành! Đã tạo 100 tài khoản test.");
         if (communityPostsEnabled) {
             seedCommunityPostsIfNeeded();
+        }
+    }
+
+    private void cleanupSeedCommunityPosts() {
+        List<Long> profileIds = Arrays.stream(cleanupCommunityPostProfileIds.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isBlank())
+                .map(this::parseLongSafe)
+                .flatMap(java.util.Optional::stream)
+                .distinct()
+                .collect(Collectors.toList());
+
+        if (profileIds.isEmpty()) {
+            return;
+        }
+
+        long beforeCount = postRepo.count();
+        postRepo.deleteByUserIdIn(profileIds);
+        long afterCount = postRepo.count();
+        long deleted = Math.max(0L, beforeCount - afterCount);
+        log.info("DataSeeder: Cleanup community post mock theo profile IDs {}. Deleted={}", profileIds, deleted);
+    }
+
+    private java.util.Optional<Long> parseLongSafe(String value) {
+        try {
+            return java.util.Optional.of(Long.parseLong(value));
+        } catch (NumberFormatException ex) {
+            return java.util.Optional.empty();
         }
     }
 

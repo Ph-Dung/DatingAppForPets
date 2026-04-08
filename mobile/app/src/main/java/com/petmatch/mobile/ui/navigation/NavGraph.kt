@@ -75,6 +75,7 @@ object Routes {
 
     const val COMMUNITY         = "community"
     const val POST_MANAGEMENT   = "community/management"
+    const val POST_MANAGEMENT_WITH_EDIT = "community/management?editPostId={editPostId}"
     const val POST_ADD          = "community/add"
     const val REGISTER          = "register"
     const val ACCOUNT           = "account"
@@ -107,6 +108,8 @@ object Routes {
     fun appointmentList(userId: Long) = "chat/appointments/$userId"
     fun review(revieweeId: Long, revieweeName: String) = "chat/review/$revieweeId/$revieweeName"
     fun messengerProfile(userId: Long, userName: String) = "chat/profile/$userId/$userName"
+    fun postManagement(editPostId: Long? = null) =
+        if (editPostId != null) "community/management?editPostId=$editPostId" else POST_MANAGEMENT
 }
 
 @Composable
@@ -258,7 +261,13 @@ fun PetMatchNavGraph(
         // ── Chat & Community ──────────────────────────────────
         composable(Routes.CHAT_LIST) { ChatListScreen(navController, chatVm) }
         composable(Routes.COMMUNITY)  { CommunityScreen(navController, communityVm) }
-        composable(Routes.POST_MANAGEMENT) { PostManagementScreen(navController, communityVm) }
+        composable(
+            route = Routes.POST_MANAGEMENT_WITH_EDIT,
+            arguments = listOf(navArgument("editPostId") { type = NavType.LongType; defaultValue = -1L })
+        ) { back ->
+            val editPostId = back.arguments?.getLong("editPostId")?.let { if (it == -1L) null else it }
+            PostManagementScreen(navController, communityVm, editPostId)
+        }
         composable(Routes.POST_ADD) { AddPostScreen(navController, communityVm) }
 
         // ── Chat Detail (Direct) ─────────────────────────────

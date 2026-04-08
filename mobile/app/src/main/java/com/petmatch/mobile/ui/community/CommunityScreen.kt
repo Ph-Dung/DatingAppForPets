@@ -25,11 +25,12 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.petmatch.mobile.data.model.CommunityPostResponse
+import com.petmatch.mobile.ui.account.UserInfoState
+import com.petmatch.mobile.ui.account.UserViewModel
 import com.petmatch.mobile.ui.common.GradientButton
 import com.petmatch.mobile.ui.common.PetMatchTopBar
 import com.petmatch.mobile.ui.navigation.Routes
 import com.petmatch.mobile.ui.petprofile.PetProfileViewModel
-import com.petmatch.mobile.ui.petprofile.PetUiState
 import com.petmatch.mobile.ui.theme.PrimaryPink
 import android.util.Log
 
@@ -44,8 +45,9 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
     val comments by vm.comments.collectAsState()
     val commentsLoading by vm.commentsLoading.collectAsState()
     val petVm: PetProfileViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
-    val myPet by petVm.myPet.collectAsState()
-    val currentPet = (myPet as? PetUiState.Success)?.pet
+    val userVm: UserViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+    val userInfo by userVm.userInfo.collectAsState()
+    val currentUser = (userInfo as? UserInfoState.Success)?.user
 
     var commentPostId by remember { mutableStateOf<Long?>(null) }
     var replyToCommentId by remember { mutableStateOf<Long?>(null) }
@@ -56,6 +58,7 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
     LaunchedEffect(Unit) {
         vm.loadFeed(ctx)
         petVm.loadMyProfile(ctx)
+        userVm.loadMyInfo(ctx)
     }
 
     Scaffold(
@@ -80,8 +83,8 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
         ) {
             item {
                 CreatePostBar(
-                    petAvatarUrl = currentPet?.avatarUrl,
-                    petName = currentPet?.name,
+                    userAvatarUrl = currentUser?.avatarUrl,
+                    userName = currentUser?.fullName,
                     onPostClick = { navController.navigate(Routes.POST_ADD) },
                     onManageClick = { navController.navigate(Routes.POST_MANAGEMENT) }
                 )
@@ -136,12 +139,16 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
             items(posts, key = { it.id }) { post ->
                 CommunityPostItem(
                     post = post,
+                    isOwner = currentUser?.id == post.ownerId,
                     onToggleLike = { vm.toggleLike(ctx, post.id) },
                     onOpenComments = {
                         commentPostId = post.id
                         replyToCommentId = null
                         commentInput = ""
                         vm.loadComments(ctx, post.id)
+                    },
+                    onEditPost = {
+                        navController.navigate(Routes.postManagement(post.id))
                     },
                     onReportPost = {
                         showReportDialogForPostId = post.id
@@ -303,8 +310,8 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
 
 @Composable
 fun CreatePostBar(
-    petAvatarUrl: String?,
-    petName: String?,
+    userAvatarUrl: String?,
+    userName: String?,
     onPostClick: () -> Unit,
     onManageClick: () -> Unit
 ) {
@@ -314,14 +321,31 @@ fun CreatePostBar(
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        AsyncImage(
-            model = petAvatarUrl ?: "https://placedog.net/120/120",
-            contentDescription = petName ?: "Avatar",
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape),
-            contentScale = ContentScale.Crop
-        )
+        if (!userAvatarUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = userAvatarUrl,
+                contentDescription = userName ?: "Avatar",
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFE4E6EB)),
+                contentAlignment = Alignment.BottomCenter
+            ) {
+                Icon(
+                    Icons.Default.Person,
+                    null,
+                    tint = Color(0xFF8A8D91),
+                    modifier = Modifier.size(30.dp).offset(y = 4.dp)
+                )
+            }
+        }
         Spacer(modifier = Modifier.width(12.dp))
         Box(
             modifier = Modifier
@@ -333,7 +357,7 @@ fun CreatePostBar(
                 .padding(horizontal = 16.dp),
             contentAlignment = Alignment.CenterStart
         ) {
-            Text("Bạn đang nghĩ gì, ${petName ?: "thú cưng của bạn"}?", color = Color.Gray, fontSize = 14.sp)
+            Text("Bạn đang nghĩ gì, ${userName ?: "người dùng"}?", color = Color.Gray, fontSize = 14.sp)
         }
         Spacer(modifier = Modifier.width(12.dp))
         Column(
@@ -349,8 +373,10 @@ fun CreatePostBar(
 @Composable
 fun CommunityPostItem(
     post: CommunityPostResponse,
+    isOwner: Boolean,
     onToggleLike: () -> Unit,
     onOpenComments: () -> Unit,
+    onEditPost: () -> Unit,
     onReportPost: () -> Unit
 ) {
     var showMoreMenu by remember { mutableStateOf(false) }
@@ -362,14 +388,31 @@ fun CommunityPostItem(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            AsyncImage(
-                model = post.ownerAvatar,
-                contentDescription = null,
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape),
-                contentScale = ContentScale.Crop
-            )
+            if (!post.ownerAvatar.isNullOrBlank()) {
+                AsyncImage(
+                    model = post.ownerAvatar,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFE4E6EB)),
+                    contentAlignment = Alignment.BottomCenter
+                ) {
+                    Icon(
+                        Icons.Default.Person,
+                        null,
+                        tint = Color(0xFF8A8D91),
+                        modifier = Modifier.size(30.dp).offset(y = 4.dp)
+                    )
+                }
+            }
             Spacer(modifier = Modifier.width(8.dp))
             Column {
                 Text(post.ownerName, fontWeight = FontWeight.Bold, fontSize = 14.sp)
@@ -383,13 +426,23 @@ fun CommunityPostItem(
                 Icon(Icons.Default.MoreVert, null)
             }
                 DropdownMenu(expanded = showMoreMenu, onDismissRequest = { showMoreMenu = false }) {
-                    DropdownMenuItem(
-                        text = { Text("Báo cáo bài viết") },
-                        onClick = {
-                            showMoreMenu = false
-                            onReportPost()
-                        }
-                    )
+                    if (isOwner) {
+                        DropdownMenuItem(
+                            text = { Text("Chỉnh sửa bài viết") },
+                            onClick = {
+                                showMoreMenu = false
+                                onEditPost()
+                            }
+                        )
+                    } else {
+                        DropdownMenuItem(
+                            text = { Text("Báo cáo bài viết") },
+                            onClick = {
+                                showMoreMenu = false
+                                onReportPost()
+                            }
+                        )
+                    }
                 }
             }
         }

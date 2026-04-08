@@ -55,7 +55,11 @@ import com.petmatch.mobile.ui.theme.PrimaryPink
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PostManagementScreen(navController: NavController, vm: CommunityViewModel) {
+fun PostManagementScreen(
+    navController: NavController,
+    vm: CommunityViewModel,
+    editPostId: Long? = null
+) {
     val ctx = LocalContext.current
     val myPosts by vm.myPosts.collectAsState()
     val loading by vm.loading.collectAsState()
@@ -101,6 +105,7 @@ fun PostManagementScreen(navController: NavController, vm: CommunityViewModel) {
                 items(myPosts) { post ->
                     ManagePostItem(
                         post = post,
+                        startInEditMode = editPostId == post.id,
                         actionLoading = actionLoading,
                         onDelete = { vm.deletePost(ctx, post.id) },
                         onSaveEdit = { content, imageUrl, location ->
@@ -116,11 +121,12 @@ fun PostManagementScreen(navController: NavController, vm: CommunityViewModel) {
 @Composable
 fun ManagePostItem(
     post: CommunityPostResponse,
+    startInEditMode: Boolean,
     actionLoading: Boolean,
     onDelete: () -> Unit,
     onSaveEdit: (String, String?, String?) -> Unit
 ) {
-    var isEditing by remember { mutableStateOf(false) }
+    var isEditing by remember(post.id, startInEditMode) { mutableStateOf(startInEditMode) }
     var editContent by remember(post.id) { mutableStateOf(post.content) }
     var editImageUrl by remember(post.id) { mutableStateOf(post.imageUrl ?: "") }
     var editLocation by remember(post.id) { mutableStateOf(post.location ?: "") }
@@ -258,6 +264,9 @@ fun ManagePostItem(
 fun PostManagementPreview() {
     MaterialTheme {
         val context = androidx.compose.ui.platform.LocalContext.current
-        PostManagementScreen(navController = androidx.navigation.NavController(context), vm = CommunityViewModel())
+        PostManagementScreen(
+            navController = androidx.navigation.NavController(context),
+            vm = CommunityViewModel()
+        )
     }
 }
