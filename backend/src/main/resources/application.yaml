@@ -2,9 +2,11 @@ spring:
   profiles:
     include: secret
   datasource:
-    url: jdbc:postgresql://localhost:5433/petmatch_db
-    username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:123456}
+
+
+    url: jdbc:postgresql://localhost:5432/petmatch_db
+    username: postgres
+    password: 123456
 
   jpa:
     hibernate:

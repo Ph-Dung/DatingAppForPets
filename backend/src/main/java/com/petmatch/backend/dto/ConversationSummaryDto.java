@@ -18,4 +18,5 @@ public class ConversationSummaryDto {
     private long unreadCount;
     private boolean isOnline;
     private boolean isMuted;
+    private String nickname;  // Nickname riêng cho conversation này
 }
