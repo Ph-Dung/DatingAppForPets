@@ -14,5 +14,9 @@ public class UserResponse {
     private String phone;
     private String address;
     private String avatarUrl;
+    private boolean warned;
+    private int warningCount;
+    private LocalDateTime lastWarnedAt;
+    private String warningMessage;
     private LocalDateTime createdAt;
 }

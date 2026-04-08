@@ -180,6 +180,50 @@ fun AccountScreen(
                 }
             }
 
+            if (user?.warned == true) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF4E5))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Warning,
+                                contentDescription = null,
+                                tint = Color(0xFFC77D00)
+                            )
+                            Text(
+                                text = "Tài khoản của bạn đã bị cảnh cáo",
+                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                color = Color(0xFF8A5A00)
+                            )
+                        }
+
+                        Text(
+                            text = user.warningMessage
+                                ?: "Tài khoản của bạn đã bị người dùng báo cáo do vi phạm quy định. Vui lòng tuân thủ đúng quy định cộng đồng.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color(0xFF5F3B00)
+                        )
+
+                        Text(
+                            text = "Số lần cảnh cáo: ${user.warningCount}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Color(0xFF8A5A00)
+                        )
+                    }
+                }
+            }
+
             // ── Thông tin cá nhân ─────────────────────────────────
             SectionHeader("Thông tin cá nhân")
 
