@@ -1,5 +1,23 @@
 package com.petmatch.backend.controller;
 
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
 import com.petmatch.backend.dto.PostResponse;
 import com.petmatch.backend.dto.request.CommunityReportRequest;
 import com.petmatch.backend.dto.request.CreateCommentRequest;
@@ -7,18 +25,12 @@ import com.petmatch.backend.dto.request.CreatePostRequest;
 import com.petmatch.backend.dto.request.UpdateCommentRequest;
 import com.petmatch.backend.dto.request.UpdatePostRequest;
 import com.petmatch.backend.dto.response.CommentResponse;
+import com.petmatch.backend.dto.response.CommunityNotificationResponse;
 import com.petmatch.backend.entity.Report;
 import com.petmatch.backend.service.CommunityService;
+
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
-
-import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/community")
@@ -170,5 +182,23 @@ public class CommunityController {
     @GetMapping("/reports/me")
     public ResponseEntity<List<Report>> getMyReports() {
         return ResponseEntity.ok(communityService.getMyReports());
+    }
+
+    @GetMapping("/notifications")
+    public ResponseEntity<List<CommunityNotificationResponse>> getMyNotifications(
+            @RequestParam(name = "markRead", defaultValue = "true") boolean markRead
+    ) {
+        return ResponseEntity.ok(communityService.getMyNotifications(markRead));
+    }
+
+    @GetMapping("/notifications/unread-count")
+    public ResponseEntity<Map<String, Long>> getUnreadNotificationCount() {
+        return ResponseEntity.ok(Map.of("count", communityService.getUnreadNotificationCount()));
+    }
+
+    @PostMapping("/notifications/read-all")
+    public ResponseEntity<Void> markAllNotificationsAsRead() {
+        communityService.markAllNotificationsAsRead();
+        return ResponseEntity.noContent().build();
     }
 }

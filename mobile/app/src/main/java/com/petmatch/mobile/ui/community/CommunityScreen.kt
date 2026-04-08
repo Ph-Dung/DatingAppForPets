@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -22,8 +23,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -32,6 +36,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.zIndex
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.petmatch.mobile.data.model.CommunityPostResponse
@@ -42,7 +47,7 @@ import com.petmatch.mobile.ui.common.PetMatchTopBar
 import com.petmatch.mobile.ui.navigation.Routes
 import com.petmatch.mobile.ui.petprofile.PetProfileViewModel
 import com.petmatch.mobile.ui.theme.PrimaryPink
-import android.util.Log
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -61,6 +66,7 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
     val userVm: UserViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
     val userInfo by userVm.userInfo.collectAsState()
     val currentUser = (userInfo as? UserInfoState.Success)?.user
+    val focusManager = LocalFocusManager.current
 
     var commentPostId by remember { mutableStateOf<Long?>(null) }
     var replyToCommentId by remember { mutableStateOf<Long?>(null) }
@@ -69,7 +75,7 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
     var selectedReportReason by remember { mutableStateOf<String?>(null) }
     var customReportReason by remember { mutableStateOf("") }
     var showReportConfirmDialog by remember { mutableStateOf(false) }
-    var commentInput by remember { mutableStateOf("") }
+    var commentInput by remember { mutableStateOf(TextFieldValue("")) }
     val commentInputFocusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
 
@@ -88,17 +94,7 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
 
     Scaffold(
         topBar = {
-            PetMatchTopBar(
-                title = "Cộng đồng",
-                actions = {
-                    IconButton(onClick = { Log.d("CommunityScreen", "Search tapped - TODO") }) {
-                        Icon(Icons.Default.Search, null, tint = Color.Black)
-                    }
-                    IconButton(onClick = { Log.d("CommunityScreen", "Notification tapped - TODO") }) {
-                        Icon(Icons.Default.NotificationsNone, null, tint = Color.Black)
-                    }
-                }
-            )
+            PetMatchTopBar(title = "Cộng đồng")
         }
     ) { padding ->
         LazyColumn(
@@ -125,8 +121,7 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
             if (!loading && posts.isEmpty()) {
                 item {
                     CommunityEmptyState(
-                        onCreatePost = { navController.navigate(Routes.POST_ADD) },
-                        onRetry = { vm.loadFeed(ctx) }
+                        onCreatePost = { navController.navigate(Routes.POST_ADD) }
                     )
                 }
             }
@@ -171,7 +166,7 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
                         commentPostId = post.id
                         replyToCommentId = null
                         replyToUserName = null
-                        commentInput = ""
+                        commentInput = TextFieldValue("")
                         vm.loadComments(ctx, post.id)
                     },
                     onEditPost = {
@@ -203,6 +198,12 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
                     .fillMaxWidth()
                     .fillMaxHeight(0.96f)
                     .padding(horizontal = 14.dp, vertical = 8.dp)
+                    .pointerInput(Unit) {
+                        detectTapGestures {
+                            focusManager.clearFocus(force = true)
+                            keyboardController?.hide()
+                        }
+                    }
             ) {
                 Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Text(
@@ -241,8 +242,16 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
                             onReply = {
                                 replyToCommentId = c.id
                                 replyToUserName = c.userName
-                                if (commentInput.isBlank()) {
-                                    commentInput = "@${c.userName} "
+                                if (commentInput.text.isBlank()) {
+                                    val prefix = "@${c.userName} "
+                                    commentInput = TextFieldValue(
+                                        text = prefix,
+                                        selection = TextRange(prefix.length)
+                                    )
+                                } else {
+                                    commentInput = commentInput.copy(
+                                        selection = TextRange(commentInput.text.length)
+                                    )
                                 }
                             }
                         )
@@ -290,6 +299,7 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
                                 TextButton(onClick = {
                                     replyToCommentId = null
                                     replyToUserName = null
+                                    commentInput = commentInput.copy(selection = TextRange(commentInput.text.length))
                                 }) {
                                     Text("Hủy")
                                 }
@@ -322,15 +332,16 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
                                 commentPostId = null
                                 replyToCommentId = null
                                 replyToUserName = null
+                                focusManager.clearFocus(force = true)
                             }) {
                                 Text("Đóng")
                             }
                             TextButton(
-                                enabled = commentInput.isNotBlank() && !actionLoading,
+                                enabled = commentInput.text.isNotBlank() && !actionLoading,
                                 onClick = {
                                     val postId = commentPostId
                                     if (postId != null) {
-                                        val payload = commentInput.trim()
+                                        val payload = commentInput.text.trim()
                                         val replyingId = replyToCommentId
                                         if (replyingId != null) {
                                             val replyTag = replyToUserName?.let { "@$it" }
@@ -340,13 +351,13 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
                                                 payload
                                             }
                                             vm.replyComment(ctx, postId, replyingId, replyContent) {
-                                                commentInput = ""
+                                                commentInput = TextFieldValue("")
                                                 replyToCommentId = null
                                                 replyToUserName = null
                                             }
                                         } else {
                                             vm.addComment(ctx, postId, payload) {
-                                                commentInput = ""
+                                                commentInput = TextFieldValue("")
                                             }
                                         }
                                     }
@@ -381,13 +392,21 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
                 )
             },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(
+                    modifier = Modifier.pointerInput(Unit) {
+                        detectTapGestures {
+                            focusManager.clearFocus(force = true)
+                        }
+                    },
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
                     reportReasons.forEach { reason ->
                         val selected = selectedReportReason == reason
                         Button(
                             onClick = {
                                 selectedReportReason = reason
                                 customReportReason = ""
+                                focusManager.clearFocus(force = true)
                             },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(20.dp),
@@ -412,6 +431,12 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
                                     selectedReportReason = null
                                 }
                             },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = Color.White,
+                            unfocusedContainerColor = Color.White,
+                            focusedBorderColor = Color(0xFFEE3F5A),
+                            unfocusedBorderColor = if (customReportReason.isNotBlank()) Color(0xFFEE3F5A) else Color(0xFFD1D5DB)
+                        ),
                         label = { Text("Lý do khác") },
                         minLines = 2
                     )
@@ -492,24 +517,24 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
                         ) {
                             Text(if (actionLoading) "Đang gửi..." else "Báo cáo", color = Color.White, maxLines = 1)
                         }
+                    }
 
-                        Button(
-                            enabled = postId != null && finalReason != null && !actionLoading,
-                            onClick = {
-                                if (postId != null && finalReason != null) {
-                                    vm.submitReport(ctx, postId, finalReason, hidePost = true) {
-                                        showReportConfirmDialog = false
-                                        showReportDialogForPostId = null
-                                        selectedReportReason = null
-                                        customReportReason = ""
-                                    }
+                    Button(
+                        enabled = postId != null && finalReason != null && !actionLoading,
+                        onClick = {
+                            if (postId != null && finalReason != null) {
+                                vm.submitReport(ctx, postId, finalReason, hidePost = true) {
+                                    showReportConfirmDialog = false
+                                    showReportDialogForPostId = null
+                                    selectedReportReason = null
+                                    customReportReason = ""
                                 }
-                            },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD12F49))
-                        ) {
-                            Text("Báo cáo và chặn", color = Color.White, maxLines = 1)
-                        }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD12F49))
+                    ) {
+                        Text("Báo cáo và chặn", color = Color.White, maxLines = 1)
                     }
                 }
             }
@@ -783,19 +808,22 @@ private fun PostImageCarousel(imageUrls: List<String>) {
         }
 
         if (imageUrls.size > 1) {
-            Surface(
+            Row(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 10.dp),
-                color = Color.Black.copy(alpha = 0.5f),
-                shape = RoundedCornerShape(12.dp)
+                    .padding(bottom = 12.dp)
+                    .zIndex(2f),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "${currentIndex + 1}/${imageUrls.size}",
-                    color = Color.White,
-                    fontSize = 11.sp,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                )
+                imageUrls.indices.forEach { index ->
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(if (index == currentIndex) Color(0xFF111827) else Color(0xFF9CA3AF))
+                    )
+                }
             }
         }
     }
@@ -888,14 +916,31 @@ private fun CommentItem(
             .padding(start = (depth * 18).dp),
         verticalAlignment = Alignment.Top
     ) {
-        AsyncImage(
-            model = avatarUrl ?: "https://placedog.net/80/80",
-            contentDescription = name,
-            modifier = Modifier
-                .size(28.dp)
-                .clip(CircleShape),
-            contentScale = ContentScale.Crop
-        )
+        if (!avatarUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = avatarUrl,
+                contentDescription = name,
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(CircleShape),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFE4E6EB)),
+                contentAlignment = Alignment.BottomCenter
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Person,
+                    contentDescription = null,
+                    tint = Color(0xFF8A8D91),
+                    modifier = Modifier.size(20.dp).offset(y = 2.dp)
+                )
+            }
+        }
         Spacer(modifier = Modifier.width(8.dp))
         Column(modifier = Modifier.weight(1f)) {
             Surface(
@@ -932,8 +977,7 @@ private fun CommentItem(
 
 @Composable
 private fun CommunityEmptyState(
-    onCreatePost: () -> Unit,
-    onRetry: () -> Unit
+    onCreatePost: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -958,9 +1002,6 @@ private fun CommunityEmptyState(
             onClick = onCreatePost,
             modifier = Modifier.fillMaxWidth(0.78f)
         )
-        TextButton(onClick = onRetry) {
-            Text("Làm mới")
-        }
     }
 }
 

@@ -80,9 +80,6 @@ fun WhoLikedMeScreen(
                         onClick = { navController.navigate(Routes.MATCH_SWIPE) { popUpTo(Routes.WHO_LIKED_ME) { inclusive = true } } },
                         modifier = Modifier.fillMaxWidth(0.6f)
                     )
-                    TextButton(onClick = { matchVm.loadWhoLikedMe(ctx) }) {
-                        Text("Tai lai")
-                    }
                 }
             }
             return@Scaffold
