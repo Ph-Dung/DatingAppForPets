@@ -11,6 +11,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
+import kotlinx.coroutines.launch
+import android.net.Uri
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
+
 sealed class UserInfoState {
     object Idle : UserInfoState()
     object Loading : UserInfoState()
@@ -86,5 +91,28 @@ class UserViewModel : ViewModel() {
                 com.petmatch.mobile.data.model.UpdateLocationRequest(lat, lon)
             )
         } catch (_: Exception) {}
+    }
+
+    fun updateAvatar(ctx: Context, uri: Uri) = viewModelScope.launch {
+        _updateState.value = null
+        try {
+            val stream = ctx.contentResolver.openInputStream(uri) ?: return@launch
+            val bytes = stream.readBytes()
+            stream.close()
+
+            val mimeType = ctx.contentResolver.getType(uri) ?: "image/jpeg"
+            val requestBody = bytes.toRequestBody(mimeType.toMediaType())
+            val part = okhttp3.MultipartBody.Part.createFormData("file", "avatar.jpg", requestBody)
+
+            val res = RetrofitClient.userApi(ctx).updateAvatar(part)
+            if (res.isSuccessful && res.body() != null) {
+                _userInfo.value = UserInfoState.Success(res.body()!!)
+                _updateState.value = "avatar_success"
+            } else {
+                _updateState.value = "Cập nhật ảnh đại diện thất bại"
+            }
+        } catch (e: Exception) {
+            _updateState.value = "Lỗi upload: ${e.message}"
+        }
     }
 }
