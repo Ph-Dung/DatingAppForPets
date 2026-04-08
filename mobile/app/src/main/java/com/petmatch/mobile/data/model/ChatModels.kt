@@ -35,7 +35,8 @@ data class ConversationItem(
     val lastMessageTime: String?,
     val unreadCount: Long,
     val isOnline: Boolean = false,
-    val isMuted: Boolean = false
+    val isMuted: Boolean = false,
+    val nickname: String? = null
 )
 
 // ── Block Status ──────────────────────────────────────────────────────────────

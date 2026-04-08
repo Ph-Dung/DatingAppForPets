@@ -227,17 +227,27 @@ class AdminViewModel : ViewModel() {
     }
 
     fun loadReports(ctx: Context, status: String = "PENDING") = viewModelScope.launch {
-        _uiState.value = _uiState.value.copy(loading = true, error = null)
+        _uiState.value = _uiState.value.copy(loading = true, reports = emptyList(), error = null)
         try {
             val res = RetrofitClient.adminApi(ctx).getReports(status = status)
             if (res.isSuccessful && res.body() != null) {
-                _uiState.value = _uiState.value.copy(loading = false, reports = res.body()!!.content)
+                val sortedReports = res.body()!!.content
+                    .sortedWith(
+                        compareByDescending<AdminReportItemResponse> { reportTimeKey(it) }
+                            .thenByDescending { it.id }
+                    )
+                _uiState.value = _uiState.value.copy(loading = false, reports = sortedReports)
             } else {
                 _uiState.value = _uiState.value.copy(loading = false, error = "Không tải được báo cáo")
             }
         } catch (e: Exception) {
             _uiState.value = _uiState.value.copy(loading = false, error = "Lỗi: ${e.message}")
         }
+    }
+
+    // Keep newest reports at the top. For processed reports, prefer handledAt when available.
+    private fun reportTimeKey(report: AdminReportItemResponse): String {
+        return report.handledAt ?: report.createdAt ?: ""
     }
 
     fun setUserLocked(ctx: Context, userId: Long, locked: Boolean, onDone: (() -> Unit)? = null) = viewModelScope.launch {
@@ -282,12 +292,13 @@ class AdminViewModel : ViewModel() {
         ctx: Context,
         reportId: Long,
         action: String,
+        currentStatus: String = "PENDING",
         note: String? = null,
         onDone: (() -> Unit)? = null
     ) = viewModelScope.launch {
         try {
             RetrofitClient.adminApi(ctx).handleReport(reportId, AdminHandleReportRequest(action, note))
-            loadReports(ctx)
+            loadReports(ctx, currentStatus)
             loadDashboard(ctx)
             loadPets(ctx, petQuery, petHidden)
             loadUsers(ctx, userQuery, userLocked, userWarned)

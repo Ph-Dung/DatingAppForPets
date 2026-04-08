@@ -31,6 +31,11 @@ fun AdminPetsScreen(vm: AdminViewModel) {
     var deleteTarget by remember { mutableStateOf<AdminPetItemResponse?>(null) }
     val listState = rememberLazyListState()
 
+    val currentHiddenFilter = when (activeFilter) {
+        "hidden" -> true
+        else -> null
+    }
+
     LaunchedEffect(Unit) {
         vm.loadPets(ctx)
     }
@@ -67,7 +72,7 @@ fun AdminPetsScreen(vm: AdminViewModel) {
                 singleLine = true
             )
             Button(
-                onClick = { vm.loadPets(ctx, query = query) },
+                onClick = { vm.loadPets(ctx, query = query, hidden = currentHiddenFilter) },
                 modifier = Modifier.height(56.dp)
             ) {
                 Text("Tìm")
@@ -86,7 +91,7 @@ fun AdminPetsScreen(vm: AdminViewModel) {
                 isActive = activeFilter == "all",
                 onClick = {
                     activeFilter = "all"
-                    vm.loadPets(ctx)
+                    vm.loadPets(ctx, query = query)
                 },
                 modifier = Modifier.weight(1f)
             )
@@ -95,7 +100,7 @@ fun AdminPetsScreen(vm: AdminViewModel) {
                 isActive = activeFilter == "hidden",
                 onClick = {
                     activeFilter = "hidden"
-                    vm.loadPets(ctx, hidden = true)
+                    vm.loadPets(ctx, query = query, hidden = true)
                 },
                 modifier = Modifier.weight(1f)
             )
@@ -107,6 +112,26 @@ fun AdminPetsScreen(vm: AdminViewModel) {
         }
 
         Spacer(Modifier.height(10.dp))
+
+        if (!state.loading && state.pets.isEmpty()) {
+            val emptyMessage = if (activeFilter == "hidden") {
+                "Hiện không có hồ sơ thú cưng nào đang bị ẩn."
+            } else {
+                "Không có hồ sơ thú cưng phù hợp."
+            }
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = Color(0xFFF5F8FF),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = emptyMessage,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 14.dp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(Modifier.height(10.dp))
+        }
 
         LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(10.dp)) {
             items(state.pets) { pet ->

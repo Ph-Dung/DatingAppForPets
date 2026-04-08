@@ -485,10 +485,40 @@ class ChatViewModel : ViewModel() {
         }
     }
 
-    fun createGroup(ctx: Context, name: String, avatarUrl: String?, memberIds: List<Long>, onSuccess: (GroupChatResponse) -> Unit) {
+    fun createGroup(ctx: Context, name: String, avatarUri: android.net.Uri?, memberIds: List<Long>, onSuccess: (GroupChatResponse) -> Unit) {
         viewModelScope.launch {
             _groupLoading.value = true; _groupError.value = null
             try {
+                var avatarUrl: String? = null
+                
+                // Upload avatar if provided
+                if (avatarUri != null) {
+                    try {
+                        val contentResolver = ctx.contentResolver
+                        val mimeType = contentResolver.getType(avatarUri) ?: "application/octet-stream"
+                        val inputStream = contentResolver.openInputStream(avatarUri) ?: throw Exception("Không thể mở file hình ảnh")
+                        val tempFile = File.createTempFile("group_avatar_", null, ctx.cacheDir)
+                        tempFile.outputStream().use { inputStream.copyTo(it) }
+
+                        val requestFile = tempFile.asRequestBody(mimeType.toMediaTypeOrNull())
+                        val filePart = MultipartBody.Part.createFormData("file", tempFile.name, requestFile)
+                        val typePart = "IMAGE".toRequestBody("text/plain".toMediaTypeOrNull())
+
+                        val uploadResp = RetrofitClient.chatApi(ctx).uploadMedia(filePart, typePart)
+                        if (uploadResp.isSuccessful) {
+                            avatarUrl = uploadResp.body()?.mediaUrl
+                        } else {
+                            throw Exception("Lỗi upload ảnh nhóm")
+                        }
+                    } catch (e: Exception) {
+                        Log.e("ChatViewModel", "Lỗi upload avatar: ${e.message}")
+                        _groupError.value = "Lỗi upload ảnh nhóm: ${e.message}"
+                        _groupLoading.value = false
+                        return@launch
+                    }
+                }
+                
+                // Create group with avatar URL
                 val resp = RetrofitClient.groupChatApi(ctx).createGroup(GroupChatCreateRequest(name, avatarUrl, memberIds))
                 if (resp.isSuccessful) resp.body()?.let { _groupCreateSuccess.value = true; onSuccess(it) }
                 else _groupError.value = "Không thể tạo nhóm"
@@ -517,6 +547,33 @@ class ChatViewModel : ViewModel() {
                 RetrofitClient.groupChatApi(ctx).sendGroupMessage(groupId, req)
             } catch (e: Exception) {
                 Log.e("ChatViewModel", "Lỗi gửi tin nhắn nhóm: ${e.message}")
+            }
+        }
+    }
+
+    fun uploadAndSendGroupMedia(ctx: Context, fileUri: android.net.Uri, type: String, groupId: Long) {
+        viewModelScope.launch {
+            _mediaUploadLoading.value = true
+            try {
+                val contentResolver = ctx.contentResolver
+                val mimeType = contentResolver.getType(fileUri) ?: "application/octet-stream"
+                val inputStream = contentResolver.openInputStream(fileUri) ?: return@launch
+                val tempFile = File.createTempFile("upload_", null, ctx.cacheDir)
+                tempFile.outputStream().use { inputStream.copyTo(it) }
+
+                val requestFile = tempFile.asRequestBody(mimeType.toMediaTypeOrNull())
+                val filePart = MultipartBody.Part.createFormData("file", tempFile.name, requestFile)
+                val typePart = type.toRequestBody("text/plain".toMediaTypeOrNull())
+
+                val resp = RetrofitClient.chatApi(ctx).uploadMedia(filePart, typePart)
+                if (resp.isSuccessful) {
+                    val upload = resp.body() ?: return@launch
+                    val req = GroupMessageRequest(content = upload.mediaUrl)
+                    RetrofitClient.groupChatApi(ctx).sendGroupMessage(groupId, req)
+                }
+            } catch (_: Exception) {}
+            finally {
+                _mediaUploadLoading.value = false
             }
         }
     }

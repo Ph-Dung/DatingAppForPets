@@ -20,6 +20,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.*
 import androidx.navigation.NavController
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.net.Uri
 import coil.compose.AsyncImage
 import com.petmatch.mobile.data.model.ConversationItem
 import com.petmatch.mobile.ui.common.GradientButton
@@ -43,8 +46,14 @@ fun CreateGroupChatScreen(
 
     var groupName by remember { mutableStateOf("") }
     var searchQuery by remember { mutableStateOf("") }
+    var groupAvatarUri by remember { mutableStateOf<Uri?>(null) }
     val selectedMembers = remember { mutableStateListOf<ConversationItem>() }
     var step by remember { mutableIntStateOf(1) }  // 1=Select members, 2=Name group
+
+    // Image picker
+    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        uri?.let { groupAvatarUri = it }
+    }
 
     // Load danh sách người đã match (conversations thật từ API)
     val conversations by chatVm.conversations.collectAsState()
@@ -155,12 +164,14 @@ fun CreateGroupChatScreen(
                         selectedMembers = selectedMembers,
                         isLoading = loading,
                         error = error,
+                        groupAvatarUri = groupAvatarUri,
+                        onAvatarPick = { imagePicker.launch("image/*") },
                         onCreate = {
                             if (isNameValid && hasMembersSelected) {
                                 chatVm.createGroup(
                                     ctx = ctx,
                                     name = groupName,
-                                    avatarUrl = null,
+                                    avatarUri = groupAvatarUri,
                                     memberIds = selectedMembers.map { it.userId }
                                 ) {}
                             }
@@ -298,6 +309,8 @@ private fun NameGroupStep(
     selectedMembers: List<ConversationItem>,
     isLoading: Boolean,
     error: String?,
+    groupAvatarUri: Uri?,
+    onAvatarPick: () -> Unit,
     onCreate: () -> Unit
 ) {
     Column(
@@ -322,10 +335,17 @@ private fun NameGroupStep(
                         .size(90.dp)
                         .clip(CircleShape)
                         .background(petMatchGradient)
-                        .clickable { /* TODO: pick avatar */ },
+                        .clickable { onAvatarPick() },
                     contentAlignment = Alignment.Center
                 ) {
-                    if (groupName.isNotEmpty()) {
+                    if (groupAvatarUri != null) {
+                        AsyncImage(
+                            model = groupAvatarUri,
+                            contentDescription = "Ảnh nhóm",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else if (groupName.isNotEmpty()) {
                         Text(
                             groupName.firstOrNull()?.uppercase() ?: "G",
                             style = MaterialTheme.typography.displaySmall.copy(
