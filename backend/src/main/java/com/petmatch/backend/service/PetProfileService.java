@@ -125,6 +125,12 @@ public class PetProfileService {
                 .orElseThrow(() -> new AppException("Không tìm thấy hồ sơ", NOT_FOUND)));
     }
 
+    @Transactional(readOnly = true)
+    public PetProfileResponse getByUserId(Long userId) {
+        return toResponse(petProfileRepo.findByOwnerId(userId)
+                .orElseThrow(() -> new AppException("Người dùng chưa có thú cưng", NOT_FOUND)));
+    }
+
     // ── Suggestions & Search ─────────────────────────────
     @Transactional(readOnly = true)
     public Page<PetProfileResponse> getSuggestions(int page, int size) {

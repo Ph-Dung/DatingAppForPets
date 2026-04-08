@@ -318,18 +318,27 @@ class ChatViewModel : ViewModel() {
                 val resp = RetrofitClient.chatApi(ctx).uploadMedia(filePart, typePart)
                 if (resp.isSuccessful) {
                     val upload = resp.body() ?: return@launch
-                    // Thêm vào UI ngay (optimistic)
                     val localMsg = MessageResponse(
                         id = System.currentTimeMillis(),
                         senderId = currentUserId,
                         receiverId = receiverId,
-                        content = null,
+                        content = upload.mediaUrl, // use mediaUrl as content for fallback or consistency
                         sentAt = java.time.LocalDateTime.now().toString(),
                         isRead = false,
                         type = upload.type,
                         mediaUrl = upload.mediaUrl
                     )
                     addLocalMessage(localMsg)
+
+                    // Persist to backend
+                    val req = MessageRequest(
+                        senderId = currentUserId,
+                        receiverId = receiverId,
+                        content = upload.mediaUrl,
+                        type = upload.type,
+                        mediaUrl = upload.mediaUrl
+                    )
+                    RetrofitClient.chatApi(ctx).sendMessage(req)
                 }
             } catch (_: Exception) {}
             finally {
@@ -501,5 +510,30 @@ class ChatViewModel : ViewModel() {
         _groupMessages.value = _groupMessages.value + msg
     }
 
+    fun sendGroupMessage(ctx: Context, groupId: Long, currentUserId: Long, text: String) {
+        viewModelScope.launch {
+            try {
+                val req = GroupMessageRequest(content = text)
+                RetrofitClient.groupChatApi(ctx).sendGroupMessage(groupId, req)
+            } catch (e: Exception) {
+                Log.e("ChatViewModel", "Lỗi gửi tin nhắn nhóm: ${e.message}")
+            }
+        }
+    }
+
     fun resetGroupCreateSuccess() { _groupCreateSuccess.value = false }
+
+    fun addGroupMember(ctx: Context, groupId: Long, newMemberId: Long, onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            try {
+                val resp = RetrofitClient.groupChatApi(ctx).addMember(groupId, newMemberId)
+                if (resp.isSuccessful) {
+                    loadUserGroups(ctx) // Reload để có danh sách member mới nhất
+                    onSuccess()
+                }
+            } catch (e: Exception) {
+                Log.e("ChatViewModel", "Lỗi thêm thành viên: ${e.message}")
+            }
+        }
+    }
 }

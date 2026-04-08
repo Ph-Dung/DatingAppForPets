@@ -131,7 +131,7 @@ public class MatchRequestService {
      */
     private void createOrUpdateUserMatch(User user1, User user2) {
         // Kiểm tra Match đã tồn tại chưa (2 chiều)
-        boolean matchExists = matchRepository.findMatchByUsers(user1, user2).isPresent();
+        boolean matchExists = matchRepository.findMatchByUserIds(user1.getId(), user2.getId()).isPresent();
         
         if (!matchExists) {
             Match match = Match.builder()

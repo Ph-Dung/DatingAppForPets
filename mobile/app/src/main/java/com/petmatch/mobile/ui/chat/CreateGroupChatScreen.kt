@@ -460,7 +460,7 @@ private fun ContactSelectRow(
         // Avatar
         Box {
             AsyncImage(
-                model = contact.userAvatar ?: "https://placedog.net/48/48?r=${contact.userId}",
+                model = contact.userAvatar ?: "https://loremflickr.com/48/48/dog?lock=${contact.userId}",
                 contentDescription = contact.userName,
                 modifier = Modifier.size(48.dp).clip(CircleShape),
                 contentScale = ContentScale.Crop
@@ -521,7 +521,7 @@ private fun SelectedMemberChip(member: ConversationItem, onRemove: () -> Unit) {
     ) {
         Box {
             AsyncImage(
-                model = member.userAvatar ?: "https://placedog.net/44/44?r=${member.userId}",
+                model = member.userAvatar ?: "https://loremflickr.com/44/44/dog?lock=${member.userId}",
                 contentDescription = member.userName,
                 modifier = Modifier
                     .size(44.dp)

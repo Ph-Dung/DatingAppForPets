@@ -191,9 +191,6 @@ fun ChatListScreen(
                                                 contentPadding = PaddingValues(horizontal = 16.dp),
                                                 horizontalArrangement = Arrangement.spacedBy(14.dp)
                                             ) {
-                                                item {
-                                                    NewMatchItem(match = null, onClick = { /* TODO: Add Story */ })
-                                                }
                                                 items(newMatches, key = { it.userId }) { match ->
                                                     NewMatchItem(
                                                         match = match,
@@ -379,7 +376,7 @@ private fun ConversationListItem(conv: ConversationItem, onClick: () -> Unit) {
     ) {
         Box {
             AsyncImage(
-                model = conv.userAvatar ?: "https://placedog.net/60/60?r=${conv.userId}",
+                model = conv.userAvatar ?: "https://loremflickr.com/60/60/dog?lock=${conv.userId}",
                 contentDescription = conv.userName,
                 modifier = Modifier.size(58.dp).clip(CircleShape),
                 contentScale = ContentScale.Crop
@@ -625,7 +622,7 @@ private fun NewMatchItem(match: ConversationItem?, onClick: () -> Unit) {
                     )
                 } else {
                     AsyncImage(
-                        model = match?.userAvatar ?: "https://placedog.net/60/60?r=${match?.userId}",
+                        model = match?.userAvatar ?: "https://loremflickr.com/60/60/dog?lock=${match?.userId}",
                         contentDescription = match?.userName,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop

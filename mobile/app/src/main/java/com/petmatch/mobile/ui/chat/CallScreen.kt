@@ -272,7 +272,7 @@ fun CallScreen(
         } else {
             // Audio call hoặc chưa connected: blurred avatar background
             AsyncImage(
-                model        = "https://placedog.net/400/800?r=$peerId",
+                model        = "https://loremflickr.com/400/800/dog?lock=$peerId",
                 contentDescription = null,
                 modifier     = Modifier.fillMaxSize().blur(24.dp),
                 contentScale = ContentScale.Crop
@@ -322,7 +322,7 @@ fun CallScreen(
                         PulsingCallRing(size = 160.dp, color = PrimaryPink.copy(0.15f), delayMs = 400)
                     }
                     AsyncImage(
-                        model              = "https://placedog.net/120/120?r=$peerId",
+                        model              = "https://loremflickr.com/120/120/dog?lock=$peerId",
                         contentDescription = peerName,
                         modifier           = Modifier
                             .size(114.dp)
@@ -611,7 +611,7 @@ fun IncomingCallOverlay(
                 PulsingCallRing(size = 120.dp, color = PrimaryPink.copy(0.4f))
                 PulsingCallRing(size = 150.dp, color = PrimaryPink.copy(0.2f), delayMs = 500)
                 AsyncImage(
-                    model              = "https://placedog.net/110/110?r=${state.callerId}",
+                    model              = "https://loremflickr.com/110/110/dog?lock=${state.callerId}",
                     contentDescription = state.callerName,
                     modifier           = Modifier
                         .size(108.dp)

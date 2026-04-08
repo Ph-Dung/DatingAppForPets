@@ -96,7 +96,7 @@ fun ReviewScreen(
                 ) {
                     Box {
                         AsyncImage(
-                            model = "https://placedog.net/96/96?r=$revieweeId",
+                            model = "https://loremflickr.com/96/96/dog?lock=$revieweeId",
                             contentDescription = revieweeName,
                             modifier = Modifier
                                 .size(90.dp)

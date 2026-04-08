@@ -20,6 +20,9 @@ interface PetApi {
     @GET("api/pets/{petId}")
     suspend fun getPetById(@Path("petId") petId: Long): Response<PetProfileResponse>
 
+    @GET("api/pets/user/{userId}")
+    suspend fun getPetByUserId(@Path("userId") userId: Long): Response<PetProfileResponse>
+
     @PATCH("api/pets/toggle-hidden")
     suspend fun toggleHidden(): Response<Unit>
 

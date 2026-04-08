@@ -58,6 +58,8 @@ fun ChatDetailScreen(
     val loading by chatVm.chatLoading.collectAsState()
     val blockStatus by chatVm.blockStatus.collectAsState()
     val mediaUploading by chatVm.mediaUploadLoading.collectAsState()
+    val convs by chatVm.conversations.collectAsState()
+    val otherAvatarUrl = remember(convs, otherUserId) { convs.find { it.userId == otherUserId }?.userAvatar }
 
     var messageText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
@@ -67,6 +69,27 @@ fun ChatDetailScreen(
     var showBlockDialog by remember { mutableStateOf(false) }
     var showAttachSheet by remember { mutableStateOf(false) }
 
+    var isSearching by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+
+    val activateSearchState = navController.currentBackStackEntry?.savedStateHandle?.getStateFlow("activateSearch", false)?.collectAsState(initial = false)
+    val activateSearch = activateSearchState?.value ?: false
+    LaunchedEffect(activateSearch) {
+        if (activateSearch) {
+            isSearching = true
+            navController.currentBackStackEntry?.savedStateHandle?.remove<Boolean>("activateSearch")
+        }
+    }
+
+    // Filter messages for search
+    val displayedMessages = remember(messages, searchQuery, isSearching) {
+        if (isSearching && searchQuery.isNotBlank()) {
+            messages.filter { it.content?.contains(searchQuery, ignoreCase = true) == true }
+        } else {
+            messages
+        }
+    }
+
     LaunchedEffect(Unit) {
         chatVm.loadCurrentUserId(ctx)
         chatVm.loadChatHistory(ctx, currentUserId, otherUserId)
@@ -74,8 +97,14 @@ fun ChatDetailScreen(
         chatVm.loadBlockStatus(ctx, otherUserId)
     }
 
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.lastIndex)
+    LaunchedEffect(currentUserId) {
+        if (currentUserId > 0) {
+            chatVm.loadUserAppointments(ctx, currentUserId)
+        }
+    }
+
+    LaunchedEffect(displayedMessages.size) {
+        if (displayedMessages.isNotEmpty()) listState.animateScrollToItem(displayedMessages.lastIndex)
     }
 
     // ── Image Picker ─────────────────────────────────────────────────────────
@@ -87,7 +116,35 @@ fun ChatDetailScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            if (isSearching) {
+                TopAppBar(
+                    title = {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            placeholder = { Text("Tìm kiếm tin nhắn...", color = Color.White.copy(0.7f)) },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color.Transparent,
+                                unfocusedBorderColor = Color.Transparent,
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White
+                            ),
+                            modifier = Modifier.fillMaxWidth().height(50.dp),
+                            singleLine = true
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = { 
+                            isSearching = false 
+                            searchQuery = ""
+                        }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White)
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = PrimaryPink)
+                )
+            } else {
+                TopAppBar(
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White)
@@ -103,7 +160,7 @@ fun ChatDetailScreen(
                     ) {
                         Box {
                             AsyncImage(
-                                model = "https://placedog.net/40/40?r=$otherUserId",
+                            model = otherAvatarUrl ?: "https://loremflickr.com/40/40/dog?lock=$otherUserId",
                                 contentDescription = otherUserName,
                                 modifier = Modifier.size(38.dp).clip(CircleShape),
                                 contentScale = ContentScale.Crop
@@ -155,6 +212,13 @@ fun ChatDetailScreen(
                             onDismissRequest = { showOptionsMenu = false }
                         ) {
                             DropdownMenuItem(
+                                text = { Text("Tìm kiếm tin nhắn 🔍") },
+                                onClick = {
+                                    showOptionsMenu = false
+                                    isSearching = true
+                                }
+                            )
+                            DropdownMenuItem(
                                 text = { Text("Đặt lịch hẹn 📅") },
                                 onClick = { showOptionsMenu = false; showAppointmentDialog = true },
                                 leadingIcon = { Icon(Icons.Default.CalendarMonth, null) },
@@ -194,6 +258,7 @@ fun ChatDetailScreen(
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = PrimaryPink)
             )
+            }
         },
         bottomBar = {
             Column {
@@ -246,7 +311,12 @@ fun ChatDetailScreen(
                             }
                         },
                         onAttach = { showAttachSheet = true },
-                        isUploading = mediaUploading
+                        isUploading = mediaUploading,
+                        onVoiceRecord = { voiceUri ->
+                            voiceUri?.let {
+                                chatVm.uploadAndSendMedia(ctx, it, "VOICE", currentUserId, otherUserId)
+                            }
+                        }
                     )
                 }
             }
@@ -278,7 +348,11 @@ fun ChatDetailScreen(
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 items(messages, key = { it.id }) { msg ->
-                    MessageBubble(msg = msg, isMe = msg.senderId == currentUserId)
+                    if (msg.type == "APPOINTMENT") {
+                        AppointmentBubble(msg, isMe = msg.senderId == currentUserId)
+                    } else {
+                        MessageBubble(msg = msg, isMe = msg.senderId == currentUserId, avatarUrl = if (msg.senderId == currentUserId) null else otherAvatarUrl)
+                    }
                 }
             }
         }
@@ -330,7 +404,7 @@ fun ChatDetailScreen(
 
 // ── Message Bubble ────────────────────────────────────────────────────────────
 @Composable
-private fun MessageBubble(msg: MessageResponse, isMe: Boolean) {
+private fun MessageBubble(msg: MessageResponse, isMe: Boolean, avatarUrl: String? = null) {
     val timeStr = try {
         DateTimeFormatter.ofPattern("HH:mm").format(LocalDateTime.parse(msg.sentAt))
     } catch (_: Exception) { "" }
@@ -341,7 +415,7 @@ private fun MessageBubble(msg: MessageResponse, isMe: Boolean) {
     ) {
         if (!isMe) {
             AsyncImage(
-                model = "https://placedog.net/32/32?r=${msg.senderId}",
+                model = avatarUrl ?: "https://loremflickr.com/32/32/dog?lock=${msg.senderId}",
                 contentDescription = null,
                 modifier = Modifier.size(32.dp).clip(CircleShape).align(Alignment.Bottom),
                 contentScale = ContentScale.Crop
@@ -357,6 +431,7 @@ private fun MessageBubble(msg: MessageResponse, isMe: Boolean) {
                 "IMAGE" -> ImageBubble(msg, isMe)
                 "VOICE" -> VoiceBubble(msg, isMe)
                 "CALL" -> CallBubble(msg, isMe)
+                "APPOINTMENT" -> AppointmentBubble(msg, isMe)
                 else -> TextBubble(msg, isMe)
             }
             Row(
@@ -395,6 +470,89 @@ private fun TextBubble(msg: MessageResponse, isMe: Boolean) {
 }
 
 @Composable
+private fun AppointmentBubble(msg: MessageResponse, isMe: Boolean) {
+    val ctx = LocalContext.current
+    val chatVm: ChatViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+    val liveAppointments by chatVm.appointments.collectAsState()
+
+    var id: Long = 0
+    var location = ""
+    var time = ""
+    var status = "PENDING"
+    try {
+        val json = org.json.JSONObject(msg.content ?: "{}")
+        id = json.optLong("id", 0)
+        location = json.optString("location", "")
+        time = json.optString("time", "")
+        status = json.optString("status", "PENDING")
+    } catch (_: Exception) {}
+
+    // Ghi đè trạng thái realtime nếu được cập nhật (trong phiên này hoặc đã load)
+    val liveAptt = liveAppointments.find { it.id == id }
+    if (liveAptt != null) {
+        status = liveAptt.status
+    }
+
+    val statusColor = when (status) {
+        "PENDING" -> SecondaryOrange
+        "CONFIRMED" -> LikeGreen
+        "CANCELLED" -> DislikeRed
+        else -> TextSecondary
+    }
+
+    Box(
+        modifier = Modifier
+            .clip(bubbleShape(isMe))
+            .background(
+                if (isMe)
+                    Brush.linearGradient(listOf(GradientStart, GradientEnd), Offset.Zero, Offset(Float.POSITIVE_INFINITY, 0f))
+                else Brush.linearGradient(listOf(SurfaceVariant, SurfaceVariant))
+            )
+            .padding(14.dp)
+            .widthIn(min = 200.dp, max = 240.dp)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("📅 Cuộc hẹn", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = if (isMe) Color.White else PrimaryPink))
+            HorizontalDivider(color = if (isMe) Color.White.copy(0.3f) else Divider)
+            Text("📍 $location", style = MaterialTheme.typography.bodySmall, color = if (isMe) Color.White else TextPrimary)
+            Text("⏰ $time", style = MaterialTheme.typography.bodySmall, color = if (isMe) Color.White else TextPrimary)
+            
+            if (status == "PENDING" && !isMe) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = { chatVm.updateAppointmentStatus(ctx, id, "CONFIRMED") },
+                        modifier = Modifier.weight(1f).height(36.dp),
+                        contentPadding = PaddingValues(0.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = LikeGreen)
+                    ) { Text("Chấp nhận", fontSize = 12.sp, color = Color.White) }
+                    Button(
+                        onClick = { chatVm.updateAppointmentStatus(ctx, id, "CANCELLED") },
+                        modifier = Modifier.weight(1f).height(36.dp),
+                        contentPadding = PaddingValues(0.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = DislikeRed)
+                    ) { Text("Từ chối", fontSize = 12.sp, color = Color.White) }
+                }
+            } else if (status != "PENDING") {
+                val statusText = if (status == "CONFIRMED") "Đã chấp nhận ✔️" else "Đã từ chối ✖️"
+                Text(
+                    text = statusText,
+                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                    color = statusColor,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
+            } else {
+                Text(
+                    text = if (status == "PENDING") "Đang đợi phản hồi..." else if (status == "CONFIRMED") "Đã chấp nhận" else if (status == "CANCELLED") "Đã từ chối" else status,
+                    style = MaterialTheme.typography.bodySmall.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic),
+                    color = if (isMe) Color.White.copy(0.8f) else statusColor
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun CallBubble(msg: MessageResponse, isMe: Boolean) {
     Box(
         modifier = Modifier
@@ -427,17 +585,49 @@ private fun CallBubble(msg: MessageResponse, isMe: Boolean) {
 
 @Composable
 private fun ImageBubble(msg: MessageResponse, isMe: Boolean) {
+    var showFullImage by remember { mutableStateOf(false) }
+
     Box(
         modifier = Modifier
             .size(200.dp, 150.dp)
             .clip(bubbleShape(isMe))
+            .background(Color.LightGray.copy(alpha = 0.3f))
+            .clickable { showFullImage = true }
     ) {
         AsyncImage(
-            model = msg.mediaUrl,
+            model = coil.request.ImageRequest.Builder(LocalContext.current)
+                .data(msg.mediaUrl)
+                .crossfade(true)
+                .build(),
             contentDescription = "Hình ảnh",
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop
         )
+    }
+
+    if (showFullImage) {
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = { showFullImage = false },
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.9f))
+                    .clickable { showFullImage = false },
+                contentAlignment = Alignment.Center
+            ) {
+                AsyncImage(
+                    model = coil.request.ImageRequest.Builder(LocalContext.current)
+                        .data(msg.mediaUrl)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = "Hình ảnh Full",
+                    modifier = Modifier.fillMaxWidth(),
+                    contentScale = ContentScale.Fit
+                )
+            }
+        }
     }
 }
 
@@ -526,7 +716,9 @@ private fun ChatInputBar(
     onTextChange: (String) -> Unit,
     onSend: () -> Unit,
     onAttach: () -> Unit,
-    isUploading: Boolean
+    isUploading: Boolean,
+    onVoiceRecord: (Uri?) -> Unit = {},
+    isGroupChat: Boolean = false
 ) {
     Surface(shadowElevation = 8.dp, color = MaterialTheme.colorScheme.surface) {
         Row(
@@ -539,7 +731,7 @@ private fun ChatInputBar(
         ) {
             if (isUploading) {
                 CircularProgressIndicator(modifier = Modifier.size(36.dp), color = PrimaryPink, strokeWidth = 3.dp)
-            } else {
+            } else if (!isGroupChat) {
                 IconButton(
                     onClick = onAttach,
                     modifier = Modifier.size(40.dp).background(SurfaceVariant, CircleShape)
@@ -570,9 +762,9 @@ private fun ChatInputBar(
             )
 
             if (text.isBlank()) {
-                VoiceRecordButton(onVoiceReady = { uri ->
-                    // gửi voice message
-                })
+                if (!isGroupChat) {
+                    VoiceRecordButton(onVoiceReady = onVoiceRecord)
+                }
             } else {
                 IconButton(
                     onClick = onSend,
@@ -848,7 +1040,13 @@ fun GroupChatDetailScreen(
 ) {
     val ctx = LocalContext.current
     val messages by chatVm.groupMessages.collectAsState()
+    val groups by chatVm.groups.collectAsState()
+    val currentGroup = groups.find { it.id == groupId }
+    val conversations by chatVm.conversations.collectAsState()
+    
     var messageText by remember { mutableStateOf("") }
+    var showMembersSheet by remember { mutableStateOf(false) }
+    var showAddMemberSheet by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
 
     LaunchedEffect(Unit) { chatVm.loadGroupHistory(ctx, groupId) }
@@ -866,6 +1064,7 @@ fun GroupChatDetailScreen(
                 },
                 title = {
                     Row(
+                        modifier = Modifier.clickable { showMembersSheet = true },
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -880,13 +1079,14 @@ fun GroupChatDetailScreen(
                         }
                         Column {
                             Text(groupName, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White))
-                            Text("Nhóm chat", style = MaterialTheme.typography.labelSmall.copy(color = Color.White.copy(0.8f)))
+                            Text("${currentGroup?.members?.size ?: 0} thành viên", style = MaterialTheme.typography.labelSmall.copy(color = Color.White.copy(0.8f)))
                         }
                     }
                 },
                 actions = {
-                    IconButton(onClick = {}) { Icon(Icons.Default.GroupAdd, null, tint = Color.White) }
-                    IconButton(onClick = {}) { Icon(Icons.Default.MoreVert, null, tint = Color.White) }
+                    IconButton(onClick = { showAddMemberSheet = true }) { 
+                        Icon(Icons.Default.GroupAdd, null, tint = Color.White) 
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = PrimaryPink)
             )
@@ -903,11 +1103,13 @@ fun GroupChatDetailScreen(
                             sentAt = LocalDateTime.now().toString()
                         )
                         chatVm.addLocalGroupMessage(localMsg)
+                        chatVm.sendGroupMessage(ctx, groupId, currentUserId, messageText.trim())
                         messageText = ""
                     }
                 },
                 onAttach = {},
-                isUploading = false
+                isUploading = false,
+                isGroupChat = true
             )
         }
     ) { padding ->
@@ -931,8 +1133,71 @@ fun GroupChatDetailScreen(
             }
         }
     }
-}
 
+    if (showMembersSheet && currentGroup != null) {
+        ModalBottomSheet(onDismissRequest = { showMembersSheet = false }) {
+            Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                Text("Thành viên nhóm (${currentGroup.members.size})", style = MaterialTheme.typography.titleLarge)
+                Spacer(Modifier.height(16.dp))
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    items(currentGroup.members, key = { it.userId }) { member ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            AsyncImage(
+                                model = member.avatarUrl ?: "https://loremflickr.com/40/40/dog?lock=${member.userId}",
+                                contentDescription = null,
+                                modifier = Modifier.size(40.dp).clip(CircleShape),
+                                contentScale = ContentScale.Crop
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Column {
+                                Text(member.fullName, style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold))
+                                Text("Vai trò: ${member.role}", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(32.dp))
+            }
+        }
+    }
+
+    if (showAddMemberSheet && currentGroup != null) {
+        val existingMemberIds = currentGroup.memberIds
+        val friendsToAdd = conversations.filter { it.userId !in existingMemberIds }
+        
+        ModalBottomSheet(onDismissRequest = { showAddMemberSheet = false }) {
+            Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                Text("Thêm thành viên", style = MaterialTheme.typography.titleLarge)
+                Spacer(Modifier.height(16.dp))
+                if (friendsToAdd.isEmpty()) {
+                    Text("Không có bạn bè nào để thêm.", color = TextSecondary)
+                } else {
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        items(friendsToAdd, key = { it.userId }) { friend ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth().clickable {
+                                    chatVm.addGroupMember(ctx, groupId, friend.userId) { showAddMemberSheet = false }
+                                }.padding(vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                AsyncImage(
+                                    model = friend.userAvatar ?: "https://loremflickr.com/40/40/dog?lock=${friend.userId}",
+                                    contentDescription = null,
+                                    modifier = Modifier.size(40.dp).clip(CircleShape),
+                                    contentScale = ContentScale.Crop
+                                )
+                                Spacer(Modifier.width(12.dp))
+                                Text(friend.userName, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                                Icon(Icons.Default.AddCircleOutline, null, tint = PrimaryPink)
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(32.dp))
+            }
+        }
+    }
+}
 @Composable
 private fun GroupMessageBubble(msg: com.petmatch.mobile.data.model.GroupMessageResponse, isMe: Boolean) {
     val timeStr = try { DateTimeFormatter.ofPattern("HH:mm").format(LocalDateTime.parse(msg.sentAt)) } catch (_: Exception) { "" }
@@ -942,7 +1207,7 @@ private fun GroupMessageBubble(msg: com.petmatch.mobile.data.model.GroupMessageR
     ) {
         if (!isMe) {
             AsyncImage(
-                model = msg.senderAvatarUrl ?: "https://placedog.net/32/32?r=${msg.senderId}",
+                model = msg.senderAvatarUrl ?: "https://loremflickr.com/32/32/dog?lock=${msg.senderId}",
                 contentDescription = msg.senderName,
                 modifier = Modifier.size(32.dp).clip(CircleShape).align(Alignment.Bottom),
                 contentScale = ContentScale.Crop
