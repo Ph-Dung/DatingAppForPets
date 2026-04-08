@@ -198,7 +198,7 @@ fun ChatListScreen(
                     } else {
                         // Show conversations (normal view)
                         val newMatches = conversations.filter { it.lastMessage == null }
-                        val activeChats = conversations.filter { it.lastMessage != null }
+                        val activeChats = conversations.filter { it.lastMessage != null }.sortedByDescending { it.lastMessageTime }
 
                         if (newMatches.isEmpty() && activeChats.isEmpty()) {
                             EmptyConversationsPlaceholder()
