@@ -31,3 +31,9 @@ build/
 
 ### VS Code ###
 .vscode/
+
+.yaml
+.env
+
+# Bỏ qua file chứa môi trường bí mật để không bị đưa lên github
+application-secret.yaml

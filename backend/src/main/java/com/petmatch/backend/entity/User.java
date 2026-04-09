@@ -1,8 +1,28 @@
 package com.petmatch.backend.entity;
 
-import jakarta.persistence.*;
-import lombok.*;
+import java.time.LocalDateTime;
 
+import org.hibernate.annotations.CreationTimestamp;
+
+import com.petmatch.backend.enums.Role;
+
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.experimental.FieldDefaults;
 import java.time.LocalDateTime;
 
 @Entity
@@ -12,25 +32,56 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@FieldDefaults(level = AccessLevel.PRIVATE)
 public class User {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    Long id;
 
-    @Column(nullable = false, unique = true)
-    private String email;
+    @Column(name = "full_name", nullable = false, length = 100)
+    String fullName;
 
-    @Column(nullable = false)
-    private String name;
+    @Column(nullable = false, unique = true, length = 255)
+    String email;
 
-    private String avatarUrl;
+    @Column(name = "password_hash", nullable = false)
+    String passwordHash;
 
-    @Column(updatable = false)
-    private LocalDateTime createdAt;
+    @Column(length = 20)
+    String phone;
 
-    @PrePersist
-    protected void onCreate() {
-        createdAt = LocalDateTime.now();
-    }
+    @Column(name = "avatar_url")
+    String avatarUrl;
+
+    String address;
+
+    Double latitude;
+    Double longitude;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    Role role = Role.USER;
+
+    @Column(name = "is_locked", nullable = false)
+    @Builder.Default
+    Boolean isLocked = false;
+
+    @Column(name = "is_warned")
+    Boolean isWarned = false;
+
+    @Column(name = "warning_count")
+    Integer warningCount = 0;
+
+    @Column(name = "last_warned_at")
+    LocalDateTime lastWarnedAt;
+
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    @CreationTimestamp
+    LocalDateTime createdAt;
+
+    // Relationship: 1 user = 1 pet profile
+    @OneToOne(mappedBy = "owner", cascade = CascadeType.ALL)
+    PetProfile petProfile;
 }

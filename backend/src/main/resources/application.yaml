@@ -1,17 +1,48 @@
 spring:
+  profiles:
+    include: secret
   datasource:
-    url: jdbc:postgresql://localhost:5432/petmatch
-    username: postgres
-    password: password
-    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://localhost:5432/petmatch_db
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:123}
+
   jpa:
     hibernate:
       ddl-auto: update
     show-sql: true
-    properties:
-      hibernate:
-        format_sql: true
-        dialect: org.hibernate.dialect.PostgreSQLDialect
+  jackson:
+    date-format: yyyy-MM-dd
+
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 20MB
 
 server:
-  port: 8080
+  port: ${SERVER_PORT:8080}
+
+app:
+  cors:
+    allowed-origins:
+      - "*"
+  seed:
+    enabled: ${APP_SEED_ENABLED:true}
+    users-count: ${APP_SEED_USERS_COUNT:30}
+    skip-when-users-gte: ${APP_SEED_SKIP_USERS_GTE:5}
+jwt:
+  secret: qwertyuiopasdfghjklzxcvbnmqwertyuiop
+  expiration: 86400000
+
+cloudinary:
+  cloud-name: ${CLOUDINARY_NAME}
+  api-key: ${CLOUDINARY_API_KEY}
+  api-secret: ${CLOUDINARY_API_SECRET}
+
+openai:
+  api-key: ${OPENAI_API_KEY}
+  base-url: "https://api.groq.com/openai/v1"
+  model: "llama-3.3-70b-versatile"
+
+community:
+  moderation:
+    enabled: false
+    blocked-keywords: []

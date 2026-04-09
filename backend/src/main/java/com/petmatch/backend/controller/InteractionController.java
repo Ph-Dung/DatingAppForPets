@@ -1,9 +1,13 @@
 package com.petmatch.backend.controller;
 
 import com.petmatch.backend.dto.ReviewRequest;
+import com.petmatch.backend.dto.request.ReportRequest;
 import com.petmatch.backend.entity.Block;
+import com.petmatch.backend.entity.BlockLevel;
+import com.petmatch.backend.entity.Report;
 import com.petmatch.backend.entity.Review;
 import com.petmatch.backend.service.InteractionService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,13 +21,13 @@ public class InteractionController {
 
     private final InteractionService interactionService;
 
-    // --- REVIEWS ---
+    // ── REVIEWS ──────────────────────────────────────────
 
-    @PostMapping("/reviews")
+    @PostMapping("/reviews/{revieweeId}")
     public ResponseEntity<Review> createReview(
-            @RequestParam Long reviewerId, // In a real app, extract from JWT
-            @RequestBody ReviewRequest request) {
-        return ResponseEntity.ok(interactionService.createReview(reviewerId, request));
+            @PathVariable Long revieweeId,
+            @Valid @RequestBody ReviewRequest request) {
+        return ResponseEntity.ok(interactionService.createReview(revieweeId, request));
     }
 
     @GetMapping("/reviews/user/{userId}")
@@ -31,18 +35,34 @@ public class InteractionController {
         return ResponseEntity.ok(interactionService.getUserReviews(userId));
     }
 
-    // --- BLOCKS ---
+    // ── BLOCKS ───────────────────────────────────────────
 
-    @PostMapping("/blocks")
+    /**
+     * Chặn người dùng với cấp độ chặn.
+     * level: MESSAGE | CALL | ALL (mặc định ALL)
+     */
+    @PostMapping("/blocks/{targetUserId}")
     public ResponseEntity<Block> blockUser(
-            @RequestParam Long blockerId, // Extract from JWT ideally
-            @RequestParam Long blockedId) {
-        return ResponseEntity.ok(interactionService.blockUser(blockerId, blockedId));
+            @PathVariable Long targetUserId,
+            @RequestParam(defaultValue = "ALL") BlockLevel level) {
+        return ResponseEntity.ok(interactionService.blockUser(targetUserId, level));
     }
 
-    @DeleteMapping("/blocks/{blockId}")
-    public ResponseEntity<Void> unblockUser(@PathVariable Long blockId) {
-        interactionService.unblockUser(blockId);
+    @DeleteMapping("/blocks/{targetUserId}")
+    public ResponseEntity<Void> unblockUser(@PathVariable Long targetUserId) {
+        interactionService.unblockUser(targetUserId);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/blocks")
+    public ResponseEntity<List<com.petmatch.backend.dto.response.BlockResponse>> getMyBlocks() {
+        return ResponseEntity.ok(interactionService.getMyBlocks());
+    }
+
+    // ── REPORTS ──────────────────────────────────────────
+
+    @PostMapping("/reports")
+    public ResponseEntity<Report> submitReport(@Valid @RequestBody ReportRequest req) {
+        return ResponseEntity.status(201).body(interactionService.submitReport(req));
     }
 }

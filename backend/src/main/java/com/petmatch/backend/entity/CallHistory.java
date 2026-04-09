@@ -39,6 +39,9 @@ public class CallHistory {
 
     private LocalDateTime endedAt;
 
+    @Column(name = "duration_seconds")
+    private Integer durationSeconds;
+
     @PrePersist
     protected void onCreate() {
         if (startedAt == null) {

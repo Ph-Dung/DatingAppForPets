@@ -2,37 +2,39 @@ package com.petmatch.backend.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import lombok.experimental.FieldDefaults;
+import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
 
-@Entity
-@Table(name = "blocks", uniqueConstraints = {
-    @UniqueConstraint(columnNames = {"blocker_id", "blocked_id"})
-})
+@Entity 
+@Table(name = "blocks",
+        uniqueConstraints = @UniqueConstraint(columnNames = {"blocker_id","blocked_id"}))
 @Getter
-@Setter
+@Setter 
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@FieldDefaults(level = AccessLevel.PRIVATE)
 public class Block {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "blocker_id", nullable = false)
-    private User blocker;
+    User blocker;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "blocked_id", nullable = false)
-    private User blocked;
+    User blocked;
 
-    @Column(updatable = false)
-    private LocalDateTime blockedAt;
+    @CreationTimestamp
+    @Column(name = "created_at", updatable = false)
+    LocalDateTime createdAt;
 
-    @PrePersist
-    protected void onCreate() {
-        blockedAt = LocalDateTime.now();
-    }
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    BlockLevel level = BlockLevel.ALL;
 }

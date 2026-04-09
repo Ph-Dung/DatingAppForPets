@@ -1,12 +1,11 @@
 package com.petmatch.backend.service;
 
 import com.petmatch.backend.dto.CallRequest;
-import com.petmatch.backend.entity.CallHistory;
-import com.petmatch.backend.entity.CallStatus;
-import com.petmatch.backend.entity.User;
-import com.petmatch.backend.repository.CallHistoryRepository;
-import com.petmatch.backend.repository.UserRepository;
+import com.petmatch.backend.entity.*;
+import com.petmatch.backend.exception.AppException;
+import com.petmatch.backend.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +18,9 @@ public class CallService {
 
     private final CallHistoryRepository callHistoryRepository;
     private final UserRepository userRepository;
+    private final MatchRepository matchRepository;
+    private final BlockRepository blockRepository;
+    private final MessageRepository messageRepository;
 
     @Transactional
     public CallHistory initiateCall(Long callerId, CallRequest request) {
@@ -26,6 +28,20 @@ public class CallService {
                 .orElseThrow(() -> new RuntimeException("Caller not found"));
         User callee = userRepository.findById(request.getCalleeId())
                 .orElseThrow(() -> new RuntimeException("Callee not found"));
+
+        // Match check
+        // if (matchRepository.findMatchByUserIds(caller.getId(), callee.getId()).isEmpty()) {
+        //     throw new AppException("Chỉ có thể gọi cho người đã match", HttpStatus.FORBIDDEN);
+        // }
+
+        // Block check: cấp CALL hoặc ALL
+        List<BlockLevel> callLevels = List.of(BlockLevel.CALL, BlockLevel.ALL);
+        if (blockRepository.existsByBlockerAndBlockedAndLevelIn(callee, caller, callLevels)) {
+            throw new AppException("Bạn đã bị người nhận chặn cuộc gọi", HttpStatus.FORBIDDEN);
+        }
+        if (blockRepository.existsByBlockerAndBlockedAndLevelIn(caller, callee, callLevels)) {
+            throw new AppException("Bạn đã chặn cuộc gọi từ người này", HttpStatus.FORBIDDEN);
+        }
 
         CallHistory callHistory = CallHistory.builder()
                 .caller(caller)
@@ -38,16 +54,48 @@ public class CallService {
     }
 
     @Transactional
-    public CallHistory endCall(Long callId, CallStatus finalStatus) {
+    public CallHistory endCall(Long callId, Long userId, CallStatus finalStatus, Integer durationSeconds) {
         CallHistory call = callHistoryRepository.findById(callId)
                 .orElseThrow(() -> new RuntimeException("Call not found"));
-        
-        call.setStatus(finalStatus);
-        if (finalStatus == CallStatus.COMPLETED) {
-            call.setEndedAt(LocalDateTime.now());
+                
+        // Validation: Must be participant
+        if (!call.getCaller().getId().equals(userId) && !call.getCallee().getId().equals(userId)) {
+            throw new AppException("Không có quyền thao tác", HttpStatus.FORBIDDEN);
         }
         
-        return callHistoryRepository.save(call);
+        call.setStatus(finalStatus);
+        call.setEndedAt(LocalDateTime.now());
+        if (durationSeconds != null && durationSeconds > 0) {
+            call.setDurationSeconds(durationSeconds);
+        }
+        
+        callHistoryRepository.save(call);
+
+        // Lưu log cuộc gọi vào đoạn chat
+        if (finalStatus != CallStatus.ONGOING) {
+            String callTypeStr = call.getType() != null && call.getType().name().equals("AUDIO") ? "Cuộc gọi thoại" : "Cuộc gọi video";
+            String content;
+            if (finalStatus == CallStatus.MISSED) {
+                content = "Cuộc gọi nhỡ";
+            } else if (finalStatus == CallStatus.REJECTED) {
+                content = "Cuộc gọi bị từ chối";
+            } else {
+                int duration = call.getDurationSeconds() != null ? call.getDurationSeconds() : 0;
+                int m = duration / 60;
+                int s = duration % 60;
+                content = callTypeStr + " - " + m + " phút " + s + " giây";
+            }
+            
+            Message callMsg = Message.builder()
+                    .sender(call.getCaller())
+                    .receiver(call.getCallee())
+                    .type(MessageType.CALL)
+                    .content(content)
+                    .build();
+            messageRepository.save(callMsg);
+        }
+
+        return call;
     }
 
     @Transactional(readOnly = true)
