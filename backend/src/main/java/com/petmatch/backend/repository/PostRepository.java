@@ -10,6 +10,11 @@ import com.petmatch.backend.entity.User;
 
 @Repository
 public interface PostRepository extends JpaRepository<Post, Long> {
+    /**
+     * Repository cho `Post`.
+     * - Chứa các truy vấn cơ bản phục vụ feed và trang cá nhân.
+     * - Sắp xếp theo `createdAt` để UI có thể hiển thị mới nhất trước.
+     */
     List<Post> findAllByOrderByCreatedAtDesc();
     List<Post> findAllByUserOrderByCreatedAtDesc(User user);
     List<Post> findAllByUserIdOrderByCreatedAtDesc(Long userId);

@@ -15,7 +15,6 @@ import com.petmatch.backend.enums.CommunityNotificationType;
 
 @Repository
 public interface CommunityNotificationRepository extends JpaRepository<CommunityNotification, Long> {
-
     List<CommunityNotification> findAllByRecipientOrderByCreatedAtDesc(User recipient);
 
     long countByRecipientAndIsReadFalse(User recipient);

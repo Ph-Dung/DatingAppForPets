@@ -31,14 +31,22 @@ import lombok.Setter;
 @AllArgsConstructor
 @Builder
 public class Post {
+    /**
+     * Entity `Post` đại diện cho một bài đăng trong cộng đồng.
+     * - Quan hệ: Nhiều `Comment`, nhiều `Like`, thuộc về một `User`.
+     * - `imageUrl` có thể lưu một chuỗi các URL ghép bởi dấu phẩy nếu nhiều ảnh.
+     */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Column(columnDefinition = "TEXT", nullable = false)
+    // Nội dung bài viết (bắt buộc)
     private String content;
 
+    // URL ảnh (có thể là nhiều URL ghép bằng dấu ,)
     private String imageUrl;
+    // Vị trí/địa điểm người dùng nhập (tuỳ chọn)
     private String location;
 
     @ManyToOne(fetch = FetchType.LAZY)

@@ -13,9 +13,13 @@ import com.petmatch.backend.entity.User;
 
 @Repository
 public interface HiddenPostRepository extends JpaRepository<HiddenPost, Long> {
-
+    /**
+     * Quản lý bản ghi "ẩn bài" của user.
+     * - Dùng để loại trừ các bài user đã ẩn khỏi feed riêng của họ.
+     */
     Optional<HiddenPost> findByUserAndPost(User user, Post post);
 
+    // Trả về danh sách postId mà user đã ẩn
     @Query("select hp.post.id from HiddenPost hp where hp.user.id = :userId")
     List<Long> findPostIdsByUserId(Long userId);
 }

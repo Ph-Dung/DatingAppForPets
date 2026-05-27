@@ -19,8 +19,18 @@ import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
 
+/**
+ * ViewModel cho màn hình Cộng đồng.
+ *
+ * Nhiệm vụ chính:
+ * - Giữ state UI cho feed, bài của tôi, comment, notification, error/loading.
+ * - Gọi API backend cho các hành động: tạo/cập nhật/xóa bài, like/unlike,
+ *   thêm/trả lời bình luận, gửi báo cáo, tải notification.
+ * - Chuyển đổi input từ UI (text, Uri, multipart) sang request body phù hợp.
+ */
 class CommunityViewModel : ViewModel() {
 
+    // ===== State hiển thị chính trên màn hình community =====
     private val _feed = MutableStateFlow<List<CommunityPostResponse>>(emptyList())
     val feed: StateFlow<List<CommunityPostResponse>> = _feed
 
@@ -51,6 +61,7 @@ class CommunityViewModel : ViewModel() {
     private val _actionDone = MutableStateFlow(false)
     val actionDone: StateFlow<Boolean> = _actionDone
 
+    // Tải bảng tin cộng đồng từ backend và cập nhật state `_feed`.
     fun loadFeed(ctx: Context) = viewModelScope.launch {
         _loading.value = true
         _error.value = null
@@ -67,6 +78,7 @@ class CommunityViewModel : ViewModel() {
         _loading.value = false
     }
 
+    // Tải danh sách bài đăng của user hiện tại và cập nhật state `_myPosts`.
     fun loadMyPosts(ctx: Context) = viewModelScope.launch {
         _loading.value = true
         _error.value = null
@@ -83,6 +95,7 @@ class CommunityViewModel : ViewModel() {
         _loading.value = false
     }
 
+    // Tạo bài viết mới bằng dữ liệu text/URL đã có sẵn từ UI.
     fun createPost(
         ctx: Context,
         content: String,
@@ -110,6 +123,7 @@ class CommunityViewModel : ViewModel() {
         _actionLoading.value = false
     }
 
+    // Tạo bài viết mới với ảnh lấy trực tiếp từ thiết bị (Uri -> Multipart).
     fun createPostWithDeviceImages(
         ctx: Context,
         content: String,
@@ -168,6 +182,7 @@ class CommunityViewModel : ViewModel() {
         _actionLoading.value = false
     }
 
+    // Cập nhật bài viết bằng dữ liệu text/URL ảnh từ UI.
     fun updatePost(
         ctx: Context,
         id: Long,
@@ -194,6 +209,7 @@ class CommunityViewModel : ViewModel() {
         _actionLoading.value = false
     }
 
+    // Cập nhật bài viết với ảnh lấy từ thiết bị, giữ lại URL ảnh remote nếu có.
     fun updatePostWithDeviceImages(
         ctx: Context,
         id: Long,
@@ -249,6 +265,7 @@ class CommunityViewModel : ViewModel() {
         _actionLoading.value = false
     }
 
+    // Xóa bài viết và đồng bộ lại hai danh sách feed/myPosts ở local state.
     fun deletePost(ctx: Context, id: Long) = viewModelScope.launch {
         _actionLoading.value = true
         _error.value = null
@@ -266,6 +283,7 @@ class CommunityViewModel : ViewModel() {
         _actionLoading.value = false
     }
 
+    // Like/unlike bài viết, sau đó cập nhật lại count trong state hiện tại.
     fun toggleLike(ctx: Context, id: Long) = viewModelScope.launch {
         _error.value = null
         try {
@@ -301,6 +319,7 @@ class CommunityViewModel : ViewModel() {
         }
     }
 
+    // Gửi reply cho 1 comment; backend sẽ gắn vào parentComment.
     fun replyComment(ctx: Context, postId: Long, parentCommentId: Long, content: String, onDone: (() -> Unit)? = null) = viewModelScope.launch {
         _actionLoading.value = true
         _error.value = null
@@ -321,6 +340,7 @@ class CommunityViewModel : ViewModel() {
         _actionLoading.value = false
     }
 
+    // Tải danh sách comment của 1 bài viết.
     fun loadComments(ctx: Context, postId: Long) = viewModelScope.launch {
         _commentsLoading.value = true
         _error.value = null
@@ -337,6 +357,7 @@ class CommunityViewModel : ViewModel() {
         _commentsLoading.value = false
     }
 
+    // Thêm comment mới cho bài viết.
     fun addComment(ctx: Context, postId: Long, content: String, onDone: (() -> Unit)? = null) = viewModelScope.launch {
         _actionLoading.value = true
         _error.value = null
@@ -357,6 +378,7 @@ class CommunityViewModel : ViewModel() {
         _actionLoading.value = false
     }
 
+    // Gửi báo cáo bài viết; tùy chọn hidePost để ẩn bài khỏi feed của user hiện tại.
     fun submitReport(
         ctx: Context,
         postId: Long,
@@ -386,6 +408,7 @@ class CommunityViewModel : ViewModel() {
         _actionLoading.value = false
     }
 
+    // Tải số notification chưa đọc để hiển thị badge trên UI.
     fun loadUnreadNotificationCount(ctx: Context) = viewModelScope.launch {
         try {
             val res = RetrofitClient.communityApi(ctx).getUnreadNotificationCount()
@@ -398,6 +421,7 @@ class CommunityViewModel : ViewModel() {
         }
     }
 
+    // Tải danh sách notification; nếu markRead=true thì backend sẽ đánh dấu đã đọc.
     fun loadNotifications(ctx: Context, markRead: Boolean = true) = viewModelScope.launch {
         try {
             val res = RetrofitClient.communityApi(ctx).getNotifications(markRead = markRead)
@@ -414,6 +438,7 @@ class CommunityViewModel : ViewModel() {
         }
     }
 
+    // Đánh dấu toàn bộ notification là đã đọc và cập nhật badge local.
     fun markAllNotificationsAsRead(ctx: Context) = viewModelScope.launch {
         try {
             RetrofitClient.communityApi(ctx).markAllNotificationsAsRead()
@@ -424,10 +449,12 @@ class CommunityViewModel : ViewModel() {
         }
     }
 
+    // Xóa trạng thái lỗi hiện tại trên UI.
     fun clearError() {
         _error.value = null
     }
 
+    // Reset cờ actionDone và xoá lỗi, dùng sau khi UI xử lý xong một hành động.
     fun clearActionState() {
         _actionDone.value = false
         _error.value = null

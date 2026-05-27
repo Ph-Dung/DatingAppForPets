@@ -55,11 +55,13 @@ fun PostManagementScreen(
 
     var deleteTarget by remember { mutableStateOf<CommunityPostResponse?>(null) }
 
+    // Load thông tin user và danh sách bài viết của chính user khi màn hình mở.
     LaunchedEffect(Unit) {
         userVm.loadMyInfo(ctx)
         vm.loadMyPosts(ctx)
     }
 
+    // Nếu được điều hướng với postId, chuyển ngay sang màn chỉnh sửa bài đó.
     LaunchedEffect(editPostId) {
         if (editPostId != null) {
             navController.navigate(Routes.postAdd(editPostId))
@@ -83,6 +85,7 @@ fun PostManagementScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
+            // Hiển thị loading khi đang tải dữ liệu.
             if (loading) {
                 item {
                     Box(
@@ -96,6 +99,7 @@ fun PostManagementScreen(
                 }
             }
 
+            // Hiển thị lỗi nếu API trả về thất bại.
             if (!error.isNullOrBlank()) {
                 item {
                     Text(
@@ -106,6 +110,7 @@ fun PostManagementScreen(
                 }
             }
 
+            // Danh sách bài viết do user hiện tại tạo ra.
             items(myPosts, key = { it.id }) { post ->
                 CommunityPostItem(
                     post = post,

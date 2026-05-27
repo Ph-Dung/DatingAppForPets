@@ -37,6 +37,11 @@ import lombok.experimental.FieldDefaults;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class HiddenPost {
 
+    /**
+     * Entity `HiddenPost` lưu trạng thái một user đã ẩn (hide) một bài viết
+     * khỏi feed của họ. Dùng cho tính năng "ẩn bài" sau khi report hoặc do user tự ẩn.
+     */
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     Long id;

@@ -73,6 +73,7 @@ fun AddPostScreen(
     val editingPost = remember(editPostId, myPosts) { myPosts.firstOrNull { it.id == editPostId } }
     var prefilled by remember(editPostId) { mutableStateOf(false) }
 
+    // Chụp ảnh nhanh từ camera để đưa vào bài đăng.
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicturePreview()
     ) { bitmap: Bitmap? ->
@@ -84,6 +85,7 @@ fun AddPostScreen(
         }
     }
 
+    // Chọn ảnh từ thư viện thiết bị.
     val libraryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -96,6 +98,7 @@ fun AddPostScreen(
         }
     }
 
+    // Nếu đăng/cập nhật thành công thì thoát màn hình hiện tại.
     LaunchedEffect(actionDone) {
         if (actionDone) {
             vm.clearActionState()
@@ -103,6 +106,7 @@ fun AddPostScreen(
         }
     }
 
+    // Tải thông tin user và bài viết đang chỉnh sửa khi màn hình vừa mở.
     LaunchedEffect(Unit) {
         userVm.loadMyInfo(ctx)
         if (isEditMode) {
@@ -110,6 +114,7 @@ fun AddPostScreen(
         }
     }
 
+    // Prefill dữ liệu khi đang ở chế độ chỉnh sửa bài.
     LaunchedEffect(editingPost?.id) {
         if (isEditMode && !prefilled && editingPost != null) {
             content = editingPost.content
@@ -119,6 +124,7 @@ fun AddPostScreen(
         }
     }
 
+    // Nếu user chưa chọn địa điểm thì dùng địa chỉ hiện có trong profile.
     LaunchedEffect(currentUser?.address) {
         if (location.isBlank()) {
             location = currentUser?.address.orEmpty()
@@ -137,6 +143,7 @@ fun AddPostScreen(
                 actions = {
                     TextButton(
                         onClick = {
+                            // Tách riêng luồng update/create nhưng đều gửi content + location + ảnh.
                             if (isEditMode && editPostId != null) {
                                 vm.updatePostWithDeviceImages(
                                     ctx = ctx,
@@ -184,7 +191,7 @@ fun AddPostScreen(
                     .padding(16.dp)
                     .verticalScroll(rememberScrollState())
             ) {
-            // User Info
+            // Header hiển thị avatar, tên và địa điểm hiện tại của bài.
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (!currentUser?.avatarUrl.isNullOrBlank()) {
                     AsyncImage(
@@ -227,6 +234,7 @@ fun AddPostScreen(
 
             Spacer(modifier = Modifier.height(10.dp))
 
+            // Ở màn tạo mới, cho phép lấy GPS và đổi sang tên địa điểm thực tế.
             if (!isEditMode) {
                 LocationUpdateButton(
                     onLocationObtained = { lat, lon ->
@@ -241,7 +249,7 @@ fun AddPostScreen(
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
-            // Input Content
+            // Ô nhập nội dung chính của bài viết.
             OutlinedTextField(
                 value = content,
                 onValueChange = { content = it },
@@ -257,7 +265,7 @@ fun AddPostScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Image Gallery (LazyRow with horizontal scroll, max 4 images)
+            // Danh sách ảnh đã chọn, giới hạn tối đa 4 ảnh.
             if (selectedImageUris.isNotEmpty()) {
                 Text("Ảnh đã chọn (${selectedImageUris.size}/4)", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 Spacer(modifier = Modifier.height(8.dp))
@@ -374,6 +382,7 @@ private fun saveBitmapToTempUri(ctx: android.content.Context, bitmap: Bitmap): U
 
 private fun getReverseGeocodedAddress(ctx: android.content.Context, lat: Double, lon: Double): String? {
     return try {
+        // Đổi tọa độ GPS thành tên địa điểm gần nhất để lưu vào post.
         val geocoder = Geocoder(ctx, Locale("vi", "VN"))
         val addresses = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             geocoder.getFromLocation(lat, lon, 1)?.firstOrNull()

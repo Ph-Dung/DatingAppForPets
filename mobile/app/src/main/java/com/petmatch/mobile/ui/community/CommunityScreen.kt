@@ -52,6 +52,15 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 
+/**
+ * Màn hình Cộng đồng của mobile.
+ *
+ * Thành phần chính:
+ * - Hiển thị feed bài viết
+ * - Mở sheet bình luận / reply
+ * - Dialog báo cáo bài viết
+ * - Điều hướng tới màn tạo bài và màn quản lý bài viết
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
@@ -79,6 +88,7 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
     val commentInputFocusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
 
+    // Khi chọn reply một comment, tự focus ô nhập và mở keyboard.
     LaunchedEffect(replyToCommentId) {
         if (replyToCommentId != null) {
             commentInputFocusRequester.requestFocus()
@@ -86,12 +96,14 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
         }
     }
 
+    // Load dữ liệu ban đầu khi screen vừa vào.
     LaunchedEffect(Unit) {
         vm.loadFeed(ctx)
         petVm.loadMyProfile(ctx)
         userVm.loadMyInfo(ctx)
     }
 
+    // Khung UI chính của Community: top bar + danh sách bài viết.
     Scaffold(
         topBar = {
             PetMatchTopBar(title = "Cộng đồng")
@@ -102,6 +114,7 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            // Thanh tạo bài và vào màn quản lý bài viết.
             item {
                 CreatePostBar(
                     userAvatarUrl = currentUser?.avatarUrl,
@@ -118,6 +131,7 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
                 }
             }
 
+            // Trạng thái khi không có bài nào trong feed.
             if (!loading && posts.isEmpty()) {
                 item {
                     CommunityEmptyState(
@@ -156,6 +170,7 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
                 }
             }
 
+            // Danh sách bài viết trong feed.
             items(posts, key = { it.id }) { post ->
                 CommunityPostItem(
                     post = post,
@@ -183,6 +198,7 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
         }
     }
 
+    // Bottom sheet bình luận: chỉ mở khi có post được chọn.
     if (commentPostId != null) {
         val commentsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         ModalBottomSheet(
@@ -213,12 +229,14 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
                 }
                 Spacer(modifier = Modifier.height(8.dp))
 
+                // Loading trạng thái tải comment.
                 if (commentsLoading) {
                     Box(modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(modifier = Modifier.size(24.dp))
                     }
                 }
 
+                // List comment + reply đệ quy hiển thị theo level.
                 LazyColumn(
                     modifier = Modifier
                         .weight(1f)
@@ -372,6 +390,7 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
         }
     }
 
+    // Dialog chọn lý do report bài viết.
     if (showReportDialogForPostId != null && !showReportConfirmDialog) {
         val reportReasons = listOf(
             "Không phải bài đăng liên quan đến thú cưng hoặc động vật",
@@ -460,6 +479,7 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
         )
     }
 
+    // Dialog xác nhận trước khi gửi report.
     if (showReportDialogForPostId != null && showReportConfirmDialog) {
         val finalReason = selectedReportReason?.ifBlank { null }
             ?: customReportReason.trim().ifBlank { null }
@@ -542,6 +562,7 @@ fun CommunityScreen(navController: NavController, vm: CommunityViewModel) {
     }
 }
 
+// Thanh tạo bài viết ở đầu feed: avatar user + nút mở màn tạo bài + nút quản lý bài viết.
 @Composable
 fun CreatePostBar(
     userAvatarUrl: String?,
@@ -604,6 +625,7 @@ fun CreatePostBar(
     }
 }
 
+// Item hiển thị 1 bài viết trong feed: header, nội dung, carousel ảnh, action like/comment.
 @Composable
 fun CommunityPostItem(
     post: CommunityPostResponse,
@@ -620,6 +642,7 @@ fun CommunityPostItem(
     val displayAvatar = post.ownerAvatar?.takeIf { it.isNotBlank() }
         ?: if (isOwner) currentUserAvatarUrl?.takeIf { it.isNotBlank() } else null
 
+    // Một bài viết trong feed: avatar, tên, địa điểm, thời gian, ảnh và các action.
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
@@ -741,6 +764,7 @@ fun CommunityPostItem(
     }
 }
 
+// Carousel ảnh cho bài viết, hỗ trợ vuốt ngang và mở fullscreen.
 @Composable
 private fun PostImageCarousel(imageUrls: List<String>) {
     var currentIndex by remember(imageUrls) { mutableIntStateOf(0) }
@@ -837,6 +861,7 @@ private fun PostImageCarousel(imageUrls: List<String>) {
     }
 }
 
+// Trình xem ảnh toàn màn hình cho carousel.
 @Composable
 private fun FullScreenImageViewer(
     imageUrls: List<String>,
@@ -900,6 +925,7 @@ private fun FullScreenImageViewer(
     }
 }
 
+// Item hiển thị comment/reply, có hỗ trợ canReply để mở luồng trả lời.
 @Composable
 private fun CommentItem(
     name: String,
@@ -975,6 +1001,7 @@ private fun CommentItem(
     }
 }
 
+// Empty state khi feed chưa có bài viết nào.
 @Composable
 private fun CommunityEmptyState(
     onCreatePost: () -> Unit
@@ -1005,6 +1032,7 @@ private fun CommunityEmptyState(
     }
 }
 
+// Chuyển timestamp dạng ISO từ backend sang chuỗi thời gian tương đối để hiển thị UI.
 private fun getRelativeTimeString(createdAtStr: String?): String {
     if (createdAtStr.isNullOrBlank()) return ""
     
@@ -1034,6 +1062,7 @@ private fun getRelativeTimeString(createdAtStr: String?): String {
     }
 }
 
+// Parse chuỗi imageUrl trả về từ backend thành list URL để carousel hiển thị.
 private fun parsePostImageUrls(imageUrl: String?): List<String> {
     if (imageUrl.isNullOrBlank()) return emptyList()
 

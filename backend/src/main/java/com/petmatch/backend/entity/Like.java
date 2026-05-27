@@ -13,6 +13,10 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class Like {
+    /**
+     * Entity `Like` ghi nhận một lượt thích của `User` cho `Post`.
+     * - Có constraint unique (user_id, post_id) để tránh like trùng lặp.
+     */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

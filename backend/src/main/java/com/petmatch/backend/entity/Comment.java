@@ -31,11 +31,16 @@ import lombok.Setter;
 @AllArgsConstructor
 @Builder
 public class Comment {
+    /**
+     * Entity `Comment` biểu diễn bình luận của user trên một `Post`.
+     * Hỗ trợ comment lồng nhau thông qua `parentComment` và danh sách `replies`.
+     */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Column(columnDefinition = "TEXT", nullable = false)
+    // Nội dung bình luận (bắt buộc)
     private String content;
 
     @ManyToOne(fetch = FetchType.LAZY)
