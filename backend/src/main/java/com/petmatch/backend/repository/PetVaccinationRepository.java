@@ -7,6 +7,19 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * 💉 Tra cứu lịch sử tiêm vaccine
+ * 
+ * Dùng bởi: PetProfileService.getVaccinations/addVaccination/deleteVaccination
+ * Tính năng:
+ * - Danh sách vaccine sắp xếp theo ngày tiêm mới nhất
+ * - Tìm vaccine theo ID với kiểm tra ownership (security)
+ * - Xóa an toàn theo pet_id
+ * 
+ * Auto-logic khi thêm/sửa/xóa vaccine:
+ * - Add: auto-update PetProfile.isVaccinated=true, lastVaccineDate=max(...)
+ * - Delete last: auto-update isVaccinated=false, lastVaccineDate=null
+ */
 @Repository
 public interface PetVaccinationRepository extends JpaRepository<PetVaccination, Long> {
 

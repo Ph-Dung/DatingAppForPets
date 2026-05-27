@@ -10,6 +10,20 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * ❤️ Tra cứu ghép đôi cấp user (dùng cho chat)
+ * 
+ * Dùng bởi: MatchRequestService.createOrUpdateUserMatch()
+ * Dùng bởi: MessageService (tìm Match để quản lý conversations)
+ * 
+ * Lưu ý: Match (user-level) khác MatchRequest (pet-level)
+ * - MatchRequest: Pet A like Pet B (PENDING/ACCEPTED/REJECTED)
+ * - Match: User A + User B đã ghép đôi (tạo khi mutual MatchRequest ACCEPTED)
+ * 
+ * Tính năng:
+ * - Tìm Match bidirectional: (user1, user2) hoặc (user2, user1)
+ * - Danh sách tất cả Match của user (để load chat conversations)
+ */
 @Repository
 public interface MatchRepository extends JpaRepository<Match, Long> {
     @Query("SELECT m FROM Match m WHERE (m.user1.id = :user1Id AND m.user2.id = :user2Id) OR (m.user1.id = :user2Id AND m.user2.id = :user1Id)")

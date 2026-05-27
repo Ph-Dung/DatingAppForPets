@@ -19,6 +19,22 @@ import java.time.Period;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * 🤖 Dịch vụ: Học máy ghép đôi (AI matching)
+ * 
+ * Xử lý:
+ * - Cập nhật SwipePreference sau mỗi lần user like/dislike
+ * - Học từ hành vi: breed trends, gender preference, weight/age average
+ * - Tính điểm tương thích cho candidates dựa trên preference
+ * - Smart suggestions (khi user có ≥5 likes)
+ * 
+ * Công thức scoring:
+ * - Match breed: +5 điểm mỗi breed ưa thích
+ * - Match gender: +3 điểm
+ * - Match health: +2 điểm
+ * - Weight/age proximity: +1 điểm (tỷ lệ phần trăm)
+ * - Candidates sắp xếp theo điểm giảm dần
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j

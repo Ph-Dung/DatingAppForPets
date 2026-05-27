@@ -13,13 +13,31 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/**
+ * Controller: Pet-level matching (Like/Super Like/Dislike)
+ * 
+ * Endpoints:
+ * - POST /api/matches: send like/super-like (auto-match if mutual)
+ * - POST /api/matches/dislike: record skip/dislike
+ * - GET /api/matches/super-like-status: check quota (1/ngày)
+ * - GET /api/matches/sent, /received, /matched: queries
+ */
 @RestController
 @RequestMapping("/api/matches")
 @RequiredArgsConstructor
 public class MatchRequestController {
     private final MatchRequestService matchService;
 
-    /** Gửi like / super like */
+    // ════════════════════════════════════════════════════════════════
+    // SEND MATCH REQUEST
+    // ════════════════════════════════════════════════════════════════
+    
+    /** 
+     * POST /api/matches: Gửi like/super-like
+     * 
+     * Auto-match: nếu mutual → ACCEPTED + create Match
+     * Super-like quota: 1/ngày/pet (reset 00:00)
+     */
     @PostMapping
     public ResponseEntity<MatchRequestResponse> send(
             @Valid @RequestBody MatchRequestDto req) {
@@ -28,7 +46,11 @@ public class MatchRequestController {
                 .body(matchService.sendRequest(req.getReceiverPetId(), isSuperLike));
     }
 
-    /** Ghi nhận bỏ qua (dislike) */
+    // ════════════════════════════════════════════════════════════════
+    // DISLIKE (SKIP)
+    // ════════════════════════════════════════════════════════════════
+    
+    /** POST /api/matches/dislike: Ghi nhận bỏ qua (skip) */
     @PostMapping("/dislike")
     public ResponseEntity<Void> recordDislike(
             @Valid @RequestBody DislikeRequestDto req) {
@@ -36,13 +58,29 @@ public class MatchRequestController {
         return ResponseEntity.noContent().build();
     }
 
-    /** Kiểm tra quota Super Like hôm nay */
+    // ════════════════════════════════════════════════════════════════
+    // SUPER LIKE STATUS
+    // ════════════════════════════════════════════════════════════════
+    
+    /** 
+     * GET /api/matches/super-like-status: Kiểm tra quota
+     * 
+     * Response: canSuperLike, nextResetAt (00:00 ngày mai), usedToday (0|1)
+     */
     @GetMapping("/super-like-status")
     public ResponseEntity<SuperLikeStatusResponse> superLikeStatus() {
         return ResponseEntity.ok(matchService.getSuperLikeStatus());
     }
 
-    /** Respond ACCEPTED / REJECTED (dùng cho manual mode nếu cần) */
+    // ════════════════════════════════════════════════════════════════
+    // MANUAL RESPOND
+    // ════════════════════════════════════════════════════════════════
+    
+    /** 
+     * PATCH /api/matches/{matchId}/respond: Manual accept/reject
+     * 
+     * (Thường không dùng vì auto-match; giữ cho flexibility)
+     */
     @PatchMapping("/{matchId}/respond")
     public ResponseEntity<MatchRequestResponse> respond(
             @PathVariable Long matchId,
@@ -50,19 +88,23 @@ public class MatchRequestController {
         return ResponseEntity.ok(matchService.respond(matchId, status));
     }
 
-    /** Danh sách match request mình đã gửi */
+    // ════════════════════════════════════════════════════════════════
+    // QUERIES
+    // ════════════════════════════════════════════════════════════════
+    
+    /** GET /api/matches/sent: Danh sách like mình đã gửi */
     @GetMapping("/sent")
     public ResponseEntity<List<MatchRequestResponse>> sent() {
         return ResponseEntity.ok(matchService.getMySentRequests());
     }
 
-    /** Ai đã like / super-like mình – super like xếp đầu */
+    /** GET /api/matches/received: Ai đã like mình (super-like first) */
     @GetMapping("/received")
     public ResponseEntity<List<MatchRequestResponse>> whoLikedMe() {
         return ResponseEntity.ok(matchService.getWhoLikedMe());
     }
 
-    /** Danh sách match thành công (mutual) */
+    /** GET /api/matches/matched: Danh sách match thành công (mutual + chat ready) */
     @GetMapping("/matched")
     public ResponseEntity<List<MatchRequestResponse>> matched() {
         return ResponseEntity.ok(matchService.getMyMatches());

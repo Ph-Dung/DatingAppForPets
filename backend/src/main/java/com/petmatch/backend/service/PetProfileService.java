@@ -32,6 +32,20 @@ import java.util.stream.Collectors;
 
 import static org.springframework.http.HttpStatus.*;
 
+/**
+ * 🐾 Dịch vụ: Quản lý hồ sơ thú cưng
+ * 
+ * Xử lý:
+ * - Tạo/cập nhật hồ sơ pet (name, species, breed, gender, age, weight, health)
+ * - Tìm kiếm + gợi ý (multi-filter: loài, giống, tuổi, cân nặng, sức khỏe, GPS)
+ * - Quản lý ảnh (upload Cloudinary, set avatar, delete)
+ * - Quản lý vaccine (add/update/delete + auto-update isVaccinated, lastVaccineDate)
+ * - Ẩn hồ sơ từ suggestions
+ * - AI smart suggestions khi user like ≥ 5 pet
+ * 
+ * GPS: Tính khoảng cách Haversine, filter suggestions theo radius (mặc định 50km)
+ * Cloudinary: Upload/delete ảnh từ Cloudinary API
+ */
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -44,7 +58,10 @@ public class PetProfileService {
     private final CloudinaryService cloudinaryService;
     private final AiMatchingService aiMatchingService;
 
-    // Helper lấy user hiện tại từ SecurityContext
+    // ════════════════════════════════════════════════════════════════
+    // HELPERS
+    // ════════════════════════════════════════════════════════════════
+    /** Lấy user hiện tại từ SecurityContext */
     private User currentUser() {
         String email = SecurityContextHolder.getContext()
                 .getAuthentication().getName();
@@ -52,12 +69,17 @@ public class PetProfileService {
                 .orElseThrow(() -> new AppException("User không tồn tại", NOT_FOUND));
     }
 
+    /** Lấy pet profile của user hiện tại */
     private PetProfile myPet() {
         return petProfileRepo.findByOwnerId(currentUser().getId())
                 .orElseThrow(() -> new AppException("Chưa có hồ sơ thú cưng", NOT_FOUND));
     }
 
-    // ── Profile CRUD ─────────────────────────────────────
+    // ════════════════════════════════════════════════════════════════
+    // PROFILE CRUD
+    // ════════════════════════════════════════════════════════════════
+    
+    /** Tạo hồ sơ pet mới (1 user chỉ có 1 pet) */
     public PetProfileResponse createProfile(PetProfileRequest req) {
         User user = currentUser();
         if (petProfileRepo.existsByOwnerId(user.getId()))
@@ -87,6 +109,7 @@ public class PetProfileService {
         return toResponse(petProfileRepo.save(pet));
     }
 
+    /** Cập nhật hồ sơ pet (owner/createdAt không thay đổi) */
     public PetProfileResponse updateProfile(PetProfileRequest req) {
         PetProfile pet = myPet();
 
@@ -110,6 +133,7 @@ public class PetProfileService {
         return toResponse(petProfileRepo.save(pet));
     }
 
+    /** Ẩn/hiện hồ sơ (toggle) */
     public void toggleHidden() {
         PetProfile pet = myPet();
         pet.setIsHidden(!pet.getIsHidden());
@@ -133,7 +157,14 @@ public class PetProfileService {
                 .orElseThrow(() -> new AppException("Người dùng chưa có thú cưng", NOT_FOUND)));
     }
 
-    // ── Suggestions & Search ─────────────────────────────
+    // ════════════════════════════════════════════════════════════════
+    // SUGGESTIONS & SEARCH
+    // ════════════════════════════════════════════════════════════════
+    
+    /** 
+     * Gợi ý: cùng loài, chưa swipe, chưa block, sắp xếp theo super-like
+     * Optional: filter theo distance (Haversine formula)
+     */
     @Transactional(readOnly = true)
     public Page<PetProfileResponse> getSuggestions(int page, int size, Double maxDistanceKm) {
         User user = currentUser();
@@ -162,9 +193,9 @@ public class PetProfileService {
                 .map(p -> toResponseWithUser(p, user));
     }
 
-    /**
-     * Smart suggestions: khi user đã có đủ 5 likes, sort theo AI score.
-     * Nếu chưa đủ (smart = false), fallback về suggestions bình thường.
+    /** 
+     * AI suggestions: khi đủ 5 likes → sort theo AI score
+     * Nếu chưa đủ → fallback suggestions bình thường
      */
     @Transactional(readOnly = true)
     public List<PetProfileResponse> getSmartSuggestions(int page, int size, Double maxDistanceKm) {
@@ -190,6 +221,10 @@ public class PetProfileService {
                 .collect(Collectors.toList());
     }
 
+    /** 
+     * Tìm kiếm với nhiều filter: loài, giống, giới tính, tuổi, cân nặng, sức khỏe, mục đích
+     * Tính toán dateOfBirth range từ minAge/maxAge
+     */
     @Transactional(readOnly = true)
     public Page<PetProfileResponse> search(String species, String breed,
                                            Gender gender, LookingFor lookingFor,
@@ -241,7 +276,11 @@ public class PetProfileService {
                 .map(p -> toResponseWithUser(p, user));
     }
 
-    // ── Vaccination CRUD ──────────────────────────────────
+    // ════════════════════════════════════════════════════════════════
+    // VACCINATION CRUD
+    // ════════════════════════════════════════════════════════════════
+    
+    /** Thêm vaccine: auto-update isVaccinated=true, lastVaccineDate=max(...) */
     public VaccinationResponse addVaccination(PetVaccinationRequest req) {
         PetProfile pet = myPet();
         PetVaccination v = PetVaccination.builder()
@@ -253,7 +292,7 @@ public class PetProfileService {
                 .notes(req.getNotes())
                 .build();
 
-        // Cập nhật is_vaccinated + ngày tiêm gần nhất
+        // Auto-update: isVaccinated=true, lastVaccineDate=max(vaccinatedDate)
         pet.setIsVaccinated(true);
         if (pet.getLastVaccineDate() == null ||
                 req.getVaccinatedDate().isAfter(pet.getLastVaccineDate())) {
@@ -263,6 +302,7 @@ public class PetProfileService {
         return toVaccinationResponse(vaccinationRepo.save(v));
     }
 
+    /** Cập nhật vaccine: recalculate lastVaccineDate */
     public VaccinationResponse updateVaccination(Long vacId, PetVaccinationRequest req) {
         PetProfile pet = myPet();
         PetVaccination v = vaccinationRepo.findByIdAndPetId(vacId, pet.getId())
@@ -274,7 +314,7 @@ public class PetProfileService {
         v.setClinicName(req.getClinicName());
         v.setNotes(req.getNotes());
 
-        // Recalculate lastVaccineDate
+        // Recalculate: tìm date tiêm gần nhất
         vaccinationRepo.findByPetIdOrderByVaccinatedDateDesc(pet.getId()).stream()
                 .findFirst()
                 .ifPresent(latest -> pet.setLastVaccineDate(latest.getVaccinatedDate()));
@@ -283,13 +323,13 @@ public class PetProfileService {
         return toVaccinationResponse(vaccinationRepo.save(v));
     }
 
+    /** Xóa vaccine: nếu không còn → isVaccinated=false, lastVaccineDate=null */
     public void deleteVaccination(Long vacId) {
         PetProfile pet = myPet();
         PetVaccination v = vaccinationRepo.findByIdAndPetId(vacId, pet.getId())
                 .orElseThrow(() -> new AppException("Không tìm thấy bản ghi vaccine", NOT_FOUND));
         vaccinationRepo.delete(v);
 
-        // Recalculate isVaccinated + lastVaccineDate
         List<PetVaccination> remaining = vaccinationRepo.findByPetIdOrderByVaccinatedDateDesc(pet.getId());
         if (remaining.isEmpty()) {
             pet.setIsVaccinated(false);
@@ -307,7 +347,11 @@ public class PetProfileService {
                 .stream().map(this::toVaccinationResponse).toList();
     }
 
-    // ── Photos ───────────────────────────────────────────
+    // ════════════════════════════════════════════════════════════════
+    // PHOTOS CRUD
+    // ════════════════════════════════════════════════════════════════
+    
+    /** Thêm ảnh: max 10 ảnh/pet, nếu setAsAvatar → old avatar mất flag */
     public PetPhoto addPhoto(String photoUrl, boolean setAsAvatar) {
         PetProfile pet = myPet();
 
@@ -324,6 +368,7 @@ public class PetProfileService {
         return petPhotoRepo.save(photo);
     }
 
+    /** Xóa ảnh: xóa khỏi Cloudinary + database */
     public void deletePhoto(Long photoId) {
         PetPhoto photo = petPhotoRepo.findById(photoId)
                 .orElseThrow(() -> new AppException("Không tìm thấy ảnh", NOT_FOUND));
@@ -335,7 +380,11 @@ public class PetProfileService {
         petPhotoRepo.delete(photo);
     }
 
-    // ── Mappers ───────────────────────────────────────────
+    // ════════════════════════════════════════════════════════════════
+    // MAPPERS: Entity → DTO
+    // ════════════════════════════════════════════════════════════════
+    
+    /** Convert PetProfile → Response (lấy currentUser từ SecurityContext) */
     private PetProfileResponse toResponse(PetProfile p) {
         User currentUser = null;
         try {
@@ -345,6 +394,10 @@ public class PetProfileService {
         return toResponseWithUser(p, currentUser);
     }
 
+    /** 
+     * Convert PetProfile → Response với user context
+     * Tính: age, avatar, distanceKm, vaccineCount, photoUrls...
+     */
     private PetProfileResponse toResponseWithUser(PetProfile p, User currentUser) {
         String avatarUrl = petPhotoRepo.findByPetIdAndIsAvatarTrue(p.getId())
                 .map(PetPhoto::getPhotoUrl).orElse(null);
@@ -354,11 +407,13 @@ public class PetProfileService {
                 .stream().map(ph -> PetPhotoDto.builder().id(ph.getId()).url(ph.getPhotoUrl()).build()).toList();
         int vacCount = (int) vaccinationRepo.countByPetId(p.getId());
 
+        // Tính age từ dateOfBirth
         Integer age = null;
         if (p.getDateOfBirth() != null) {
             age = Period.between(p.getDateOfBirth(), LocalDate.now()).getYears();
         }
 
+        // Tính distance (km) nếu có GPS
         Double distanceKm = null;
         if (currentUser != null && currentUser.getLatitude() != null
                 && p.getOwner().getLatitude() != null) {
@@ -399,9 +454,9 @@ public class PetProfileService {
                 .build();
     }
 
-    /** Haversine formula: trả về khoảng cách km giữa 2 điểm lat/lon */
+    /** Haversine formula: tính khoảng cách (km) giữa 2 điểm GPS */
     private static double haversineKm(double lat1, double lon1, double lat2, double lon2) {
-        final double R = 6371.0;
+        final double R = 6371.0;  // Bán kính Trái đất (km)
         double dLat = Math.toRadians(lat2 - lat1);
         double dLon = Math.toRadians(lon2 - lon1);
         double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)

@@ -24,6 +24,15 @@ import java.util.Optional;
 
 import static org.springframework.http.HttpStatus.*;
 
+/**
+ * Service xử lý ghép đôi (pet-level) + chat (user-level)
+ * 
+ * Nghiệp vụ chính:
+ * - Like/Super Like (quota: 1/ngày)
+ * - Auto-match Tinder: nếu mutual → ACCEPTED + create Match
+ * - Dislike (bỏ qua, không suggest lại)
+ * - Manual respond (accept/reject)
+ */
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -38,6 +47,10 @@ public class MatchRequestService {
     private final UserRepository userRepo;
     private final AiMatchingService aiMatchingService;
 
+    // ════════════════════════════════════════════════════════════════
+    // HELPERS
+    // ════════════════════════════════════════════════════════════════
+    
     private User currentUser() {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         return userRepo.findByEmail(email)
@@ -59,7 +72,14 @@ public class MatchRequestService {
                 .map(PetPhoto::getPhotoUrl).orElse(null);
     }
 
-    // ── Super Like Status ─────────────────────────────────
+    // ════════════════════════════════════════════════════════════════
+    // SUPER LIKE QUOTA
+    // ════════════════════════════════════════════════════════════════
+    
+    /** 
+     * Kiểm tra quota Super Like: 1 lần/ngày/pet
+     * Reset lúc 00:00 hôm nay (localDate.atStartOfDay())
+     */
     @Transactional(readOnly = true)
     public SuperLikeStatusResponse getSuperLikeStatus() {
         PetProfile pet = myPet();
@@ -74,11 +94,25 @@ public class MatchRequestService {
                 .build();
     }
 
-    // ── Send Match Request (Like / Super Like / Discard) ──
+    // ════════════════════════════════════════════════════════════════
+    // SEND MATCH REQUEST (LIKE / SUPER LIKE)
+    // ════════════════════════════════════════════════════════════════
+    
+    /** 
+     * Gửi like/super like + TỰ ĐỘNG AUTO-MATCH nếu mutual
+     * 
+     * Logic:
+     * 1. Validate: không self, không duplicate, không block
+     * 2. Super like quota check (max 1/ngày)
+     * 3. Tạo MatchRequest (status=PENDING)
+     * 4. Kiểm tra reverse: nếu receiver đã like sender → auto ACCEPTED + tạo Match
+     * 5. Update AI preferences
+     */
     public MatchRequestResponse sendRequest(Long receiverPetId, boolean isSuperLike) {
         PetProfile sender   = myPet();
         PetProfile receiver = requirePet(receiverPetId);
 
+        // ── Validation ───────────────────────────────────────
         if (sender.getId().equals(receiverPetId))
             throw new AppException("Không thể gửi cho chính mình", BAD_REQUEST);
 
@@ -89,14 +123,15 @@ public class MatchRequestService {
         if (matchRepo.existsBySenderPetIdAndReceiverPetId(sender.getId(), receiverPetId))
             throw new AppException("Đã gửi yêu cầu trước đó", CONFLICT);
 
-        // Validate super like quota (1 lần/ngày)
+        // ── Super Like quota check ───────────────────────────
         if (isSuperLike) {
             LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
             if (matchRepo.existsBySenderPetIdAndIsSuperLikeTrueAndCreatedAtAfter(
                     sender.getId(), startOfDay))
-                throw new AppException("Bạn đã dùng Super Like hôm nay rồi. Hãy quay lại vào ngày mai!", BAD_REQUEST);
+                throw new AppException("Đã dùng Super Like hôm nay rồi. Hãy quay lại ngày mai!", BAD_REQUEST);
         }
 
+        // ── Create MatchRequest ──────────────────────────────
         MatchRequest req = MatchRequest.builder()
                 .senderPet(sender)
                 .receiverPet(receiver)
@@ -106,8 +141,8 @@ public class MatchRequestService {
 
         MatchRequest saved = matchRepo.save(req);
 
-        // ── Tinder-style auto-match ────────────────────────
-        // Nếu bên kia đã like mình trước → auto ACCEPTED cả 2
+        // ── Tinder-style AUTO-MATCH ─────────────────────────
+        // Nếu receiver đã like sender trước → cả 2 thành ACCEPTED
         Optional<MatchRequest> reverse = matchRepo.findBySenderPetIdAndReceiverPetId(
                 receiverPetId, sender.getId());
         if (reverse.isPresent() && reverse.get().getStatus() == MatchStatus.PENDING) {
@@ -116,18 +151,25 @@ public class MatchRequestService {
             matchRepo.save(reverse.get());
             matchRepo.save(saved);
             
-            // ── Create User-level Match for chat ───────────────────────
+            // ── Create User-level Match để cho phép chat ─────
             createOrUpdateUserMatch(sender.getOwner(), receiver.getOwner());
         }
 
-        // ── Cập nhật preference cho AI scoring ───────────────
+        // ── Update AI preferences ────────────────────────────
         try { aiMatchingService.updatePreferences(sender.getId()); }
-        catch (Exception ignored) { /* không block luồng chính */ }
+        catch (Exception ignored) { /* không block */ }
 
         return toResponse(saved);
     }
 
-    // ── Record Dislike (bỏ qua) ───────────────────────────
+    // ════════════════════════════════════════════════════════════════
+    // DISLIKE (BỎ QUA, SKIP)
+    // ════════════════════════════════════════════════════════════════
+    
+    /** 
+     * Bỏ qua pet: ghi Dislike record
+     * Lần sau không suggest lại pet này cho user
+     */
     public void recordDislike(Long dislikedPetId) {
         PetProfile dislikerPet = myPet();
         PetProfile dislikedPet = requirePet(dislikedPetId);
@@ -135,11 +177,9 @@ public class MatchRequestService {
         if (dislikerPet.getId().equals(dislikedPetId))
             throw new AppException("Không thể bỏ qua chính mình", BAD_REQUEST);
 
-        // Kiểm tra đã bỏ qua chưa
         if (dislikeRepo.existsByDislikerPetIdAndDislikedPetId(dislikerPet.getId(), dislikedPetId))
             throw new AppException("Đã bỏ qua rồi", CONFLICT);
 
-        // Tạo Dislike record
         Dislike dislike = Dislike.builder()
                 .dislikerPet(dislikerPet)
                 .dislikedPet(dislikedPet)
@@ -148,12 +188,12 @@ public class MatchRequestService {
         dislikeRepo.save(dislike);
     }
 
-    /**
-     * Tạo Match record giữa 2 user nếu chưa tồn tại,
-     * để cho chat list có thể hiển thị cuộc trò chuyện.
-     */
+    // ════════════════════════════════════════════════════════════════
+    // USER-LEVEL MATCH (FOR CHAT)
+    // ════════════════════════════════════════════════════════════════
+    
+    /** Tạo Match (user-level) để cho phép chat/call */
     private void createOrUpdateUserMatch(User user1, User user2) {
-        // Kiểm tra Match đã tồn tại chưa (2 chiều)
         boolean matchExists = matchRepository.findMatchByUserIds(user1.getId(), user2.getId()).isPresent();
         
         if (!matchExists) {
@@ -165,7 +205,11 @@ public class MatchRequestService {
         }
     }
 
-    // ── Respond (vẫn giữ cho trường hợp manual nếu cần) ───
+    // ════════════════════════════════════════════════════════════════
+    // RESPOND (MANUAL)
+    // ════════════════════════════════════════════════════════════════
+    
+    /** Manual respond: accept hoặc reject (nếu không auto-match) */
     public MatchRequestResponse respond(Long matchId, MatchStatus newStatus) {
         MatchRequest match = matchRepo.findById(matchId)
                 .orElseThrow(() -> new AppException("Không tìm thấy yêu cầu", NOT_FOUND));
@@ -179,7 +223,7 @@ public class MatchRequestService {
         match.setStatus(newStatus);
         MatchRequest saved = matchRepo.save(match);
         
-        // ── Nếu ACCEPTED, tạo user-level Match cho chat ─────────────────
+        // Nếu accept → tạo Match để chat
         if (newStatus == MatchStatus.ACCEPTED) {
             createOrUpdateUserMatch(match.getSenderPet().getOwner(), match.getReceiverPet().getOwner());
         }
@@ -187,14 +231,18 @@ public class MatchRequestService {
         return toResponse(saved);
     }
 
-    // ── Lists ─────────────────────────────────────────────
+    // ════════════════════════════════════════════════════════════════
+    // QUERIES
+    // ════════════════════════════════════════════════════════════════
+    
+    /** Danh sách đã gửi like → tìm response */
     @Transactional(readOnly = true)
     public List<MatchRequestResponse> getMySentRequests() {
         return matchRepo.findBySenderPetIdOrderByCreatedAtDesc(myPet().getId())
                 .stream().map(this::toResponse).toList();
     }
 
-    /** Ai đã like/super-like mình – super like xếp trước */
+    /** Ai đã like mình → super like xếp trước (notification) */
     @Transactional(readOnly = true)
     public List<MatchRequestResponse> getWhoLikedMe() {
         return matchRepo.findByReceiverPetIdOrderByIsSuperLikeDescCreatedAtDesc(myPet().getId())
@@ -203,18 +251,24 @@ public class MatchRequestService {
                 .map(this::toResponse).toList();
     }
 
+    /** Danh sách match thành công (mutual accepted) → có thể chat */
     @Transactional(readOnly = true)
     public List<MatchRequestResponse> getMyMatches() {
         return matchRepo.findAcceptedByPetId(myPet().getId())
                 .stream().map(this::toResponse).toList();
     }
 
-    // ── Helper ────────────────────────────────────────────
+    // ════════════════════════════════════════════════════════════════
+    // MAPPERS & HELPERS
+    // ════════════════════════════════════════════════════════════════
+    
+    /** Kiểm tra mutual match: cả 2 chiều ACCEPTED */
     private boolean isMutual(MatchRequest m) {
         return matchRepo.isMatched(m.getSenderPet().getId(), m.getReceiverPet().getId())
                 && matchRepo.isMatched(m.getReceiverPet().getId(), m.getSenderPet().getId());
     }
 
+    /** Convert entity → DTO + avatar + canOpenConversation */
     private MatchRequestResponse toResponse(MatchRequest m) {
         return MatchRequestResponse.builder()
                 .id(m.getId())
@@ -231,7 +285,11 @@ public class MatchRequestService {
                 .build();
     }
 
-    // ── Data Migration for existing Matches ─────────────────
+    // ════════════════════════════════════════════════════════════════
+    // DATA MIGRATION (ApplicationReady)
+    // ════════════════════════════════════════════════════════════════
+    
+    /** Sync old data: khi app start → sync ACCEPTED requests thành Match */
     @org.springframework.context.event.EventListener(org.springframework.boot.context.event.ApplicationReadyEvent.class)
     @Transactional
     public void syncOldMatches() {

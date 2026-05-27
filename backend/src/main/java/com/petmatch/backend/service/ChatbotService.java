@@ -35,6 +35,22 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * 🤖 Dịch vụ: Chatbot hỗ trợ ghép đôi (AI tương tác tiếng Việt)
+ * 
+ * Xử lý:
+ * - Gửi tin nhắn (+ lịch sử chat) tới OpenAI GPT-4o-mini
+ * - Phân tích intent: trả lời Q&A hoặc kích hoạt search
+ * - Parse JSON từ AI: nếu action=SEARCH → query database + return suggestions
+ * - Tính khoảng cách Haversine để filter theo vị trí
+ * 
+ * Flow:
+ * 1. User: "Tôi muốn tìm chó cái Poodle 1-3 tuổi"
+ * 2. AI: Phân tích, trích filters, return JSON {action: SEARCH, species: Dog, ...}
+ * 3. Backend: Parse JSON → query DB → return PetProfileResponse[]
+ * 
+ * Lưu ý: Không lưu history vào DB (stateless, client gửi lại toàn bộ chat mỗi request)
+ */
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)

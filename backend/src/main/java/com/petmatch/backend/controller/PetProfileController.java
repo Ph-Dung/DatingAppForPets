@@ -20,6 +20,17 @@ import org.springframework.web.multipart.MultipartFile;
 import java.math.BigDecimal;
 import java.util.List;
 
+/**
+ * Controller: Pet Profile CRUD, suggestions, search, vaccine, photos
+ * 
+ * Endpoints:
+ * - POST/PUT /api/pets: create/update pet profile
+ * - GET /api/pets/me: lấy hồ sơ của chính mình
+ * - GET /api/pets/suggestions: gợi ý (basic hoặc smart AI)
+ * - GET /api/pets/search: tìm kiếm nâng cao
+ * - POST/GET/PUT/DELETE /api/pets/vaccinations: vaccine CRUD
+ * - POST/DELETE /api/pets/photos: photo CRUD + upload Cloudinary
+ */
 @RestController
 @RequestMapping("/api/pets")
 @RequiredArgsConstructor
@@ -27,41 +38,60 @@ public class PetProfileController {
     private final PetProfileService petService;
     private final CloudinaryService cloudinaryService;
 
-    // ── Profile ──────────────────────────────────────────
+    // ════════════════════════════════════════════════════════════════
+    // PROFILE CRUD
+    // ════════════════════════════════════════════════════════════════
+    
+    /** POST /api/pets: Tạo hồ sơ pet mới (1 user = 1 pet) */
     @PostMapping
     public ResponseEntity<PetProfileResponse> create(
             @Valid @RequestBody PetProfileRequest req) {
         return ResponseEntity.status(201).body(petService.createProfile(req));
     }
 
+    /** PUT /api/pets: Cập nhật hồ sơ (owner/createdAt không thay đổi) */
     @PutMapping
     public ResponseEntity<PetProfileResponse> update(
             @Valid @RequestBody PetProfileRequest req) {
         return ResponseEntity.ok(petService.updateProfile(req));
     }
 
+    /** GET /api/pets/me: Lấy hồ sơ của chính mình */
     @GetMapping("/me")
     public ResponseEntity<PetProfileResponse> getMyProfile() {
         return ResponseEntity.ok(petService.getMyProfile());
     }
 
+    /** GET /api/pets/{petId}: Lấy hồ sơ by petId */
     @GetMapping("/{petId}")
     public ResponseEntity<PetProfileResponse> getById(@PathVariable Long petId) {
         return ResponseEntity.ok(petService.getById(petId));
     }
 
+    /** GET /api/pets/user/{userId}: Lấy hồ sơ of user */
     @GetMapping("/user/{userId}")
     public ResponseEntity<PetProfileResponse> getByUserId(@PathVariable Long userId) {
         return ResponseEntity.ok(petService.getByUserId(userId));
     }
 
+    /** PATCH /api/pets/toggle-hidden: Ẩn/hiện hồ sơ từ gợi ý */
     @PatchMapping("/toggle-hidden")
     public ResponseEntity<Void> toggleHidden() {
         petService.toggleHidden();
         return ResponseEntity.noContent().build();
     }
 
-    // ── Suggestions & Search ─────────────────────────────
+    // ════════════════════════════════════════════════════════════════
+    // SUGGESTIONS & SEARCH
+    // ════════════════════════════════════════════════════════════════
+    
+    /** 
+     * GET /api/pets/suggestions: Gợi ý cùng loài
+     * 
+     * Params:
+     * - smart=true: AI sorting (nếu ≥5 likes); false: random
+     * - maxDistanceKm: filter by location (haversine)
+     */
     @GetMapping("/suggestions")
     public ResponseEntity<?> suggestions(
             @RequestParam(defaultValue = "0")  int page,
@@ -74,6 +104,14 @@ public class PetProfileController {
         return ResponseEntity.ok(petService.getSuggestions(page, size, maxDistanceKm));
     }
 
+    /** 
+     * GET /api/pets/search: Tìm kiếm nâng cao
+     * 
+     * Filters (tất cả optional):
+     * - species, breed, gender, lookingFor, healthStatus
+     * - minWeight, maxWeight, minAge, maxAge
+     * - maxDistanceKm (location)
+     */
     @GetMapping("/search")
     public ResponseEntity<Page<PetProfileResponse>> search(
             @RequestParam(required = false) String species,
@@ -94,18 +132,24 @@ public class PetProfileController {
                         maxDistanceKm, page, size));
     }
 
-    // ── Vaccinations ─────────────────────────────────────
+    // ════════════════════════════════════════════════════════════════
+    // VACCINE CRUD
+    // ════════════════════════════════════════════════════════════════
+    
+    /** POST /api/pets/vaccinations: Thêm vaccine record */
     @PostMapping("/vaccinations")
     public ResponseEntity<VaccinationResponse> addVaccination(
             @Valid @RequestBody PetVaccinationRequest req) {
         return ResponseEntity.status(201).body(petService.addVaccination(req));
     }
 
+    /** GET /api/pets/vaccinations: Danh sách vaccine (DESC by date) */
     @GetMapping("/vaccinations")
     public ResponseEntity<List<VaccinationResponse>> getVaccinations() {
         return ResponseEntity.ok(petService.getVaccinations());
     }
 
+    /** PUT /api/pets/vaccinations/{vacId}: Cập nhật vaccine */
     @PutMapping("/vaccinations/{vacId}")
     public ResponseEntity<VaccinationResponse> updateVaccination(
             @PathVariable Long vacId,
@@ -113,13 +157,25 @@ public class PetProfileController {
         return ResponseEntity.ok(petService.updateVaccination(vacId, req));
     }
 
+    /** DELETE /api/pets/vaccinations/{vacId}: Xóa vaccine */
     @DeleteMapping("/vaccinations/{vacId}")
     public ResponseEntity<Void> deleteVaccination(@PathVariable Long vacId) {
         petService.deleteVaccination(vacId);
         return ResponseEntity.noContent().build();
     }
 
-    // ── Photos ───────────────────────────────────────────
+    // ════════════════════════════════════════════════════════════════
+    // PHOTO CRUD
+    // ════════════════════════════════════════════════════════════════
+    
+    /** 
+     * POST /api/pets/photos: Upload ảnh + set as avatar
+     * 
+     * Multipart upload to Cloudinary
+     * Params:
+     * - file: MultipartFile
+     * - setAsAvatar: true → replace old avatar
+     */
     @PostMapping("/photos")
     public ResponseEntity<PetPhoto> addPhoto(
             @RequestParam("file") MultipartFile file,
@@ -129,6 +185,7 @@ public class PetProfileController {
                 .body(petService.addPhoto(photoUrl, setAsAvatar));
     }
 
+    /** DELETE /api/pets/photos/{photoId}: Xóa ảnh (từ Cloudinary + DB) */
     @DeleteMapping("/photos/{photoId}")
     public ResponseEntity<Void> deletePhoto(@PathVariable Long photoId) {
         petService.deletePhoto(photoId);
