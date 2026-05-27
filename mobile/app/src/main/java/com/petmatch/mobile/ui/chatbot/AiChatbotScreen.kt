@@ -230,7 +230,6 @@ fun AiChatbotScreen(
                                 pet = pet,
                                 onLike = {
                                     petVm.sendLikeFromChatbot(ctx, pet.id)
-                                    navController.navigate(Routes.petDetail(pet.id))
                                 },
                                 onViewDetail = {
                                     navController.navigate(Routes.petDetail(pet.id))
@@ -315,6 +314,8 @@ private fun SuggestedPetCard(
     onLike: () -> Unit,
     onViewDetail: () -> Unit
 ) {
+    var isLiked by remember { mutableStateOf(false) }
+    
     Card(
         modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
         shape = RoundedCornerShape(20.dp),
@@ -405,14 +406,20 @@ private fun SuggestedPetCard(
                     Text("Chi tiết", fontWeight = FontWeight.Bold)
                 }
                 Button(
-                    onClick = onLike,
+                    onClick = {
+                        isLiked = true
+                        onLike()
+                    },
                     modifier = Modifier.weight(1f).height(48.dp),
                     shape = RoundedCornerShape(24.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = LikeGreen)
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isLiked) LikeGreen.copy(alpha = 0.6f) else LikeGreen
+                    ),
+                    enabled = !isLiked
                 ) {
                     Icon(Icons.Default.Favorite, null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Thích", fontWeight = FontWeight.Bold)
+                    Text(if (isLiked) "Đã thích" else "Thích", fontWeight = FontWeight.Bold)
                 }
             }
         }

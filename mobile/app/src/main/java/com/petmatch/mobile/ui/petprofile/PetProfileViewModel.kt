@@ -151,10 +151,17 @@ class PetProfileViewModel : ViewModel() {
     /** Gửi like từ màn hình chatbot (không cần MatchViewModel) */
     fun sendLikeFromChatbot(ctx: Context, receiverPetId: Long) = viewModelScope.launch {
         try {
-            RetrofitClient.matchApi(ctx).sendMatchRequest(
+            val res = RetrofitClient.matchApi(ctx).sendMatchRequest(
                 com.petmatch.mobile.data.model.SendMatchRequest(receiverPetId, false)
             )
-        } catch (_: Exception) {}
+            if (res.isSuccessful) {
+                android.widget.Toast.makeText(ctx, "Đã thích 💚", android.widget.Toast.LENGTH_SHORT).show()
+            } else {
+                android.widget.Toast.makeText(ctx, "Không thể gửi lượt thích", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        } catch (e: Exception) {
+            android.widget.Toast.makeText(ctx, "Gặp lỗi: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+        }
     }
 
     fun resetAction() { _actionState.value = ActionState.Idle }

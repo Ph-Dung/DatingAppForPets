@@ -16,6 +16,14 @@ import java.util.List;
 
 import static org.springframework.http.HttpStatus.*;
 
+/**
+ * Dịch vụ: Tương tác người dùng (Bài viết nhữn xét, Chặn, Báo cáo)
+ * 
+ * Xử lý:
+ * - Chặn người dùng (ngăn giao tiếp/hiển thị)
+ * - Báo cáo lạm dụng/spam (quy trình kiểm duyệt)
+ * - Nhữn xét (phản hồi sau khi ghép nối)
+ */
 @Service
 @RequiredArgsConstructor
 public class InteractionService {
@@ -29,13 +37,19 @@ public class InteractionService {
     private final com.petmatch.backend.repository.PetProfileRepository petProfileRepo;
     private final com.petmatch.backend.repository.PetPhotoRepository petPhotoRepo;
 
+    // ════════════════════════════════════════════════════════════════
+    // TRỢ GIÙP
+    // ════════════════════════════════════════════════════════════════
+    
     private User currentUser() {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new AppException("User không tồn tại", NOT_FOUND));
     }
 
-    // ── REVIEWS ──────────────────────────────────────────
+    // ════════════════════════════════════════════════════════════════
+    // NHẺN XÉT (PHẢN HồI SAU GHÉP NỐI)
+    // ════════════════════════════════════════════════════════════════
     @Transactional
     public Review createReview(Long revieweeId, ReviewRequest request) {
         User reviewer = currentUser();
@@ -82,7 +96,19 @@ public class InteractionService {
         return reviewRepository.findByRevieweeOrderByCreatedAtDesc(user);
     }
 
-    // ── BLOCKS ───────────────────────────────────────────
+    // ════════════════════════════════════════════════════════════════
+    // CHẶN NGưỚI DÙNG (NGĂN GIAO TIếP/HIỄN THị)
+    // ════════════════════════════════════════════════════════════════
+    
+    /** 
+     * Chặn người dùng (chặn hoàn toàn hoặc chặn cấp độ)
+     * 
+     * Logic:
+     * - Người chặn không thấy hồ sơ người bị chặn
+     * - Người bị chặn không thể gửi tin nhắn cho người chặn
+     * - Người bị chặn bị lọc khỏi danh sách gợi ý của người chặn
+     * - Nếu đã chặn → cập nhật mức độ
+     */
     @Transactional
     public Block blockUser(Long targetUserId, com.petmatch.backend.entity.BlockLevel level) {
         User blocker = currentUser();
@@ -95,7 +121,7 @@ public class InteractionService {
         com.petmatch.backend.entity.BlockLevel effectiveLevel =
                 (level != null) ? level : com.petmatch.backend.entity.BlockLevel.ALL;
 
-        // Nếu đã chặn thì cập nhật level mới
+        // ── Update if already blocked ──────────────────────────────────
         blockRepository.findByBlockerAndBlocked(blocker, blocked).ifPresent(existing -> {
             existing.setLevel(effectiveLevel);
             blockRepository.save(existing);
@@ -112,6 +138,7 @@ public class InteractionService {
                 .build());
     }
 
+    /** Xóa bản ghi chặn - user có thể thấy/nhắn tin nhắn lại */
     @Transactional
     public void unblockUser(Long targetUserId) {
         User blocker = currentUser();
@@ -119,6 +146,7 @@ public class InteractionService {
                 .ifPresent(blockRepository::delete);
     }
 
+    /** Danh sách tất cả người dùng bị user hiện tại chặn (với đại diện + timestamps) */
     @Transactional(readOnly = true)
     public List<com.petmatch.backend.dto.response.BlockResponse> getMyBlocks() {
         return blockRepository.findByBlocker(currentUser()).stream()
@@ -132,6 +160,7 @@ public class InteractionService {
                 .collect(java.util.stream.Collectors.toList());
     }
 
+    /** Lấy đại diện thú cưng ngưỚi dùng qua PetProfile → PetPhoto tra cứu */
     private String getAvatarForUser(Long userId) {
         // Find avatar via PetPhoto
         return userRepository.findById(userId)
@@ -141,7 +170,19 @@ public class InteractionService {
                 .orElse(null);
     }
 
-    // ── REPORTS ──────────────────────────────────────────
+    // ════════════════════════════════════════════════════════════════
+    // BÁO CÁO (LẠM DụNG/SPAM KIểM DUYệT)
+    // ════════════════════════════════════════════════════════════════
+
+    /** 
+     * Gửi báo cáo làm dụng đế admin xem xét (quy trình kiểm duyệt)
+     * 
+     * Logic:
+     * - Tạo báo cáo với trạng thái PENDING
+     * - Xác thực targetType (USER/POST/COMMENT/PET_PROFILE)
+     * - Admin xem xét và thực hiện hành động (CẢNH_BÁO/TẠM_KHÓA/KHÓA/XÓA)
+     * - Trạng thái: PENDING → RESOLVED/DISMISSED
+     */
     @Transactional
     public Report submitReport(ReportRequest req) {
         User reporter = currentUser();

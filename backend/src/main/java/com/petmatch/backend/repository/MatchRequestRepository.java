@@ -11,25 +11,48 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Repository: Query MatchRequest (pet-level ghép đôi)
+ * 
+ * Queries chính:
+ * - Duplicate check: existsBySenderPetIdAndReceiverPetId
+ * - Quota check: existsBySenderPetIdAndIsSuperLikeTrueAndCreatedAtAfter
+ * - Suggestions: findByReceiverPetIdOrderByIsSuperLikeDescCreatedAtDesc (super like first)
+ * - Mutual: isMatched (cả 2 chiều ACCEPTED)
+ */
 @Repository
 public interface MatchRequestRepository extends JpaRepository<MatchRequest, Long> {
 
-    // Kiểm tra đã gửi request chưa
+    // ════════════════════════════════════════════════════════════════
+    // VALIDATION QUERIES
+    // ════════════════════════════════════════════════════════════════
+    
+    /** Kiểm tra đã gửi request tới pet này chưa (tránh duplicate) */
     boolean existsBySenderPetIdAndReceiverPetId(Long senderPetId, Long receiverPetId);
 
-    // Danh sách request đã gửi
+    // ════════════════════════════════════════════════════════════════
+    // SUGGESTION QUERIES
+    // ════════════════════════════════════════════════════════════════
+    
+    /** Danh sách đã gửi like → tìm response */
     List<MatchRequest> findBySenderPetIdOrderByCreatedAtDesc(Long senderPetId);
 
-    // Danh sách request nhận được với status cụ thể
-    List<MatchRequest> findByReceiverPetIdAndStatusOrderByCreatedAtDesc(
-            Long receiverPetId, MatchStatus status);
-
-    // Ai đã like/super-like mình → super like xếp trước, rồi theo thời gian mới nhất
+    /** Ai đã like/super-like mình → super like xếp trước, rồi mới nhất */
     List<MatchRequest> findByReceiverPetIdOrderByIsSuperLikeDescCreatedAtDesc(Long receiverPetId);
 
-                void deleteBySenderPetIdOrReceiverPetId(Long senderPetId, Long receiverPetId);
+    // ════════════════════════════════════════════════════════════════
+    // SUPER LIKE QUOTA QUERIES
+    // ════════════════════════════════════════════════════════════════
+    
+    /** Kiểm tra hôm nay đã dùng super like chưa (quota: 1/ngày) */
+    boolean existsBySenderPetIdAndIsSuperLikeTrueAndCreatedAtAfter(
+            Long senderPetId, LocalDateTime since);
 
-    // Kiểm tra 2 pet có mutual match không (cả 2 đều accepted)
+    // ════════════════════════════════════════════════════════════════
+    // MUTUAL MATCH QUERIES
+    // ════════════════════════════════════════════════════════════════
+    
+    /** Kiểm tra 2 pet có mutual match không (A ACCEPTED B AND B ACCEPTED A) */
     @Query("""
         SELECT CASE WHEN COUNT(m) > 0 THEN true ELSE false END
         FROM MatchRequest m
@@ -38,7 +61,7 @@ public interface MatchRequestRepository extends JpaRepository<MatchRequest, Long
         """)
     boolean isMatched(@Param("petA") Long petA, @Param("petB") Long petB);
 
-    // Lấy match thành công (cả 2 chiều)
+    /** Lấy danh sách match thành công (cả 2 chiều → có thể chat) */
     @Query("""
         SELECT m FROM MatchRequest m
         WHERE m.status = 'ACCEPTED'
@@ -46,18 +69,20 @@ public interface MatchRequestRepository extends JpaRepository<MatchRequest, Long
         """)
     List<MatchRequest> findAcceptedByPetId(@Param("petId") Long petId);
 
+    // ════════════════════════════════════════════════════════════════
+    // LOOKUP QUERIES
+    // ════════════════════════════════════════════════════════════════
+    
+    /** Tìm request 1 chiều: từ A sang B */
     Optional<MatchRequest> findBySenderPetIdAndReceiverPetId(
             Long senderPetId, Long receiverPetId);
 
-    // Kiểm tra hôm nay đã dùng super like chưa
-    boolean existsBySenderPetIdAndIsSuperLikeTrueAndCreatedAtAfter(
-            Long senderPetId, LocalDateTime since);
-
-    // Đếm số super like đã dùng từ thời điểm X
-    long countBySenderPetIdAndIsSuperLikeTrueAndCreatedAtAfter(
-            Long senderPetId, LocalDateTime since);
-
-    /** Lấy danh sách pets đã được like (để học preference) */
+    // ════════════════════════════════════════════════════════════════
+    // DELETE QUERIES
+    // ════════════════════════════════════════════════════════════════
+    
+    /** Xóa toàn bộ match của pet (khi xóa pet) */
+    void deleteBySenderPetIdOrReceiverPetId(Long senderPetId, Long receiverPetId);
     @Query("""
         SELECT m.receiverPet FROM MatchRequest m
         WHERE m.senderPet.id = :petId

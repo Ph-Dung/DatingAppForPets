@@ -17,6 +17,20 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/interactions")
 @RequiredArgsConstructor
+/**
+ * 🔗 API: Tương tác người dùng (nhận xét, chặn, báo cáo)
+ * 
+ * Endpoints:
+ * - POST /api/interactions/reviews/{revieweeId} - Viết nhận xét (sau khi chat)
+ * - GET /api/interactions/reviews/user/{userId} - Xem nhận xét của user
+ * - POST /api/interactions/blocks/{targetUserId} - Chặn user
+ * - DELETE /api/interactions/blocks/{targetUserId} - Gỡ chặn
+ * - GET /api/interactions/my-blocks - Danh sách "Người tôi chặn"
+ * - POST /api/interactions/report - Báo cáo lạm dụng/spam
+ * 
+ * Dependencies:
+ * - InteractionService: blockUser, unblockUser, getMyBlocks, submitReport, createReview
+ */
 public class InteractionController {
 
     private final InteractionService interactionService;
