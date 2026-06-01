@@ -24,7 +24,14 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Transactional
 public class AuthService {
-
+    /**
+     * Dịch vụ xác thực (Auth) xử lý:
+     * - Đăng ký người dùng mới (`register`)
+     * - Đăng nhập người dùng (`login`)
+     * - Đăng nhập admin (`loginAdmin`)
+     *
+     * Các thông báo lỗi đã được localize sang tiếng Việt.
+     */
     private final UserRepository userRepo;
     private final PetProfileRepository petProfileRepo;
     private final PasswordEncoder encoder;
@@ -60,8 +67,10 @@ public class AuthService {
             authManager.authenticate(
                     new UsernamePasswordAuthenticationToken(req.getEmail(), req.getPassword()));
         } catch (LockedException e) {
+            // Nếu tài khoản bị khoá bởi admin
             throw new AppException("Tài khoản đã bị khoá vui lòng liên hệ admin", HttpStatus.FORBIDDEN);
         } catch (BadCredentialsException e) {
+            // Sai email hoặc mật khẩu
             throw new AppException("Email hoặc mật khẩu không đúng", HttpStatus.UNAUTHORIZED);
         }
 
@@ -98,6 +107,7 @@ public class AuthService {
             throw new AppException("Tài khoản đã bị khoá vui lòng liên hệ admin", HttpStatus.FORBIDDEN);
 
         if (user.getRole() != Role.ADMIN)
+            // Không phải admin → từ chối
             throw new AppException("Tài khoản không có quyền admin", HttpStatus.FORBIDDEN);
 
         String token = jwtUtil.generateToken(user.getEmail(), user.getId());

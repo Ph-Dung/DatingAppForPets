@@ -143,7 +143,8 @@ data class RegisterRequest(
     val password: String,
     val phone: String? = null
 )
-
+// Ghi chú: các lớp trên liên quan tới xác thực.
+// `AuthResponse` chứa token JWT và thông tin cơ bản của user.
 // ── User Account ──────────────────────────────────────────
 data class UserResponse(
     val id: Long,

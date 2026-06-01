@@ -1,5 +1,10 @@
 package com.petmatch.mobile.ui.auth
 
+/**
+ * ViewModel xử lý logic xác thực cho mobile client.
+ * - `login` và `register` gọi API backend, lưu token vào DataStore.
+ * - Trả về `AuthState` với trạng thái Loading/Success/Error để UI quan sát.
+ */
 import android.content.Context
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey

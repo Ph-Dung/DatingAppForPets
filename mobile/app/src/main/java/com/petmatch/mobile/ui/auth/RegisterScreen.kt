@@ -1,5 +1,11 @@
 package com.petmatch.mobile.ui.auth
 
+/**
+ * Màn hình đăng ký (RegisterScreen).
+ * Giao diện này cho phép người dùng tạo tài khoản mới với:
+ * - Họ và tên, email, mật khẩu, xác nhận mật khẩu và số điện thoại (tùy chọn).
+ * - Hiển thị lỗi phía client cho mật khẩu ngắn và mật khẩu không khớp.
+ */
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape

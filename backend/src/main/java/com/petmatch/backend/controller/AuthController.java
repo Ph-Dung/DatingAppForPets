@@ -17,22 +17,28 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class AuthController {
     private final AuthService authService;
+    /**
+     * Controller xử lý xác thực người dùng (auth).
+     * Bao gồm các endpoint: đăng ký, đăng nhập người dùng thường và đăng nhập admin.
+     * Trả về `AuthResponse` chứa token JWT và thông tin cơ bản của user.
+     */
 
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(
             @Valid @RequestBody RegisterRequest req) {
+        // Đăng ký tài khoản mới, trả về token và thông tin người dùng
         return ResponseEntity.status(201).body(authService.register(req));
     }
-
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(
             @Valid @RequestBody LoginRequest req) {
+        // Đăng nhập user bình thường
         return ResponseEntity.ok(authService.login(req));
     }
-
     @PostMapping("/admin/login")
     public ResponseEntity<AuthResponse> loginAdmin(
             @Valid @RequestBody LoginRequest req) {
+        // Đăng nhập admin (kiểm tra role trước khi trả token admin)
         return ResponseEntity.ok(authService.loginAdmin(req));
     }
 }

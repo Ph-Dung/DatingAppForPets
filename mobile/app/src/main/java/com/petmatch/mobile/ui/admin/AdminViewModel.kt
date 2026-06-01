@@ -37,7 +37,11 @@ data class AdminUiState(
 )
 
 class AdminViewModel : ViewModel() {
-
+    /**
+     * ViewModel cho giao diện admin trên mobile.
+     * - Quản lý đăng nhập admin, tải dashboard, danh sách users/pets/reports
+     * - Thực hiện các hành động admin thông qua `AdminApi` (khoá user, cảnh cáo, xử lý báo cáo...)
+     */
     private val _authState = MutableStateFlow<AdminAuthState>(AdminAuthState.Idle)
     val authState: StateFlow<AdminAuthState> = _authState
 
